@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 )
 
 // +genclient
@@ -56,10 +55,6 @@ type AzureClusterProviderSpec struct {
 	// this never changes until ca is rotated
 	// do not move to status, since it uses on disk ca certs, which causes issues during regeneration
 	DiscoveryHashes []string `json:"discoveryHashes,omitempty"`
-
-	// ClusterConfiguration holds the cluster-wide information used during a
-	// kubeadm init call.
-	ClusterConfiguration kubeadmv1beta1.ClusterConfiguration `json:"clusterConfiguration,omitempty"`
 }
 
 // KeyPair is how operators can supply custom keypairs for kubeadm to use.

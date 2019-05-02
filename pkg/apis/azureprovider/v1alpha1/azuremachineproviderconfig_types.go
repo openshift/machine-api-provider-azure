@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 )
 
 // +genclient
@@ -48,17 +47,6 @@ type AzureMachineProviderSpec struct {
 	OSDisk        OSDisk `json:"osDisk"`
 	SSHPublicKey  string `json:"sshPublicKey"`
 	SSHPrivateKey string `json:"sshPrivateKey"`
-}
-
-// KubeadmConfiguration holds the various configurations that kubeadm uses.
-type KubeadmConfiguration struct {
-	// JoinConfiguration is used to customize any kubeadm join configuration
-	// parameters.
-	Join kubeadmv1beta1.JoinConfiguration `json:"join,omitempty"`
-
-	// InitConfiguration is used to customize any kubeadm init configuration
-	// parameters.
-	Init kubeadmv1beta1.InitConfiguration `json:"init,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
