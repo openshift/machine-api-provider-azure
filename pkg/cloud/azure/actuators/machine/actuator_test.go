@@ -162,6 +162,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
 		virtualMachinesExtSvc: fakeSuccessSvc,
+		disksSvc:              fakeSuccessSvc,
 	}
 }
 
@@ -211,6 +212,31 @@ func (s *FakeVMService) CreateOrUpdate(ctx context.Context, spec azure.Spec) err
 
 // Delete returns fake success.
 func (s *FakeVMService) Delete(ctx context.Context, spec azure.Spec) error {
+	s.DeleteCallCount++
+	return nil
+}
+
+// FakeVMService generic vm service
+type FakeCountService struct {
+	GetCallCount            int
+	CreateOrUpdateCallCount int
+	DeleteCallCount         int
+}
+
+// Get returns fake success.
+func (s *FakeCountService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
+	s.GetCallCount++
+	return nil, nil
+}
+
+// CreateOrUpdate returns fake success.
+func (s *FakeCountService) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
+	s.CreateOrUpdateCallCount++
+	return nil
+}
+
+// Delete returns fake success.
+func (s *FakeCountService) Delete(ctx context.Context, spec azure.Spec) error {
 	s.DeleteCallCount++
 	return nil
 }
@@ -267,6 +293,10 @@ func TestReconcileVMFailedState(t *testing.T) {
 		ProvisioningState: "Failed",
 	}
 	fakeReconciler.virtualMachinesSvc = fakeVMService
+	fakeDiskService := &FakeCountService{}
+	fakeReconciler.disksSvc = fakeDiskService
+	fakeNicService := &FakeCountService{}
+	fakeReconciler.networkInterfacesSvc = fakeNicService
 
 	if err := fakeReconciler.Create(context.Background()); err == nil {
 		t.Errorf("expected create to fail")
@@ -278,6 +308,14 @@ func TestReconcileVMFailedState(t *testing.T) {
 
 	if fakeVMService.DeleteCallCount != 1 {
 		t.Errorf("expected delete to be called just once")
+	}
+
+	if fakeDiskService.DeleteCallCount != 1 {
+		t.Errorf("expected disk delete to be called just once")
+	}
+
+	if fakeNicService.DeleteCallCount != 1 {
+		t.Errorf("expected nic delete to be called just once")
 	}
 
 	if fakeVMService.CreateOrUpdateCallCount != 0 {

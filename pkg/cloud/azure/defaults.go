@@ -91,3 +91,13 @@ func GenerateManagedIdentityName(subscriptionID, resourceGroupName, clusterName 
 		resourceGroupName,
 		clusterName)
 }
+
+// GenerateOSDiskName generates OS disk name used by VM
+func GenerateOSDiskName(machineName string) string {
+	return fmt.Sprintf("%s_OSDisk", machineName)
+}
+
+// GenerateNetworkInterfaceName generates network interface name used by VM
+func GenerateNetworkInterfaceName(machineName string) string {
+	return fmt.Sprintf("%s-nic", machineName)
+}

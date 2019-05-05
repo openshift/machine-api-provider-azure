@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/certificates"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/config"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachineextensions"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
@@ -58,6 +59,7 @@ type Reconciler struct {
 	networkInterfacesSvc  azure.Service
 	virtualMachinesSvc    azure.Service
 	virtualMachinesExtSvc azure.Service
+	disksSvc              azure.Service
 }
 
 // NewReconciler populates all the services based on input scope
@@ -68,6 +70,7 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 		networkInterfacesSvc:  networkinterfaces.NewService(scope.Scope),
 		virtualMachinesSvc:    virtualmachines.NewService(scope.Scope),
 		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope.Scope),
+		disksSvc:              disks.NewService(scope.Scope),
 	}
 }
 
@@ -80,7 +83,7 @@ func (s *Reconciler) Create(ctx context.Context) error {
 		s.scope.Machine.Annotations = map[string]string{}
 	}
 
-	nicName := fmt.Sprintf("%s-nic", s.scope.Machine.Name)
+	nicName := azure.GenerateNetworkInterfaceName(s.scope.Machine.Name)
 	if err := s.createNetworkInterface(ctx, nicName); err != nil {
 		return errors.Wrapf(err, "failed to create nic %s for machine %s", nicName, s.scope.Machine.Name)
 	}
@@ -202,8 +205,16 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to delete machine")
 	}
 
+	osDiskSpec := &disks.Spec{
+		Name: azure.GenerateOSDiskName(s.scope.Machine.Name),
+	}
+	err = s.disksSvc.Delete(ctx, osDiskSpec)
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete OS disk")
+	}
+
 	networkInterfaceSpec := &networkinterfaces.Spec{
-		Name:     fmt.Sprintf("%s-nic", s.scope.Machine.Name),
+		Name:     azure.GenerateNetworkInterfaceName(s.scope.Machine.Name),
 		VnetName: azure.GenerateVnetName(s.scope.Cluster.Name),
 	}
 
@@ -515,7 +526,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 		if *vm.ProvisioningState == "Failed" {
 			// If VM failed provisioning, delete it so it can be recreated
-			err = s.virtualMachinesSvc.Delete(ctx, vmSpec)
+			err = s.Delete(ctx)
 			if err != nil {
 				return errors.Wrapf(err, "failed to delete machine")
 			}
