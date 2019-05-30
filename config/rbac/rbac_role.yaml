@@ -1,22 +1,10 @@
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: manager-role
+  name: cluster-api-manager-role
 rules:
-- apiGroups:
-  - azureprovider.k8s.io
-  resources:
-  - azureclusterproviderconfigs
-  - azureclusterproviderstatuses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
 - apiGroups:
   - cluster.k8s.io
   resources:
@@ -31,28 +19,14 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - azureprovider.k8s.io
-  resources:
-  - azuremachineproviderconfigs
-  - azuremachineproviderstatuses
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - cluster.k8s.io
+  - machine.openshift.io
   resources:
   - machines
   - machines/status
-  - machinedeployments
-  - machinedeployments/status
   - machinesets
   - machinesets/status
-  - machineclasses
+  - machinedeployments
+  - machinedeployments/status
   verbs:
   - get
   - list
@@ -62,24 +36,95 @@ rules:
   - patch
   - delete
 - apiGroups:
-  - cluster.k8s.io
+  - ""
   resources:
-  - clusters
-  - clusters/status
+  - nodes
   verbs:
   - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  - pods/status
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - pods/eviction
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - watch
+  - create
+  - delete
+  - list
+- apiGroups:
+  - policy
+  resources:
+  - poddisruptionbudgets
+  verbs:
   - list
   - watch
 - apiGroups:
   - ""
   resources:
-  - nodes
-  - events
+  - services
+  - secrets
+  - replicationcontrollers
+  - persistentvolumes
+  - persistentvolumeclaims
   verbs:
-  - get
   - list
   - watch
+- apiGroups:
+  - apps
+  resources:
+  - statefulsets
+  - replicasets
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - storage.k8s.io
+  resources:
+  - storageclasses
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resources:
+  - daemonsets
+  verbs:
+  - list
+  - watch
+  - get
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
   - create
   - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - watch
+  - list
   - patch
-  - delete
