@@ -47,6 +47,7 @@ type AzureMachineProviderSpec struct {
 	OSDisk        OSDisk `json:"osDisk"`
 	SSHPublicKey  string `json:"sshPublicKey"`
 	SSHPrivateKey string `json:"sshPrivateKey"`
+	PublicIP      bool   `json:"publicIP"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

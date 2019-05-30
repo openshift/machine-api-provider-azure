@@ -25,6 +25,7 @@ import (
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicloadbalancers"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/subnets"
 )
@@ -38,6 +39,7 @@ type Spec struct {
 	PublicLoadBalancerName   string
 	InternalLoadBalancerName string
 	NatRule                  int
+	PublicIP                 string
 }
 
 // Get provides information about a network interface.
@@ -79,6 +81,19 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if nicSpec.StaticIPAddress != "" {
 		nicConfig.PrivateIPAllocationMethod = network.Static
 		nicConfig.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
+	}
+
+	if nicSpec.PublicIP != "" {
+		publicIPInterface, publicIPErr := publicips.NewService(s.Scope).Get(ctx, &publicips.Spec{Name: nicSpec.PublicIP})
+		if publicIPErr != nil {
+			return publicIPErr
+		}
+
+		ip, ok := publicIPInterface.(network.PublicIPAddress)
+		if !ok {
+			return errors.New("public ip get returned invalid network interface")
+		}
+		nicConfig.PublicIPAddress = &ip
 	}
 
 	backendAddressPools := []network.BackendAddressPool{}

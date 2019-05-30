@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/config"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachineextensions"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 
@@ -57,6 +58,7 @@ type Reconciler struct {
 	scope                 *actuators.MachineScope
 	availabilityZonesSvc  azure.Service
 	networkInterfacesSvc  azure.Service
+	publicIPSvc           azure.Service
 	virtualMachinesSvc    azure.Service
 	virtualMachinesExtSvc azure.Service
 	disksSvc              azure.Service
@@ -70,6 +72,7 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 		networkInterfacesSvc:  networkinterfaces.NewService(scope.Scope),
 		virtualMachinesSvc:    virtualmachines.NewService(scope.Scope),
 		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope.Scope),
+		publicIPSvc:           publicips.NewService(scope.Scope),
 		disksSvc:              disks.NewService(scope.Scope),
 	}
 }
@@ -221,6 +224,13 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	err = s.networkInterfacesSvc.Delete(ctx, networkInterfaceSpec)
 	if err != nil {
 		return errors.Wrapf(err, "Unable to delete network interface")
+	}
+
+	err = s.publicIPSvc.Delete(ctx, &publicips.Spec{
+		Name: azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name),
+	})
+	if err != nil {
+		return errors.Wrap(err, "unable to delete Public IP")
 	}
 
 	return nil
@@ -459,6 +469,15 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		networkInterfaceSpec.NatRule = 0
 	default:
 		return errors.Errorf("unknown value %s for label `set` on machine %s, skipping machine creation", set, s.scope.Machine.Name)
+	}
+
+	if s.scope.MachineConfig.PublicIP {
+		publicIPName := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
+		err := s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
+		if err != nil {
+			return errors.Wrap(err, "unable to create Public IP")
+		}
+		networkInterfaceSpec.PublicIP = publicIPName
 	}
 
 	err := s.networkInterfacesSvc.CreateOrUpdate(ctx, networkInterfaceSpec)

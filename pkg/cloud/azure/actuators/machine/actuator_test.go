@@ -163,6 +163,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 		virtualMachinesSvc:    fakeVMSuccessSvc,
 		virtualMachinesExtSvc: fakeSuccessSvc,
 		disksSvc:              fakeSuccessSvc,
+		publicIPSvc:           fakeSuccessSvc,
 	}
 }
 
