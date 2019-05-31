@@ -38,7 +38,7 @@ type Spec struct {
 	StaticIPAddress          string
 	PublicLoadBalancerName   string
 	InternalLoadBalancerName string
-	NatRule                  int
+	NatRule                  *int
 	PublicIP                 string
 }
 
@@ -112,10 +112,12 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			network.BackendAddressPool{
 				ID: (*lb.BackendAddressPools)[0].ID,
 			})
-		nicConfig.LoadBalancerInboundNatRules = &[]network.InboundNatRule{
-			{
-				ID: (*lb.InboundNatRules)[nicSpec.NatRule].ID,
-			},
+		if nicSpec.NatRule != nil {
+			nicConfig.LoadBalancerInboundNatRules = &[]network.InboundNatRule{
+				{
+					ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID,
+				},
+			}
 		}
 	}
 	if nicSpec.InternalLoadBalancerName != "" {

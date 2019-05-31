@@ -585,16 +585,21 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		Name:     nicName,
 		VnetName: azure.GenerateVnetName(s.scope.Cluster.Name),
 	}
-	switch set := s.scope.Machine.ObjectMeta.Labels[v1alpha1.MachineRoleLabel]; set {
-	case v1alpha1.Node:
-		networkInterfaceSpec.SubnetName = azure.GenerateNodeSubnetName(s.scope.Cluster.Name)
-	case v1alpha1.ControlPlane:
-		networkInterfaceSpec.SubnetName = azure.GenerateControlPlaneSubnetName(s.scope.Cluster.Name)
-		networkInterfaceSpec.PublicLoadBalancerName = azure.GeneratePublicLBName(s.scope.Cluster.Name)
-		networkInterfaceSpec.InternalLoadBalancerName = azure.GenerateInternalLBName(s.scope.Cluster.Name)
-		networkInterfaceSpec.NatRule = 0
-	default:
-		return errors.Errorf("unknown value %s for label `set` on machine %s, skipping machine creation", set, s.scope.Machine.Name)
+
+	if s.scope.MachineConfig.Subnet == "" {
+		return errors.Errorf("MachineConfig subnet is missing on machine %s, skipping machine creation", s.scope.Machine.Name)
+	}
+
+	networkInterfaceSpec.SubnetName = s.scope.MachineConfig.Subnet
+
+	if s.scope.MachineConfig.PublicLoadBalancer != "" {
+		networkInterfaceSpec.PublicLoadBalancerName = s.scope.MachineConfig.PublicLoadBalancer
+		if s.scope.MachineConfig.NatRule != nil {
+			networkInterfaceSpec.NatRule = s.scope.MachineConfig.NatRule
+		}
+	}
+	if s.scope.MachineConfig.InternalLoadBalancer != "" {
+		networkInterfaceSpec.InternalLoadBalancerName = s.scope.MachineConfig.InternalLoadBalancer
 	}
 
 	if s.scope.MachineConfig.PublicIP {
