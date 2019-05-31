@@ -231,6 +231,18 @@ func (s *Reconciler) Update(ctx context.Context) error {
 
 	s.scope.Machine.Status.Addresses = networkAddresses
 
+	// Set provider ID
+	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+		providerID := azure.GenerateMachineProviderID(
+			s.scope.SubscriptionID,
+			s.scope.ClusterConfig.ResourceGroup,
+			*vm.OsProfile.ComputerName)
+		s.scope.Machine.Spec.ProviderID = &providerID
+	} else {
+		klog.Warningf("Unable to set providerID, not able to get vm.OsProfile.ComputerName. Setting ProviderID to nil.")
+		s.scope.Machine.Spec.ProviderID = nil
+	}
+
 	return nil
 }
 

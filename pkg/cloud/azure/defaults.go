@@ -97,6 +97,16 @@ func GenerateManagedIdentityName(subscriptionID, resourceGroupName, clusterName 
 		clusterName)
 }
 
+// GenerateMachineProviderID generates machine provider id.
+func GenerateMachineProviderID(subscriptionID, resourceGroupName, machineName string) string {
+	// From https://github.com/kubernetes/kubernetes/blob/e09f5c40b55c91f681a46ee17f9bc447eeacee57/pkg/cloudprovider/providers/azure/azure_standard.go#L68-L75
+	return fmt.Sprintf(
+		"azure:///subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
+		subscriptionID,
+		resourceGroupName,
+		machineName)
+}
+
 // GenerateOSDiskName generates OS disk name used by VM
 func GenerateOSDiskName(machineName string) string {
 	return fmt.Sprintf("%s_OSDisk", machineName)
