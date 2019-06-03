@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "actuator.go",
         "annotations.go",
+        "conditions.go",
         "reconciler.go",
     ],
     importpath = "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine",
@@ -42,7 +43,10 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["actuator_test.go"],
+    srcs = [
+        "actuator_test.go",
+        "conditions_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/azureprovider/v1alpha1:go_default_library",

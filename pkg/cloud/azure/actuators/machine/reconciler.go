@@ -81,6 +81,20 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 
 // Create creates machine if and only if machine exists, handled by cluster-api
 func (s *Reconciler) Create(ctx context.Context) error {
+	if err := s.CreateMachine(ctx); err != nil {
+		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1alpha1.AzureMachineProviderCondition{
+			Type:    v1alpha1.MachineCreated,
+			Status:  apicorev1.ConditionTrue,
+			Reason:  machineCreationFailedReason,
+			Message: err.Error(),
+		})
+		return err
+	}
+	return nil
+}
+
+// CreateMachine creates machine if and only if machine exists, handled by cluster-api
+func (s *Reconciler) CreateMachine(ctx context.Context) error {
 	// TODO: update once machine controllers have a way to indicate a machine has been provisoned. https://github.com/kubernetes-sigs/cluster-api/issues/253
 	// Seeing a node cannot be purely relied upon because the provisioned control plane will not be registering with
 	// the stack that provisions it.
@@ -242,6 +256,14 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		klog.Warningf("Unable to set providerID, not able to get vm.OsProfile.ComputerName. Setting ProviderID to nil.")
 		s.scope.Machine.Spec.ProviderID = nil
 	}
+
+	// Set instance conditions
+	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1alpha1.AzureMachineProviderCondition{
+		Type:    v1alpha1.MachineCreated,
+		Status:  apicorev1.ConditionTrue,
+		Reason:  machineCreationSucceedReason,
+		Message: machineCreationSucceedMessage,
+	})
 
 	return nil
 }
