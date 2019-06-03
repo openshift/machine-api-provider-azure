@@ -191,11 +191,8 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		return errors.Wrapf(err, "cannot create vm")
 	}
 
-	err = future.WaitForCompletionRef(ctx, s.Client.Client)
-	if err != nil {
-		return errors.Wrapf(err, "cannot get the vm create or update future response")
-	}
-
+	// Do not wait until the operation completes. Just check the result
+	// so the call to Create actuator operation is async.
 	_, err = future.Result(s.Client)
 	if err != nil {
 		return err
@@ -221,11 +218,8 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.Wrapf(err, "failed to delete vm %s in resource group %s", vmSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
 	}
 
-	err = future.WaitForCompletionRef(ctx, s.Client.Client)
-	if err != nil {
-		return errors.Wrap(err, "cannot delete, future response")
-	}
-
+	// Do not wait until the operation completes. Just check the result
+	// so the call to Delete actuator operation is async.
 	_, err = future.Result(s.Client)
 
 	klog.V(2).Infof("successfully deleted vm %s ", vmSpec.Name)

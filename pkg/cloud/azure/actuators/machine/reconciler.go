@@ -677,7 +677,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			}
 			return errors.Errorf("vm %s is deleted, retry creating in next reconcile", s.scope.Machine.Name)
 		} else if *vm.ProvisioningState != "Succeeded" {
-			return errors.Errorf("vm %s is still in provisioningstate %s, reconcile", s.scope.Machine.Name, *vm.ProvisioningState)
+			return errors.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.ProvisioningState)
 		}
 	}
 
