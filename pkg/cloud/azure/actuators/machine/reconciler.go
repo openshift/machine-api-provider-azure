@@ -179,6 +179,12 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			Type:    apicorev1.NodeHostName,
 			Address: *vm.OsProfile.ComputerName,
 		})
+
+		// csr approved requires node internal dns name to be equal to a node name
+		networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
+			Type:    apicorev1.NodeInternalDNS,
+			Address: *vm.OsProfile.ComputerName,
+		})
 	}
 
 	if vm.NetworkProfile != nil && vm.NetworkProfile.NetworkInterfaces != nil {
@@ -198,6 +204,14 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			if !ok {
 				klog.Errorf("Network interfaces get returned invalid network interface, getting %T instead", networkIface)
 				continue
+			}
+
+			// Internal dns name consists of a hostname and internal dns suffix
+			if niface.InterfacePropertiesFormat.DNSSettings != nil && niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix != nil && vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+				networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
+					Type:    apicorev1.NodeInternalDNS,
+					Address: fmt.Sprintf("%s.%s", *vm.OsProfile.ComputerName, *niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix),
+				})
 			}
 
 			if niface.InterfacePropertiesFormat.IPConfigurations == nil {
