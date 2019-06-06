@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Initialize event recorder.
-	record.InitFromRecorder(mgr.GetRecorder("azure-controller"))
+	record.InitFromRecorder(mgr.GetEventRecorderFor("azure-controller"))
 
 	// Initialize machine actuator.
 	machineActuator := machine.NewActuator(machine.ActuatorParams{

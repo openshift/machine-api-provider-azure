@@ -115,7 +115,7 @@ func CreatePKICertificates(cfg *kubeadmapi.InitConfiguration) error {
 // CreateSACertificates creates sa certificates in cfg.CertDir directory.
 func CreateSACertificates(cfg *kubeadmapi.InitConfiguration) error {
 	klog.V(2).Infof("CreateSACertificates")
-	if err := certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg); err != nil {
+	if err := certsphase.CreateServiceAccountKeyAndPublicKeyFiles(cfg.CertificatesDir); err != nil {
 		return err
 	}
 	klog.V(2).Infof("CreateSACertificates success")
