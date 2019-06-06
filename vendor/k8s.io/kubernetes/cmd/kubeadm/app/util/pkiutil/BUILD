@@ -11,6 +11,7 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//vendor/k8s.io/client-go/util/cert:go_default_library",
+        "//vendor/k8s.io/client-go/util/keyutil:go_default_library",
         "//vendor/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//vendor/k8s.io/kubernetes/cmd/kubeadm/app/constants:go_default_library",
         "//vendor/k8s.io/kubernetes/cmd/kubeadm/app/util:go_default_library",

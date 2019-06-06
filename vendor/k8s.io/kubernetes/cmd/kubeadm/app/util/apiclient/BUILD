@@ -36,7 +36,6 @@ go_library(
         "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
         "//vendor/k8s.io/kubernetes/cmd/kubeadm/app/constants:go_default_library",
         "//vendor/k8s.io/kubernetes/cmd/kubeadm/app/util:go_default_library",
-        "//vendor/k8s.io/kubernetes/pkg/kubelet/apis:go_default_library",
         "//vendor/k8s.io/kubernetes/pkg/kubelet/types:go_default_library",
         "//vendor/k8s.io/kubernetes/pkg/registry/core/service/ipallocator:go_default_library",
     ],

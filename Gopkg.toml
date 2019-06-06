@@ -29,6 +29,7 @@ required = [
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
+    "github.com/golang/mock/mockgen", # for mock clients
     "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",
@@ -46,7 +47,7 @@ required = [
 
 [[override]]
   name = "github.com/openshift/cluster-api"
-  branch = "openshift-4.0-cluster-api-0.0.0-alpha.4"
+  branch = "openshift-4.2-cluster-api-0.1.0"
 
 [[constraint]]
   name = "github.com/Azure/azure-sdk-for-go"
@@ -55,6 +56,40 @@ required = [
 [[constraint]]
   name = "github.com/Azure/go-autorest"
   version = "11.5.2"
+
+[[override]]
+  name = "k8s.io/kube-aggregator"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/code-generator"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/api"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/apiserver"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/apiextensions-apiserver"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/apimachinery"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "k8s.io/client-go"
+  version = "kubernetes-1.14.1"
+
+[[override]]
+  name = "sigs.k8s.io/controller-runtime"
+  # Pin the latest master HEAD to get support webhooks
+  # which are not yet released
+  revision="96b67f231945a8e8550dbdd8bfbd550a0c68097b"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
@@ -73,5 +108,3 @@ required = [
   [[prune.project]]
   name = "k8s.io/apimachinery"
   unused-packages = false
-
-  
