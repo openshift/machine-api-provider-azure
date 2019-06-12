@@ -89,12 +89,12 @@ func GenerateFQDN(publicIPName, location string) string {
 }
 
 // GenerateManagedIdentityName generates managed identity name.
-func GenerateManagedIdentityName(subscriptionID, resourceGroupName, clusterName string) string {
+func GenerateManagedIdentityName(subscriptionID, resourceGroupName, managedIdentityName string) string {
 	return fmt.Sprintf(
-		"/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s-identity",
+		"/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s",
 		subscriptionID,
 		resourceGroupName,
-		clusterName)
+		managedIdentityName)
 }
 
 // GenerateMachineProviderID generates machine provider id.
