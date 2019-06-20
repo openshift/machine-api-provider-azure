@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: manager-controllers
+  name: machine-api-controllers
   namespace: default
   labels:
     api: clusterapi

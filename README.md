@@ -23,7 +23,7 @@ stabilizes within the community.
     $ az role definition update --role-definition azure-role.json
     ```
 
-## Deploy with minikube (to create bootstrapping cluster)
+## Deploy machine API plane with minikube
 
 1. **Install kvm**
 
@@ -71,10 +71,6 @@ stabilizes within the community.
     kustomize build config | kubectl apply --validate=false -f -
     ```
 
-    Available deployment also deploys publicly available azure machine controller, that needs to be stopped
-    before the locally built machine controller is run. Simply, edit `clusterapi-manager-controllers` deployment
-    and remove `machine-controller` container from it.
-
 4. **Deploy secret with Azure credentials**
 
    Azure actuator assumes existence of a secret file (references in machine object) with base64 encoded credentials:
@@ -87,20 +83,28 @@ stabilizes within the community.
      namespace: default
    type: Opaque
    data:
-     azure_client_id:
-     azure_client_secret:
+     azure_client_id: FILLIN
+     azure_client_secret: FILLIN
      azure_region: ZWFzdHVzMg==   # eastus2 in base64
      azure_resource_prefix: b3M0LWNvbW1vbg== # os4-common in base64
      azure_resourcegroup: b3M0LWNvbW1vbg==
-     azure_subscription_id:
-     azure_tenant_id:
-  ```
+     azure_subscription_id: FILLIN
+     azure_tenant_id: FILLIN
+   ```
 
-  ```sh
-  $ kubectl apply -f secret.yaml
-  ```
+   ```sh
+   $ kubectl apply -f secret.yaml
+   ```
 
-5. **Build and run azure actuator outside of the cluster**
+## Test locally built azure actuator
+
+1. **Tear down machine-controller**
+
+   Deployed machine API plane (`machine-api-controllers` deployment) is (among other
+   controllers) running `machine-controller`. In order to run locally built one,
+   simply edit `machine-api-controllers` deployment and remove `machine-controller` container from it.
+
+1. **Build and run azure actuator outside of the cluster**
 
    ```sh
    $ go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager
@@ -110,7 +114,7 @@ stabilizes within the community.
    $ ./bin/manager --kubeconfig ~/.kube/config --logtostderr -v 5 -alsologtostderr
    ```
 
-6. **Deploy k8s apiserver through machine manifest**:
+1. **Deploy k8s apiserver through machine manifest**:
 
    To deploy user data secret with kubernetes apiserver initialization (under [config/master-user-data-secret.yaml](config/master-user-data-secret.yaml)):
 
@@ -124,7 +128,60 @@ stabilizes within the community.
    $ kubectl apply -f config/master-machine.yaml
    ```
 
-7. **Pull kubeconfig from created master machine**
+1. **Pull kubeconfig from created master machine**
+
+   All virtual machines created by machine templates under `config` can be
+   accessed by using `config/sshkey` private key.
+
+   The master public IP can be accessed from Azure Portal. Once done, you
+   can collect the kube config by running:
+
+   ```
+   $ ssh -i config/sshkey capi@PUBLICIP 'sudo cat /root/.kube/config' > kubeconfig
+   $ kubectl --kubeconfig=kubeconfig config set-cluster kubernetes --server=https://PUBLICIP:8443
+   ```
+
+   Once done, you can access the cluster via `kubectl`. E.g.
+
+   ```sh
+   $ kubectl --kubeconfig=kubeconfig get nodes
+   ```
+
+## Deploy k8s cluster in Azure with machine API plane deployed
+
+1. **Generate bootstrap user data**
+
+   To generate bootstrap script for machine api plane, simply run:
+
+   ```sh
+   $ ./examples/generate-bootstrap.sh
+   ```
+
+   The script requires `AZURE_SUBSCRIPTION_ID`, `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` environment variables to be set.
+   It generates `config/bootstrap.yaml` secret for master machine
+   under `config/master-machine.yaml`.
+
+   The generated bootstrap secret contains user data responsible for:
+   - deployment of kube-apiserver
+   - deployment of machine API plane with azure machine controllers
+   - generating worker machine user data script secret deploying a node
+   - deployment of worker machineset
+
+1. **Deploy machine API plane through machine manifest**:
+
+   First, deploy generated bootstrap secret:
+
+   ```yaml
+   $ kubectl apply -f config/bootstrap.yaml
+   ```
+
+   Then, deploy master machine (under [config/master-machine.yaml](config/master-machine.yaml)):
+
+   ```yaml
+   $ kubectl apply -f config/master-machine.yaml
+   ```
+
+1. **Pull kubeconfig from created master machine**
 
    All virtual machines created by machine templates under `config` can be
    accessed by using `config/sshkey` private key.
