@@ -188,13 +188,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	}
 
 	if vm.NetworkProfile != nil && vm.NetworkProfile.NetworkInterfaces != nil {
-		var vnetName string
 		if s.scope.MachineConfig.Vnet == "" {
-			// TODO(jchaloup): fail once installer sets MachineConfig.Vnet explicitly
-			// return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
-			vnetName = azure.GenerateVnetName(s.scope.Cluster.Name)
-		} else {
-			vnetName = s.scope.MachineConfig.Vnet
+			return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 		}
 
 		for _, iface := range *vm.NetworkProfile.NetworkInterfaces {
@@ -202,7 +197,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			ifaceName := path.Base(*iface.ID)
 			networkIface, err := s.networkInterfacesSvc.Get(ctx, &networkinterfaces.Spec{
 				Name:     ifaceName,
-				VnetName: vnetName,
+				VnetName: s.scope.MachineConfig.Vnet,
 			})
 			if err != nil {
 				klog.Errorf("Unable to get %q network interface: %v", ifaceName, err)
@@ -351,18 +346,13 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		return errors.Wrapf(err, "failed to delete OS disk")
 	}
 
-	var vnetName string
 	if s.scope.MachineConfig.Vnet == "" {
-		// TODO(jchaloup): fail once installer sets MachineConfig.Vnet explicitly
-		// return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
-		vnetName = azure.GenerateVnetName(s.scope.Cluster.Name)
-	} else {
-		vnetName = s.scope.MachineConfig.Vnet
+		return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     azure.GenerateNetworkInterfaceName(s.scope.Machine.Name),
-		VnetName: vnetName,
+		VnetName: s.scope.MachineConfig.Vnet,
 	}
 
 	err = s.networkInterfacesSvc.Delete(ctx, networkInterfaceSpec)
@@ -599,18 +589,13 @@ func (s *Reconciler) getVirtualMachineZone(ctx context.Context) (string, error) 
 }
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
-	var vnetName string
 	if s.scope.MachineConfig.Vnet == "" {
-		// TODO(jchaloup): fail once installer sets MachineConfig.Vnet explicitly
-		// return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
-		vnetName = azure.GenerateVnetName(s.scope.Cluster.Name)
-	} else {
-		vnetName = s.scope.MachineConfig.Vnet
+		return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     nicName,
-		VnetName: vnetName,
+		VnetName: s.scope.MachineConfig.Vnet,
 	}
 
 	if s.scope.MachineConfig.Subnet == "" {
@@ -663,13 +648,8 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			return errors.Wrap(zoneErr, "failed to get availability zone")
 		}
 
-		var managedIdentity string
 		if s.scope.MachineConfig.ManagedIdentity == "" {
-			managedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, fmt.Sprintf("%s-identity", s.scope.Cluster.Name))
-			// TODO(jchaloup): fail once installer sets MachineConfig.ManagedIdentity explicitly
-			// return errors.Errorf("MachineConfig managedIdentity is missing on machine %s", s.scope.Machine.Name)
-		} else {
-			managedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+			return errors.Errorf("MachineConfig managedIdentity is missing on machine %s", s.scope.Machine.Name)
 		}
 
 		vmSpec = &virtualmachines.Spec{
@@ -680,7 +660,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			OSDisk:          s.scope.MachineConfig.OSDisk,
 			Image:           s.scope.MachineConfig.Image,
 			Zone:            vmZone,
-			ManagedIdentity: managedIdentity,
+			ManagedIdentity: azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity),
 		}
 
 		userData, userDataErr := s.getCustomUserData()

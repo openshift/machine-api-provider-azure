@@ -145,7 +145,9 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 		Machine:       m,
 		MachineClient: c.Machines("dummyNamespace"),
 		MachineConfig: &v1alpha1.AzureMachineProviderSpec{
-			Subnet: "dummySubnet",
+			Subnet:          "dummySubnet",
+			Vnet:            "dummyVnet",
+			ManagedIdentity: "dummyIdentity",
 		},
 		MachineStatus: &v1alpha1.AzureMachineProviderStatus{},
 	}
