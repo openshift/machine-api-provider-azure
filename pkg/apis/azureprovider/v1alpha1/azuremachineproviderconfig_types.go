@@ -66,6 +66,11 @@ type AzureMachineProviderSpec struct {
 
 	// Vnet to set virtual network name
 	Vnet string `json:"vnet"`
+
+	// Availability Zone for the virtual machine.
+	// If nil, a zone will be randomly chosen from the list of zones for the location.
+	// If the virtual machine should be deployed to no zone, it must be explicitly set to empty string.
+	Zone *string `json:"zone,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
