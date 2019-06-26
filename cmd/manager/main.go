@@ -63,8 +63,10 @@ func main() {
 
 	// Initialize machine actuator.
 	machineActuator := machine.NewActuator(machine.ActuatorParams{
-		Client:     cs.MachineV1beta1(),
-		CoreClient: mgr.GetClient(),
+		Client:            cs.MachineV1beta1(),
+		CoreClient:        mgr.GetClient(),
+		ReconcilerBuilder: machine.NewReconciler,
+		EventRecorder:     mgr.GetEventRecorderFor("azure-controller"),
 	})
 
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {

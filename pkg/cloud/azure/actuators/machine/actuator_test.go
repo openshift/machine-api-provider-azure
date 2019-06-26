@@ -19,12 +19,14 @@ package machine
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
+	"github.com/golang/mock/gomock"
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake"
@@ -33,10 +35,14 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	providerv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -575,6 +581,186 @@ func TestCustomDataFailures(t *testing.T) {
 	fakeScope.CoreClient = controllerfake.NewFakeClient(userDataSecret)
 	if _, err := fakeReconciler.getCustomUserData(); err == nil {
 		t.Errorf("expected get custom data to fail, due to missing userdata")
+	}
+}
+
+func TestMachineEvents(t *testing.T) {
+	machine, err := stubMachine()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	machinePc := stubProviderConfig()
+	machinePc.Subnet = ""
+	machinePc.Vnet = ""
+	machinePc.VMSize = ""
+	providerSpec, err := providerspecv1.EncodeMachineSpec(machinePc)
+	if err != nil {
+		t.Fatalf("EncodeMachineSpec failed: %v", err)
+	}
+
+	invalidMachine := machine.DeepCopy()
+	invalidMachine.Spec.ProviderSpec = machinev1.ProviderSpec{Value: providerSpec}
+
+	azureCredentialsSecret := stubAzureCredentialsSecret()
+	invalidAzureCredentialsSecret := stubAzureCredentialsSecret()
+	delete(invalidAzureCredentialsSecret.Data, "azure_client_id")
+
+	cases := []struct {
+		name       string
+		machine    *machinev1.Machine
+		credSecret *corev1.Secret
+		error      string
+		operation  func(actuator *Actuator, machine *machinev1.Machine)
+		event      string
+	}{
+		{
+			name:       "Create machine event failed (scope)",
+			machine:    machine,
+			credSecret: invalidAzureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Create(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedCreate CreateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+		},
+		{
+			name:       "Create machine event failed (reconciler)",
+			machine:    invalidMachine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Create(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine",
+		},
+		{
+			name:       "Create machine event succeed",
+			machine:    machine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Create(context.TODO(), nil, machine)
+			},
+			event: fmt.Sprintf("Normal Created Created machine %q", machine.Name),
+		},
+		{
+			name:       "Update machine event failed (scope)",
+			machine:    machine,
+			credSecret: invalidAzureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Update(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+		},
+		{
+			name:       "Update machine event failed (reconciler)",
+			machine:    invalidMachine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Update(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedUpdate UpdateError: failed to update machine \"azure-actuator-testing-machine\": found attempt to change immutable state",
+		},
+		{
+			name:       "Update machine event succeed",
+			machine:    machine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Update(context.TODO(), nil, machine)
+			},
+			event: fmt.Sprintf("Normal Updated Updated machine %q", machine.Name),
+		},
+		{
+			name:       "Delete machine event failed (scope)",
+			machine:    machine,
+			credSecret: invalidAzureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Delete(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+		},
+		{
+			name:       "Delete machine event failed (reconciler)",
+			machine:    invalidMachine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Delete(context.TODO(), nil, machine)
+			},
+			event: "Warning FailedDelete DeleteError: failed to delete machine \"azure-actuator-testing-machine\": MachineConfig vnet is missing on machine azure-actuator-testing-machine",
+		},
+		{
+			name:       "Delete machine event succeed",
+			machine:    machine,
+			credSecret: azureCredentialsSecret,
+			operation: func(actuator *Actuator, machine *machinev1.Machine) {
+				actuator.Delete(context.TODO(), nil, machine)
+			},
+			event: fmt.Sprintf("Normal Deleted Deleted machine %q", machine.Name),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cs := controllerfake.NewFakeClient(tc.credSecret)
+
+			mockCtrl := gomock.NewController(t)
+			azSvc := mock_azure.NewMockService(mockCtrl)
+			networkSvc := mock_azure.NewMockService(mockCtrl)
+			vmSvc := mock_azure.NewMockService(mockCtrl)
+			vmExtSvc := mock_azure.NewMockService(mockCtrl)
+			pipSvc := mock_azure.NewMockService(mockCtrl)
+			disksSvc := mock_azure.NewMockService(mockCtrl)
+
+			eventsChannel := make(chan string, 1)
+
+			machineActuator := NewActuator(ActuatorParams{
+				Client:     fake.NewSimpleClientset(tc.machine).MachineV1beta1(),
+				CoreClient: cs,
+				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
+					return &Reconciler{
+						scope:                 scope,
+						availabilityZonesSvc:  azSvc,
+						networkInterfacesSvc:  networkSvc,
+						virtualMachinesSvc:    vmSvc,
+						virtualMachinesExtSvc: vmExtSvc,
+						publicIPSvc:           pipSvc,
+						disksSvc:              disksSvc,
+					}
+				},
+				// use fake recorder and store an event into one item long buffer for subsequent check
+				EventRecorder: &record.FakeRecorder{
+					Events: eventsChannel,
+				},
+			})
+
+			networkSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{
+				ID:   pointer.StringPtr("vm-id"),
+				Name: pointer.StringPtr("vm-name"),
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					ProvisioningState: pointer.StringPtr("Succeeded"),
+					HardwareProfile: &compute.HardwareProfile{
+						VMSize: compute.VirtualMachineSizeTypesStandardB2ms,
+					},
+					OsProfile: &compute.OSProfile{
+						ComputerName: pointer.StringPtr("vm-name"),
+					},
+				},
+			}, nil).AnyTimes()
+			vmSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			disksSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			networkSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			pipSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
+			tc.operation(machineActuator, tc.machine)
+
+			select {
+			case event := <-eventsChannel:
+				if event != tc.event {
+					t.Errorf("Expected %q event, got %q", tc.event, event)
+				}
+			default:
+				t.Errorf("Expected %q event, got none", tc.event)
+			}
+		})
 	}
 }
 

@@ -24,11 +24,21 @@ import (
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	client "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1"
 	controllerError "github.com/openshift/cluster-api/pkg/controller/error"
+	apierrors "github.com/openshift/cluster-api/pkg/errors"
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/deployer"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
+)
+
+const (
+	createEventAction = "Create"
+	updateEventAction = "Update"
+	deleteEventAction = "Delete"
+	noEventAction     = ""
 )
 
 //+kubebuilder:rbac:groups=azureprovider.k8s.io,resources=azuremachineproviderconfigs;azuremachineproviderstatuses,verbs=get;list;watch;create;update;patch;delete
@@ -40,23 +50,41 @@ import (
 type Actuator struct {
 	*deployer.Deployer
 
-	client     client.MachineV1beta1Interface
-	coreClient controllerclient.Client
+	client        client.MachineV1beta1Interface
+	coreClient    controllerclient.Client
+	eventRecorder record.EventRecorder
+
+	reconcilerBuilder func(scope *actuators.MachineScope) *Reconciler
 }
 
 // ActuatorParams holds parameter information for Actuator.
 type ActuatorParams struct {
-	Client     client.MachineV1beta1Interface
-	CoreClient controllerclient.Client
+	Client            client.MachineV1beta1Interface
+	CoreClient        controllerclient.Client
+	EventRecorder     record.EventRecorder
+	ReconcilerBuilder func(scope *actuators.MachineScope) *Reconciler
 }
 
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		Deployer:   deployer.New(deployer.Params{ScopeGetter: actuators.DefaultScopeGetter}),
-		client:     params.Client,
-		coreClient: params.CoreClient,
+		Deployer:          deployer.New(deployer.Params{ScopeGetter: actuators.DefaultScopeGetter}),
+		client:            params.Client,
+		coreClient:        params.CoreClient,
+		eventRecorder:     params.EventRecorder,
+		reconcilerBuilder: params.ReconcilerBuilder,
 	}
+}
+
+// Set corresponding event based on error. It also returns the original error
+// for convenience, so callers can do "return handleMachineError(...)".
+func (a *Actuator) handleMachineError(machine *machinev1.Machine, err *apierrors.MachineError, eventAction string) error {
+	if eventAction != noEventAction {
+		a.eventRecorder.Eventf(machine, corev1.EventTypeWarning, "Failed"+eventAction, "%v: %v", err.Reason, err.Message)
+	}
+
+	klog.Errorf("Machine error: %v", err.Message)
+	return err
 }
 
 // Create creates a machine and is invoked by the machine controller.
@@ -70,17 +98,19 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return errors.Errorf("failed to create scope: %+v", err)
+		return a.handleMachineError(machine, apierrors.CreateMachine("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
 	}
 	defer scope.Close()
 
-	err = NewReconciler(scope).Create(context.Background())
+	err = a.reconcilerBuilder(scope).Create(context.Background())
 	if err != nil {
-		klog.Errorf("failed to reconcile machine %s: %v", machine.Name, err)
+		a.handleMachineError(machine, apierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
 	}
+
+	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Created", "Created machine %q", machine.Name)
 
 	return nil
 }
@@ -96,18 +126,20 @@ func (a *Actuator) Delete(ctx context.Context, cluster *clusterv1.Cluster, machi
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to create scope")
+		return a.handleMachineError(machine, apierrors.DeleteMachine("failed to create machine %q scope: %v", machine.Name, err), deleteEventAction)
 	}
 
 	defer scope.Close()
 
-	err = NewReconciler(scope).Delete(context.Background())
+	err = a.reconcilerBuilder(scope).Delete(context.Background())
 	if err != nil {
-		klog.Errorf("failed to delete machine %s: %v", machine.Name, err)
+		a.handleMachineError(machine, apierrors.DeleteMachine("failed to delete machine %q: %v", machine.Name, err), deleteEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
 	}
+
+	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Deleted", "Deleted machine %q", machine.Name)
 
 	return nil
 }
@@ -125,18 +157,20 @@ func (a *Actuator) Update(ctx context.Context, cluster *clusterv1.Cluster, machi
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return errors.Errorf("failed to create scope: %+v", err)
+		return a.handleMachineError(machine, apierrors.UpdateMachine("failed to create machine %q scope: %v", machine.Name, err), updateEventAction)
 	}
 
 	defer scope.Close()
 
-	err = NewReconciler(scope).Update(context.Background())
+	err = a.reconcilerBuilder(scope).Update(context.Background())
 	if err != nil {
-		klog.Errorf("failed to update machine %s: %v", machine.Name, err)
+		a.handleMachineError(machine, apierrors.UpdateMachine("failed to update machine %q: %v", machine.Name, err), updateEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
 	}
+
+	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
 
 	return nil
 }
@@ -157,7 +191,7 @@ func (a *Actuator) Exists(ctx context.Context, cluster *clusterv1.Cluster, machi
 
 	defer scope.Close()
 
-	isExists, err := NewReconciler(scope).Exists(context.Background())
+	isExists, err := a.reconcilerBuilder(scope).Exists(context.Background())
 	if err != nil {
 		klog.Errorf("failed to check machine %s exists: %v", machine.Name, err)
 	}
