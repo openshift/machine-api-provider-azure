@@ -176,9 +176,10 @@
   revision = "5b532d6fd5efaf7fa130d4e859a2fde0fc3a9e1b"
 
 [[projects]]
-  digest = "1:27f22f5f78d7258edae2bedc36f7abb2b3224044e0d7fe900cce272b9b857d1c"
+  digest = "1:5e14df5b9539151b485eeb3ebea90a2823347516732978b0911ff17acea2842c"
   name = "github.com/golang/mock"
   packages = [
+    "gomock",
     "mockgen",
     "mockgen/model",
   ]
@@ -424,6 +425,7 @@
     "pkg/controller/error",
     "pkg/controller/machine",
     "pkg/controller/noderefutil",
+    "pkg/errors",
     "pkg/util",
   ]
   pruneopts = "T"
@@ -1160,19 +1162,21 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:97ea237b186fdbb4088160fb1a2b24d650f82aa06addd5584d95aae5d6adb914"
+  digest = "1:cf6717f0518dfcc9e03a9083edf52acaf99f9abd4cd9117a11070f5d878f6b22"
   name = "k8s.io/utils"
   packages = [
     "buffer",
     "exec",
     "integer",
+    "pointer",
     "trace",
   ]
   pruneopts = "UT"
   revision = "21c4ce38f2a793ec01e925ddc31216500183b773"
 
 [[projects]]
-  digest = "1:cd4ccccc3ed5ddace16fc70f0d492f39453649cf64fce14814f7e56f0400ed87"
+  branch = "release-0.2"
+  digest = "1:48a180fffc108d63b7a473e240bbc93fe3893907f28821db406b28fbbae9b02e"
   name = "sigs.k8s.io/controller-runtime"
   packages = [
     "pkg/cache",
@@ -1210,7 +1214,7 @@
     "pkg/webhook/internal/metrics",
   ]
   pruneopts = "UT"
-  revision = "96b67f231945a8e8550dbdd8bfbd550a0c68097b"
+  revision = "f60c87ec713cb8da81257228530605457ebf7220"
 
 [[projects]]
   digest = "1:77a19ea61ca4e01817ad2bc3e91689c5097b4b439668127d1fb5d8b95c3aca03"
@@ -1264,6 +1268,7 @@
     "github.com/Azure/go-autorest/autorest/to",
     "github.com/emicklei/go-restful",
     "github.com/ghodss/yaml",
+    "github.com/golang/mock/gomock",
     "github.com/golang/mock/mockgen",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
@@ -1279,6 +1284,7 @@
     "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1",
     "github.com/openshift/cluster-api/pkg/controller/error",
     "github.com/openshift/cluster-api/pkg/controller/machine",
+    "github.com/openshift/cluster-api/pkg/errors",
     "github.com/pkg/errors",
     "github.com/spf13/cobra",
     "golang.org/x/crypto/ssh",
@@ -1306,6 +1312,7 @@
     "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig",
     "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig",
     "k8s.io/kubernetes/cmd/kubeadm/app/util/pubkeypin",
+    "k8s.io/utils/pointer",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/client/fake",
