@@ -87,6 +87,16 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		}
 	}
 
+	scope.ClusterConfig.NetworkResourceGroup = scope.ClusterConfig.ResourceGroup
+
+	if machineConfig.ResourceGroup != "" {
+		scope.ClusterConfig.ResourceGroup = machineConfig.ResourceGroup
+	}
+
+	if machineConfig.NetworkResourceGroup != "" {
+		scope.ClusterConfig.NetworkResourceGroup = machineConfig.NetworkResourceGroup
+	}
+
 	return &MachineScope{
 		Scope:         scope,
 		Machine:       params.Machine,
