@@ -38,7 +38,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return network.VirtualNetwork{}, errors.New("Invalid VNET Specification")
 	}
-	vnet, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, vnetSpec.Name, "")
+	vnet, err := s.Client.Get(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, vnetSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, errors.Wrapf(err, "vnet %s not found", vnetSpec.Name)
 	} else if err != nil {
@@ -68,7 +68,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	}
 
 	klog.V(2).Infof("creating vnet %s ", vnetSpec.Name)
-	f, err := s.Client.CreateOrUpdate(ctx, s.Scope.ClusterConfig.ResourceGroup, vnetSpec.Name,
+	f, err := s.Client.CreateOrUpdate(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, vnetSpec.Name,
 		network.VirtualNetwork{
 			Location: to.StringPtr(s.Scope.ClusterConfig.Location),
 			VirtualNetworkPropertiesFormat: &network.VirtualNetworkPropertiesFormat{
@@ -101,13 +101,13 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("Invalid VNET Specification")
 	}
 	klog.V(2).Infof("deleting vnet %s ", vnetSpec.Name)
-	future, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup, vnetSpec.Name)
+	future, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, vnetSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete vnet %s in resource group %s", vnetSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return errors.Wrapf(err, "failed to delete vnet %s in resource group %s", vnetSpec.Name, s.Scope.ClusterConfig.NetworkResourceGroup)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
