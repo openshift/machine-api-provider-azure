@@ -482,42 +482,64 @@ func TestAvailabilityZones(t *testing.T) {
 	fakeScope := newFakeScope(t, v1alpha1.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
-	zones := []string{"1", "2", "3"}
-
-	fakeReconciler.availabilityZonesSvc = &FakeAvailabilityZonesService{
-		zonesResponse: zones,
-	}
-
+	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
-		checkZones: zones,
+		checkZones: []string{"2"},
 	}
-
 	if err := fakeReconciler.Create(context.Background()); err != nil {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.availabilityZonesSvc = &FakeAvailabilityZonesService{
-		zonesResponse: []string{},
-	}
-
+	fakeReconciler.scope.MachineConfig.Zone = nil
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
-		checkZones: []string{},
+		checkZones: []string{""},
 	}
-
 	if err := fakeReconciler.Create(context.Background()); err != nil {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.availabilityZonesSvc = &FakeAvailabilityZonesService{
-		zonesResponse: []string{"2"},
-	}
-
+	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("1")
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{"3"},
 	}
-
 	if err := fakeReconciler.Create(context.Background()); err == nil {
 		t.Errorf("expected create to fail due to zone mismatch")
+	}
+}
+
+func TestGetZone(t *testing.T) {
+	testCases := []struct {
+		inputZone *string
+		expected  string
+	}{
+		{
+			inputZone: nil,
+			expected:  "",
+		},
+		{
+			inputZone: pointer.StringPtr("3"),
+			expected:  "3",
+		},
+	}
+
+	for _, tc := range testCases {
+		fakeScope := newFakeScope(t, v1alpha1.ControlPlane)
+		fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
+		fakeReconciler.scope.MachineConfig.Zone = tc.inputZone
+
+		zones := []string{"1", "2", "3"}
+		fakeReconciler.availabilityZonesSvc = &FakeAvailabilityZonesService{
+			zonesResponse: zones,
+		}
+
+		got, err := fakeReconciler.getZone(context.Background())
+		if err != nil {
+			t.Fatalf("unexpected error getting zone")
+		}
+
+		if !strings.EqualFold(tc.expected, got) {
+			t.Errorf("expected: %v, got: %v", tc.expected, got)
+		}
 	}
 }
 

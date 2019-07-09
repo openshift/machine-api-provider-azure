@@ -75,8 +75,7 @@ type AzureMachineProviderSpec struct {
 	Vnet string `json:"vnet"`
 
 	// Availability Zone for the virtual machine.
-	// If nil, a zone will be randomly chosen from the list of zones for the location.
-	// If the virtual machine should be deployed to no zone, it must be explicitly set to empty string.
+	// If nil, the virtual machine should be deployed to no zone
 	Zone *string `json:"zone,omitempty"`
 
 	NetworkResourceGroup string `json:"networkResourceGroup"`

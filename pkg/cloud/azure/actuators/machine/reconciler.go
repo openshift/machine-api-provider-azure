@@ -20,10 +20,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"math/rand"
 	"path"
 	"strings"
 	"time"
+
+	"github.com/Azure/go-autorest/autorest/to"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
@@ -561,31 +562,8 @@ func getNodeReference(scope *actuators.MachineScope) (*apicorev1.ObjectReference
 	return nil, errors.Errorf("no node found for machine %s", scope.Name())
 }
 
-// getVirtualMachineZone gets a random availability zones from available set,
-// this will hopefully be an input from upstream machinesets so all the vms are balanced
-func (s *Reconciler) getVirtualMachineZone(ctx context.Context) (string, error) {
-	zonesSpec := &availabilityzones.Spec{
-		VMSize: s.scope.MachineConfig.VMSize,
-	}
-	zonesInterface, err := s.availabilityZonesSvc.Get(ctx, zonesSpec)
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to check availability zones for %s in region %s", s.scope.MachineConfig.VMSize, s.scope.ClusterConfig.Location)
-	}
-	if zonesInterface == nil {
-		// if its nil, probably means no zones found
-		return "", nil
-	}
-	zones, ok := zonesInterface.([]string)
-	if !ok {
-		return "", errors.New("availability zones Get returned invalid interface")
-	}
-
-	if len(zones) <= 0 {
-		return "", nil
-	}
-
-	rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
-	return zones[rand.Intn(len(zones))], nil
+func (s *Reconciler) getZone(ctx context.Context) (string, error) {
+	return to.String(s.scope.MachineConfig.Zone), nil
 }
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
@@ -643,14 +621,9 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
 	if err != nil && vmInterface == nil {
-		var vmZone string
-		if s.scope.MachineConfig.Zone == nil {
-			vmZone, err = s.getVirtualMachineZone(ctx)
-			if err != nil {
-				return errors.Wrap(err, "failed to get availability zone")
-			}
-		} else {
-			vmZone = *s.scope.MachineConfig.Zone
+		zone, err := s.getZone(ctx)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get zone")
 		}
 
 		if s.scope.MachineConfig.ManagedIdentity == "" {
@@ -664,7 +637,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			Size:            s.scope.MachineConfig.VMSize,
 			OSDisk:          s.scope.MachineConfig.OSDisk,
 			Image:           s.scope.MachineConfig.Image,
-			Zone:            vmZone,
+			Zone:            zone,
 			ManagedIdentity: azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity),
 		}
 
@@ -681,7 +654,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		if err != nil {
 			return errors.Wrapf(err, "failed to create or get machine")
 		}
-		s.scope.Machine.Annotations["availability-zone"] = vmZone
+		s.scope.Machine.Annotations["availability-zone"] = zone
 	} else if err != nil {
 		return errors.Wrap(err, "failed to get vm")
 	} else {
