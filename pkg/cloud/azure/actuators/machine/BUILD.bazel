@@ -12,7 +12,7 @@ go_library(
     importpath = "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/azureprovider/v1alpha1:go_default_library",
+        "//pkg/apis/azureprovider/v1beta1:go_default_library",
         "//pkg/cloud/azure:go_default_library",
         "//pkg/cloud/azure/actuators:go_default_library",
         "//pkg/cloud/azure/converters:go_default_library",
@@ -55,6 +55,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/azureprovider/v1alpha1:go_default_library",
+        "//pkg/apis/azureprovider/v1beta1:go_default_library",
         "//pkg/cloud/azure:go_default_library",
         "//pkg/cloud/azure/actuators:go_default_library",
         "//pkg/cloud/azure/mock:go_default_library",

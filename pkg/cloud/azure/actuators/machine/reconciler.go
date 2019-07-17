@@ -24,17 +24,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest/to"
-
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/converters"
@@ -83,8 +82,8 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 // Create creates machine if and only if machine exists, handled by cluster-api
 func (s *Reconciler) Create(ctx context.Context) error {
 	if err := s.CreateMachine(ctx); err != nil {
-		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1alpha1.AzureMachineProviderCondition{
-			Type:    v1alpha1.MachineCreated,
+		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1beta1.AzureMachineProviderCondition{
+			Type:    v1beta1.MachineCreated,
 			Status:  apicorev1.ConditionTrue,
 			Reason:  machineCreationFailedReason,
 			Message: err.Error(),
@@ -277,8 +276,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	}
 
 	// Set instance conditions
-	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1alpha1.AzureMachineProviderCondition{
-		Type:    v1alpha1.MachineCreated,
+	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1beta1.AzureMachineProviderCondition{
+		Type:    v1beta1.MachineCreated,
 		Status:  apicorev1.ConditionTrue,
 		Reason:  machineCreationSucceedReason,
 		Message: machineCreationSucceedMessage,
@@ -297,9 +296,9 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	}
 
 	switch *s.scope.MachineStatus.VMState {
-	case v1alpha1.VMStateSucceeded:
+	case v1beta1.VMStateSucceeded:
 		klog.Infof("Machine %v is running", *s.scope.MachineStatus.VMID)
-	case v1alpha1.VMStateUpdating:
+	case v1beta1.VMStateUpdating:
 		klog.Infof("Machine %v is updating", *s.scope.MachineStatus.VMID)
 	default:
 		return false, nil
@@ -376,7 +375,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 // Returns a bool indicating if an attempt to change immutable state occurred.
 //  - true:  An attempt to change immutable state occurred.
 //  - false: Immutable state was untouched.
-func isMachineOutdated(machineSpec *v1alpha1.AzureMachineProviderSpec, vm *v1alpha1.VM) bool {
+func isMachineOutdated(machineSpec *v1beta1.AzureMachineProviderSpec, vm *v1beta1.VM) bool {
 	// VM Size
 	if !strings.EqualFold(machineSpec.VMSize, vm.VMSize) {
 		return true
@@ -394,12 +393,12 @@ func (s *Reconciler) isNodeJoin() (bool, error) {
 		return false, errors.Wrapf(err, "failed to retrieve machines in cluster")
 	}
 
-	switch set := s.scope.Machine.ObjectMeta.Labels[v1alpha1.MachineRoleLabel]; set {
-	case v1alpha1.Node:
+	switch set := s.scope.Machine.ObjectMeta.Labels[v1beta1.MachineRoleLabel]; set {
+	case v1beta1.Node:
 		return true, nil
-	case v1alpha1.ControlPlane:
+	case v1beta1.ControlPlane:
 		for _, cm := range clusterMachines.Items {
-			if cm.ObjectMeta.Labels[v1alpha1.MachineRoleLabel] == v1alpha1.ControlPlane {
+			if cm.ObjectMeta.Labels[v1beta1.MachineRoleLabel] == v1beta1.ControlPlane {
 				continue
 			}
 			vmInterface, err := s.virtualMachinesSvc.Get(context.Background(), &virtualmachines.Spec{Name: cm.Name})
@@ -511,7 +510,7 @@ func (s *Reconciler) isVMExists(ctx context.Context) (bool, error) {
 		}
 	}
 
-	vmState := v1alpha1.VMState(*vm.ProvisioningState)
+	vmState := v1beta1.VMState(*vm.ProvisioningState)
 
 	s.scope.MachineStatus.VMID = vm.ID
 	s.scope.MachineStatus.VMState = &vmState

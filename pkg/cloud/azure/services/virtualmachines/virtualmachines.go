@@ -29,7 +29,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 )
@@ -41,8 +41,8 @@ type Spec struct {
 	SSHKeyData      string
 	Size            string
 	Zone            string
-	Image           v1alpha1.Image
-	OSDisk          v1alpha1.OSDisk
+	Image           v1beta1.Image
+	OSDisk          v1beta1.OSDisk
 	CustomData      string
 	ManagedIdentity string
 }

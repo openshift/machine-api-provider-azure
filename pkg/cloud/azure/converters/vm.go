@@ -18,12 +18,12 @@ package converters
 
 import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 )
 
 // SDKToVM converts azure representation to internal representation
-func SDKToVM(v compute.VirtualMachine) *v1alpha1.VM {
-	i := &v1alpha1.VM{
+func SDKToVM(v compute.VirtualMachine) *v1beta1.VM {
+	i := &v1beta1.VM{
 		ID:   *v.ID,
 		Name: *v.Name,
 

@@ -37,9 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
-	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
-	providerv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
@@ -51,14 +51,14 @@ var (
 	_ machine.Actuator = (*Actuator)(nil)
 )
 
-func newClusterProviderSpec() providerv1.AzureClusterProviderSpec {
-	return providerv1.AzureClusterProviderSpec{
+func newClusterProviderSpec() clusterproviderv1.AzureClusterProviderSpec {
+	return clusterproviderv1.AzureClusterProviderSpec{
 		ResourceGroup: "resource-group-test",
 		Location:      "southcentralus",
 	}
 }
 
-func providerSpecFromMachine(in *providerv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func providerSpecFromMachine(in *providerv1.AzureMachineProviderSpec) (*machinev
 	}, nil
 }
 
-func providerSpecFromCluster(in *providerv1.AzureClusterProviderSpec) (*clusterv1.ProviderSpec, error) {
+func providerSpecFromCluster(in *clusterproviderv1.AzureClusterProviderSpec) (*clusterv1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func providerSpecFromCluster(in *providerv1.AzureClusterProviderSpec) (*clusterv
 	}, nil
 }
 
-func newMachine(t *testing.T, machineConfig providerv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
+func newMachine(t *testing.T, machineConfig machineproviderv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -129,33 +129,33 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	scope := &actuators.Scope{
 		Context: context.Background(),
 		Cluster: newCluster(t),
-		ClusterConfig: &v1alpha1.AzureClusterProviderSpec{
+		ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{
 			ResourceGroup:       "dummyResourceGroup",
 			Location:            "dummyLocation",
-			CAKeyPair:           v1alpha1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			EtcdCAKeyPair:       v1alpha1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			FrontProxyCAKeyPair: v1alpha1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			SAKeyPair:           v1alpha1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
+			CAKeyPair:           clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
+			EtcdCAKeyPair:       clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
+			FrontProxyCAKeyPair: clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
+			SAKeyPair:           clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
 			DiscoveryHashes:     []string{"discoveryhash0"},
 		},
-		ClusterStatus: &v1alpha1.AzureClusterProviderStatus{},
+		ClusterStatus: &clusterproviderv1.AzureClusterProviderStatus{},
 	}
 	scope.Network().APIServerIP.DNSName = "DummyDNSName"
 	labels := make(map[string]string)
-	labels[v1alpha1.MachineRoleLabel] = label
-	machineConfig := providerv1.AzureMachineProviderSpec{}
+	labels[machineproviderv1.MachineRoleLabel] = label
+	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
 	c := fake.NewSimpleClientset(m).MachineV1beta1()
 	return &actuators.MachineScope{
 		Scope:         scope,
 		Machine:       m,
 		MachineClient: c.Machines("dummyNamespace"),
-		MachineConfig: &v1alpha1.AzureMachineProviderSpec{
+		MachineConfig: &machineproviderv1.AzureMachineProviderSpec{
 			Subnet:          "dummySubnet",
 			Vnet:            "dummyVnet",
 			ManagedIdentity: "dummyIdentity",
 		},
-		MachineStatus: &v1alpha1.AzureMachineProviderStatus{},
+		MachineStatus: &machineproviderv1.AzureMachineProviderStatus{},
 	}
 }
 
@@ -167,7 +167,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 		ProvisioningState: "Succeeded",
 	}
 	return &Reconciler{
-		scope:                 newFakeScope(t, v1alpha1.ControlPlane),
+		scope:                 newFakeScope(t, machineproviderv1.ControlPlane),
 		availabilityZonesSvc:  fakeSuccessSvc,
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
@@ -397,7 +397,7 @@ func TestNodeJoinFirstControlPlane(t *testing.T) {
 }
 
 func TestNodeJoinNode(t *testing.T) {
-	fakeScope := newFakeScope(t, v1alpha1.Node)
+	fakeScope := newFakeScope(t, machineproviderv1.Node)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	if isNodeJoin, err := fakeReconciler.isNodeJoin(); err != nil {
@@ -408,7 +408,7 @@ func TestNodeJoinNode(t *testing.T) {
 }
 
 func TestNodeJoinSecondControlPlane(t *testing.T) {
-	fakeScope := newFakeScope(t, v1alpha1.ControlPlane)
+	fakeScope := newFakeScope(t, machineproviderv1.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	if _, err := fakeScope.MachineClient.Create(fakeScope.Machine); err != nil {
@@ -479,7 +479,7 @@ func (s *FakeAvailabilityZonesService) Delete(ctx context.Context, spec azure.Sp
 }
 
 func TestAvailabilityZones(t *testing.T) {
-	fakeScope := newFakeScope(t, v1alpha1.ControlPlane)
+	fakeScope := newFakeScope(t, machineproviderv1.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
@@ -523,7 +523,7 @@ func TestGetZone(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeScope := newFakeScope(t, v1alpha1.ControlPlane)
+		fakeScope := newFakeScope(t, machineproviderv1.ControlPlane)
 		fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 		fakeReconciler.scope.MachineConfig.Zone = tc.inputZone
 
@@ -544,7 +544,7 @@ func TestGetZone(t *testing.T) {
 }
 
 func TestCustomUserData(t *testing.T) {
-	fakeScope := newFakeScope(t, v1alpha1.Node)
+	fakeScope := newFakeScope(t, machineproviderv1.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
@@ -573,7 +573,7 @@ func TestCustomUserData(t *testing.T) {
 }
 
 func TestCustomDataFailures(t *testing.T) {
-	fakeScope := newFakeScope(t, v1alpha1.Node)
+	fakeScope := newFakeScope(t, machineproviderv1.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",

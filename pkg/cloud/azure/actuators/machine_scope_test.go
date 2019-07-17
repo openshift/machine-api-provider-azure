@@ -26,11 +26,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	providerv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-func providerSpecFromMachine(in *providerv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -41,7 +42,7 @@ func providerSpecFromMachine(in *providerv1.AzureMachineProviderSpec) (*machinev
 }
 
 func newMachine(t *testing.T) *machinev1.Machine {
-	machineConfig := providerv1.AzureMachineProviderSpec{}
+	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -87,7 +88,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 			"azure_resource_prefix": []byte("dummyClusterName"),
 		},
 	}
-	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &providerv1.AzureClusterProviderSpec{}}
+	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
 	err := updateScope(
 		controllerfake.NewFakeClient(credentialsSecret),
 		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
@@ -114,7 +115,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 }
 
 func testCredentialFields(credentialsSecret *corev1.Secret) error {
-	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &providerv1.AzureClusterProviderSpec{}}
+	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
 	return updateScope(
 		controllerfake.NewFakeClient(credentialsSecret),
 		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},

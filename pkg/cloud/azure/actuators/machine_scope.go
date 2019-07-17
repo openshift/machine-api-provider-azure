@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
@@ -74,7 +74,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, errors.Wrap(err, "failed to get machine config")
 	}
 
-	machineStatus, err := v1alpha1.MachineStatusFromProviderStatus(params.Machine.Status.ProviderStatus)
+	machineStatus, err := v1beta1.MachineStatusFromProviderStatus(params.Machine.Status.ProviderStatus)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get machine provider status")
 	}
@@ -114,8 +114,8 @@ type MachineScope struct {
 	Machine       *machinev1.Machine
 	MachineClient machineclient.MachineInterface
 	CoreClient    controllerclient.Client
-	MachineConfig *v1alpha1.AzureMachineProviderSpec
-	MachineStatus *v1alpha1.AzureMachineProviderStatus
+	MachineConfig *v1beta1.AzureMachineProviderSpec
+	MachineStatus *v1beta1.AzureMachineProviderStatus
 }
 
 // Name returns the machine name.
@@ -130,7 +130,7 @@ func (m *MachineScope) Namespace() string {
 
 // Role returns the machine role from the labels.
 func (m *MachineScope) Role() string {
-	return m.Machine.Labels[v1alpha1.MachineRoleLabel]
+	return m.Machine.Labels[v1beta1.MachineRoleLabel]
 }
 
 // Location returns the machine location.
@@ -139,7 +139,7 @@ func (m *MachineScope) Location() string {
 }
 
 func (m *MachineScope) storeMachineSpec(machine *machinev1.Machine) (*machinev1.Machine, error) {
-	ext, err := v1alpha1.EncodeMachineSpec(m.MachineConfig)
+	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (m *MachineScope) storeMachineSpec(machine *machinev1.Machine) (*machinev1.
 }
 
 func (m *MachineScope) storeMachineStatus(machine *machinev1.Machine) (*machinev1.Machine, error) {
-	ext, err := v1alpha1.EncodeMachineStatus(m.MachineStatus)
+	ext, err := v1beta1.EncodeMachineStatus(m.MachineStatus)
 	if err != nil {
 		return nil, err
 	}
@@ -178,8 +178,8 @@ func (m *MachineScope) Close() {
 }
 
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.
-func MachineConfigFromProviderSpec(clusterClient machineclient.MachineClassesGetter, providerConfig machinev1.ProviderSpec) (*v1alpha1.AzureMachineProviderSpec, error) {
-	var config v1alpha1.AzureMachineProviderSpec
+func MachineConfigFromProviderSpec(clusterClient machineclient.MachineClassesGetter, providerConfig machinev1.ProviderSpec) (*v1beta1.AzureMachineProviderSpec, error) {
+	var config v1beta1.AzureMachineProviderSpec
 	if providerConfig.Value != nil {
 		klog.V(4).Info("Decoding ProviderConfig from Value")
 		return unmarshalProviderSpec(providerConfig.Value)
@@ -188,8 +188,8 @@ func MachineConfigFromProviderSpec(clusterClient machineclient.MachineClassesGet
 	return &config, nil
 }
 
-func unmarshalProviderSpec(spec *runtime.RawExtension) (*v1alpha1.AzureMachineProviderSpec, error) {
-	var config v1alpha1.AzureMachineProviderSpec
+func unmarshalProviderSpec(spec *runtime.RawExtension) (*v1beta1.AzureMachineProviderSpec, error) {
+	var config v1beta1.AzureMachineProviderSpec
 	if spec != nil {
 		if err := yaml.Unmarshal(spec.Raw, &config); err != nil {
 			return nil, err

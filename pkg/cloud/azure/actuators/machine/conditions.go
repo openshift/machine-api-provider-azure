@@ -3,7 +3,7 @@ package machine
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 )
 
 const (
@@ -13,8 +13,8 @@ const (
 )
 
 func shouldUpdateCondition(
-	oldCondition v1alpha1.AzureMachineProviderCondition,
-	newCondition v1alpha1.AzureMachineProviderCondition,
+	oldCondition v1beta1.AzureMachineProviderCondition,
+	newCondition v1beta1.AzureMachineProviderCondition,
 ) bool {
 	if oldCondition.Status != newCondition.Status ||
 		oldCondition.Reason != newCondition.Reason ||
@@ -33,14 +33,14 @@ func shouldUpdateCondition(
 // 1) Requested Status is different than existing status.
 // 2) requested Reason is different that existing one.
 // 3) requested Message is different that existing one.
-func setMachineProviderCondition(conditions []v1alpha1.AzureMachineProviderCondition, newCondition v1alpha1.AzureMachineProviderCondition) []v1alpha1.AzureMachineProviderCondition {
+func setMachineProviderCondition(conditions []v1beta1.AzureMachineProviderCondition, newCondition v1beta1.AzureMachineProviderCondition) []v1beta1.AzureMachineProviderCondition {
 	now := metav1.Now()
 	currentCondition := findCondition(conditions, newCondition.Type)
 	if currentCondition == nil {
 		klog.V(4).Infof("Adding new provider condition %v", newCondition)
 		conditions = append(
 			conditions,
-			v1alpha1.AzureMachineProviderCondition{
+			v1beta1.AzureMachineProviderCondition{
 				Type:               newCondition.Type,
 				Status:             newCondition.Status,
 				Reason:             newCondition.Reason,
@@ -69,7 +69,7 @@ func setMachineProviderCondition(conditions []v1alpha1.AzureMachineProviderCondi
 
 // findCondition finds in the machine the condition that has the
 // specified condition type. If none exists, then returns nil.
-func findCondition(conditions []v1alpha1.AzureMachineProviderCondition, conditionType v1alpha1.AzureMachineProviderConditionType) *v1alpha1.AzureMachineProviderCondition {
+func findCondition(conditions []v1beta1.AzureMachineProviderCondition, conditionType v1beta1.AzureMachineProviderConditionType) *v1beta1.AzureMachineProviderCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
 			return &conditions[i]
