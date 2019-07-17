@@ -56,11 +56,8 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.Wrapf(err, "failed to delete disk %s in resource group %s", diskSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
 	}
 
-	err = future.WaitForCompletionRef(ctx, s.Client.Client)
-	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
-	}
-
+	// Do not wait until the operation completes. Just check the result
+	// so the call to Delete actuator operation is async.
 	_, err = future.Result(s.Client)
 	if err != nil {
 		return errors.Wrap(err, "result error")
