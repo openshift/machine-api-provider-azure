@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -168,5 +169,106 @@ func TestCredentialsSecretFailures(t *testing.T) {
 	credentialsSecret.Data["azure_resource_prefix"] = []byte("dummyValue")
 	if err := testCredentialFields(credentialsSecret); err != nil {
 		t.Errorf("Expected New credentials secrets to succeed but found : %v", err)
+	}
+}
+
+func TestNewMachineScope(t *testing.T) {
+	machineConfig := machineproviderv1.AzureMachineProviderSpec{
+		Location:          "test",
+		ResourceGroup:     "test",
+		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
+	}
+	providerSpecWithValues, err := providerSpecFromMachine(&machineConfig)
+	if err != nil {
+		t.Fatalf("error encoding provider config: %v", err)
+	}
+
+	machineConfigNoValues := machineproviderv1.AzureMachineProviderSpec{
+		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
+	}
+	providerSpecNoValues, err := providerSpecFromMachine(&machineConfigNoValues)
+	if err != nil {
+		t.Fatalf("error encoding provider config: %v", err)
+	}
+
+	testCases := []struct {
+		machine               *machinev1.Machine
+		secret                *corev1.Secret
+		expectedLocation      string
+		expectedResourceGroup string
+	}{
+		{
+			machine: &machinev1.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: machinev1.MachineSpec{
+					ProviderSpec: *providerSpecWithValues,
+				},
+			},
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testCredentials",
+					Namespace: "dummyNamespace",
+				},
+				Data: map[string][]byte{
+					"azure_subscription_id": []byte("dummySubID"),
+					"azure_client_id":       []byte("dummyClientID"),
+					"azure_client_secret":   []byte("dummyClientSecret"),
+					"azure_tenant_id":       []byte("dummyTenantID"),
+					"azure_resourcegroup":   []byte("dummyResourceGroup"),
+					"azure_region":          []byte("dummyRegion"),
+					"azure_resource_prefix": []byte("dummyClusterName"),
+				},
+			},
+			expectedLocation:      "test",
+			expectedResourceGroup: "test",
+		},
+		{
+			machine: &machinev1.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test",
+				},
+				Spec: machinev1.MachineSpec{
+					ProviderSpec: *providerSpecNoValues,
+				},
+			},
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "testCredentials",
+					Namespace: "dummyNamespace",
+				},
+				Data: map[string][]byte{
+					"azure_subscription_id": []byte("dummySubID"),
+					"azure_client_id":       []byte("dummyClientID"),
+					"azure_client_secret":   []byte("dummyClientSecret"),
+					"azure_tenant_id":       []byte("dummyTenantID"),
+					"azure_resourcegroup":   []byte("dummyResourceGroup"),
+					"azure_region":          []byte("dummyRegion"),
+					"azure_resource_prefix": []byte("dummyClusterName"),
+				},
+			},
+			expectedLocation:      "dummyRegion",
+			expectedResourceGroup: "dummyResourceGroup",
+		},
+	}
+
+	for _, tc := range testCases {
+		scope, err := NewMachineScope(MachineScopeParams{
+			Machine:    tc.machine,
+			Cluster:    nil,
+			Client:     fake.NewSimpleClientset(tc.machine).MachineV1beta1(),
+			CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.secret),
+		})
+		if err != nil {
+			t.Fatalf("Unexpected error %v", err)
+		}
+
+		if scope.ClusterConfig.Location != tc.expectedLocation {
+			t.Errorf("Expected %v, got: %v", tc.expectedLocation, scope.ClusterConfig.Location)
+		}
+		if scope.ClusterConfig.ResourceGroup != tc.expectedResourceGroup {
+			t.Errorf("Expected %v, got: %v", tc.expectedResourceGroup, scope.ClusterConfig.ResourceGroup)
+		}
 	}
 }
