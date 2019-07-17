@@ -221,6 +221,9 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	// Do not wait until the operation completes. Just check the result
 	// so the call to Delete actuator operation is async.
 	_, err = future.Result(s.Client)
+	if err != nil {
+		return err
+	}
 
 	klog.V(2).Infof("successfully deleted vm %s ", vmSpec.Name)
 	return err
