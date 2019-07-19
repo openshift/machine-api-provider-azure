@@ -275,3 +275,7 @@ verify-boilerplate:
 	./hack/verify-boilerplate.sh
 
 check: verify-boilerplate bootstrap vendor-validate lint
+
+.PHONY: test-e2e
+test-e2e:
+	hack/e2e.sh
