@@ -31,19 +31,12 @@ DEPCACHEAGE ?= 24h # Enables caching for Dep
 BAZEL_ARGS ?=
 
 # Bazel variables
-BAZEL_VERSION := $(shell command -v bazel 2> /dev/null)
 DEP ?= bazel run dep
 
 # determine the OS
 HOSTOS := $(shell go env GOHOSTOS)
 HOSTARCH := $(shell go env GOARCH)
 BINARYPATHPATTERN :=${HOSTOS}_${HOSTARCH}_*
-
-ifndef BAZEL_VERSION
-    $(error "Bazel is not available. \
-		Installation instructions can be found at \
-		https://docs.bazel.build/versions/master/install.html")
-endif
 
 .PHONY: all
 all: check-install test manager clusterctl #clusterazureadm
