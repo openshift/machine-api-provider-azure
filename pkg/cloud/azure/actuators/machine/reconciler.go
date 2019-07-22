@@ -53,6 +53,18 @@ import (
 const (
 	// DefaultBootstrapTokenTTL default ttl for bootstrap token
 	DefaultBootstrapTokenTTL = 10 * time.Minute
+
+	// MachineRegionLabelName as annotation name for a machine region
+	MachineRegionLabelName = "machine.openshift.io/region"
+
+	// MachineAZLabelName as annotation name for a machine AZ
+	MachineAZLabelName = "machine.openshift.io/zone"
+
+	// MachineInstanceStateAnnotationName as annotation name for a machine instance state
+	MachineInstanceStateAnnotationName = "machine.openshift.io/instance-state"
+
+	// MachineInstanceTypeLabelName as annotation name for a machine instance type
+	MachineInstanceTypeLabelName = "machine.openshift.io/instance-type"
 )
 
 // Reconciler are list of services required by cluster actuator, easy to create a fake
@@ -132,8 +144,6 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create vm extension")
 		}
 	}
-
-	s.scope.Machine.Annotations["cluster-api-provider-azure"] = "true"
 
 	return nil
 }
@@ -283,11 +293,75 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		Message: machineCreationSucceedMessage,
 	})
 
-	vmState := v1beta1.VMState(*vm.ProvisioningState)
+	vmState := getVMState(vm)
 	s.scope.MachineStatus.VMID = vm.ID
 	s.scope.MachineStatus.VMState = &vmState
 
+	s.setMachineCloudProviderSpecifics(vm)
+
 	return nil
+}
+
+func getVMState(vm compute.VirtualMachine) v1beta1.VMState {
+	if vm.ProvisioningState == nil {
+		return ""
+	}
+
+	if *vm.ProvisioningState != "Succeeded" {
+		return v1beta1.VMState(*vm.ProvisioningState)
+	}
+
+	if vm.InstanceView == nil || vm.InstanceView.Statuses == nil {
+		return ""
+	}
+
+	for _, status := range *vm.InstanceView.Statuses {
+		if status.Code == nil {
+			continue
+		}
+		switch *status.Code {
+		case "ProvisioningState/succeeded":
+			continue
+		case "PowerState/starting":
+			return v1beta1.VMStateStarting
+		case "PowerState/running":
+			return v1beta1.VMStateRunning
+		case "PowerState/stopping":
+			return v1beta1.VMStateStopping
+		case "PowerState/stopped":
+			return v1beta1.VMStateStopped
+		case "PowerState/deallocating":
+			return v1beta1.VMStateDeallocating
+		case "PowerState/deallocated":
+			return v1beta1.VMStateDeallocated
+		default:
+			return v1beta1.VMStateUnknown
+		}
+	}
+
+	return ""
+}
+
+func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine) {
+	if s.scope.Machine.Labels == nil {
+		s.scope.Machine.Labels = make(map[string]string)
+	}
+
+	if s.scope.Machine.Annotations == nil {
+		s.scope.Machine.Annotations = make(map[string]string)
+	}
+
+	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(getVMState(vm))
+
+	if vm.HardwareProfile != nil {
+		s.scope.Machine.Labels[MachineInstanceTypeLabelName] = string(vm.HardwareProfile.VMSize)
+	}
+	if vm.Location != nil {
+		s.scope.Machine.Labels[MachineRegionLabelName] = *vm.Location
+	}
+	if vm.Zones != nil {
+		s.scope.Machine.Labels[MachineAZLabelName] = strings.Join(*vm.Zones, ",")
+	}
 }
 
 // Exists checks if machine exists
@@ -345,6 +419,11 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	vmSpec := &virtualmachines.Spec{
 		Name: s.scope.Machine.Name,
 	}
+
+	// Getting a vm object does not work here so let's assume
+	// an instance is really being deleted
+	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(v1beta1.VMStateDeleting)
+	s.scope.MachineStatus.VMState = &v1beta1.VMStateDeleting
 
 	err := s.virtualMachinesSvc.Delete(ctx, vmSpec)
 	if err != nil {
@@ -578,7 +657,6 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		if err != nil {
 			return errors.Wrapf(err, "failed to create or get machine")
 		}
-		s.scope.Machine.Annotations["availability-zone"] = zone
 	} else if err != nil {
 		return errors.Wrap(err, "failed to get vm")
 	} else {
@@ -589,6 +667,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		if vm.ProvisioningState == nil {
 			return errors.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
 		}
+
+		vmState := getVMState(vm)
+		s.scope.MachineStatus.VMID = vm.ID
+		s.scope.MachineStatus.VMState = &vmState
+
+		s.setMachineCloudProviderSpecifics(vm)
 
 		if *vm.ProvisioningState == "Failed" {
 			// If VM failed provisioning, delete it so it can be recreated
