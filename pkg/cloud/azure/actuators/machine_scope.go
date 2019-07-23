@@ -18,6 +18,7 @@ package actuators
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -159,22 +160,22 @@ func (m *MachineScope) storeMachineStatus(machine *machinev1.Machine) (*machinev
 	return m.MachineClient.UpdateStatus(machine)
 }
 
-// Close the MachineScope by updating the machine spec, machine status.
-func (m *MachineScope) Close() {
+// Persist the machine spec and machine status.
+func (m *MachineScope) Persist() error {
 	if m.MachineClient == nil {
-		return
+		return fmt.Errorf("machine client is empty")
 	}
 
 	latestMachine, err := m.storeMachineSpec(m.Machine)
 	if err != nil {
-		klog.Errorf("[machinescope] failed to update machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
-		return
+		return fmt.Errorf("[machinescope] failed to update machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
 	_, err = m.storeMachineStatus(latestMachine)
 	if err != nil {
-		klog.Errorf("[machinescope] failed to store provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+		return fmt.Errorf("[machinescope] failed to store provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
+	return nil
 }
 
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.

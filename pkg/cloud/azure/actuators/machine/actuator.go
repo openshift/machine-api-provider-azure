@@ -18,6 +18,7 @@ package machine
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
@@ -100,14 +101,21 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 	if err != nil {
 		return a.handleMachineError(machine, apierrors.CreateMachine("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
 	}
-	defer scope.Close()
 
 	err = a.reconcilerBuilder(scope).Create(context.Background())
 	if err != nil {
+		// We still want to persist on failure to update MachineStatus
+		if err := scope.Persist(); err != nil {
+			klog.Errorf("Error storing machine info: %v", err)
+		}
 		a.handleMachineError(machine, apierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
+	}
+
+	if err := scope.Persist(); err != nil {
+		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
 	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Created", "Created machine %q", machine.Name)
@@ -129,14 +137,20 @@ func (a *Actuator) Delete(ctx context.Context, cluster *clusterv1.Cluster, machi
 		return a.handleMachineError(machine, apierrors.DeleteMachine("failed to create machine %q scope: %v", machine.Name, err), deleteEventAction)
 	}
 
-	defer scope.Close()
-
 	err = a.reconcilerBuilder(scope).Delete(context.Background())
 	if err != nil {
+		// We still want to persist on failure to update MachineStatus
+		if err := scope.Persist(); err != nil {
+			klog.Errorf("Error storing machine info: %v", err)
+		}
 		a.handleMachineError(machine, apierrors.DeleteMachine("failed to delete machine %q: %v", machine.Name, err), deleteEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
+	}
+
+	if err := scope.Persist(); err != nil {
+		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
 	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Deleted", "Deleted machine %q", machine.Name)
@@ -160,14 +174,20 @@ func (a *Actuator) Update(ctx context.Context, cluster *clusterv1.Cluster, machi
 		return a.handleMachineError(machine, apierrors.UpdateMachine("failed to create machine %q scope: %v", machine.Name, err), updateEventAction)
 	}
 
-	defer scope.Close()
-
 	err = a.reconcilerBuilder(scope).Update(context.Background())
 	if err != nil {
+		// We still want to persist on failure to update MachineStatus
+		if err := scope.Persist(); err != nil {
+			klog.Errorf("Error storing machine info: %v", err)
+		}
 		a.handleMachineError(machine, apierrors.UpdateMachine("failed to update machine %q: %v", machine.Name, err), updateEventAction)
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: time.Minute,
 		}
+	}
+
+	if err := scope.Persist(); err != nil {
+		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
 	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
@@ -188,8 +208,6 @@ func (a *Actuator) Exists(ctx context.Context, cluster *clusterv1.Cluster, machi
 	if err != nil {
 		return false, errors.Errorf("failed to create scope: %+v", err)
 	}
-
-	defer scope.Close()
 
 	isExists, err := a.reconcilerBuilder(scope).Exists(context.Background())
 	if err != nil {
