@@ -48,38 +48,38 @@ type AzureMachineProviderSpec struct {
 	// CredentialsSecret is a reference to the secret with Azure credentials.
 	CredentialsSecret *corev1.SecretReference `json:"credentialsSecret,omitempty"`
 
-	Location      string `json:"location"`
-	VMSize        string `json:"vmSize"`
+	Location      string `json:"location,omitempty"`
+	VMSize        string `json:"vmSize,omitempty"`
 	Image         Image  `json:"image"`
 	OSDisk        OSDisk `json:"osDisk"`
-	SSHPublicKey  string `json:"sshPublicKey"`
-	SSHPrivateKey string `json:"sshPrivateKey"`
+	SSHPublicKey  string `json:"sshPublicKey,omitempty"`
+	SSHPrivateKey string `json:"sshPrivateKey,omitempty"`
 	PublicIP      bool   `json:"publicIP"`
 
 	// Subnet to use for this instance
 	Subnet string `json:"subnet"`
 
 	// PublicLoadBalancer to use for this instance
-	PublicLoadBalancer string `json:"publicLoadBalancer"`
+	PublicLoadBalancer string `json:"publicLoadBalancer,omitempty"`
 
 	// InternalLoadBalancerName to use for this instance
-	InternalLoadBalancer string `json:"internalLoadBalancer"`
+	InternalLoadBalancer string `json:"internalLoadBalancer,omitempty"`
 
 	// NatRule to set inbound NAT rule of the load balancer
-	NatRule *int `json:"natRule"`
+	NatRule *int `json:"natRule,omitempty"`
 
 	// ManagedIdentity to set managed identity name
-	ManagedIdentity string `json:"managedIdentity"`
+	ManagedIdentity string `json:"managedIdentity,omitempty"`
 
 	// Vnet to set virtual network name
-	Vnet string `json:"vnet"`
+	Vnet string `json:"vnet,omitempty"`
 
 	// Availability Zone for the virtual machine.
 	// If nil, the virtual machine should be deployed to no zone
 	Zone *string `json:"zone,omitempty"`
 
-	NetworkResourceGroup string `json:"networkResourceGroup"`
-	ResourceGroup        string `json:"resourceGroup"`
+	NetworkResourceGroup string `json:"networkResourceGroup,omitempty"`
+	ResourceGroup        string `json:"resourceGroup,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
