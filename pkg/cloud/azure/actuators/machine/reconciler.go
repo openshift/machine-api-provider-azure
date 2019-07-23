@@ -283,45 +283,58 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		Message: machineCreationSucceedMessage,
 	})
 
+	vmState := v1beta1.VMState(*vm.ProvisioningState)
+	s.scope.MachineStatus.VMID = vm.ID
+	s.scope.MachineStatus.VMState = &vmState
+
 	return nil
 }
 
 // Exists checks if machine exists
 func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
-	exists, err := s.isVMExists(ctx)
+	vmSpec := &virtualmachines.Spec{
+		Name: s.scope.Name(),
+	}
+	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
+
+	if err != nil && vmInterface == nil {
+		return false, nil
+	}
+
 	if err != nil {
-		return false, err
-	} else if !exists {
-		return false, nil
+		return false, errors.Wrap(err, "Failed to get vm")
 	}
 
-	switch *s.scope.MachineStatus.VMState {
-	case v1beta1.VMStateSucceeded:
-		klog.Infof("Machine %v is running", *s.scope.MachineStatus.VMID)
-	case v1beta1.VMStateUpdating:
-		klog.Infof("Machine %v is updating", *s.scope.MachineStatus.VMID)
-	default:
-		return false, nil
+	vm, ok := vmInterface.(compute.VirtualMachine)
+	if !ok {
+		return false, errors.Errorf("returned incorrect vm interface: %T", vmInterface)
 	}
 
-	if s.scope.Machine.Spec.ProviderID == nil || *s.scope.Machine.Spec.ProviderID == "" {
-		// TODO: This should be unified with the logic for getting the nodeRef, and
-		// should potentially leverage the code that already exists in
-		// kubernetes/cloud-provider-azure
-		providerID := fmt.Sprintf("azure:////%s", *s.scope.MachineStatus.VMID)
-		s.scope.Machine.Spec.ProviderID = &providerID
-	}
+	klog.Infof("Found vm for machine %s", s.scope.Name())
 
-	// Set the Machine NodeRef.
-	if s.scope.Machine.Status.NodeRef == nil {
-		nodeRef, err := getNodeReference(s.scope)
-		if err != nil {
-			klog.Warningf("Failed to set nodeRef: %v", err)
-			return true, nil
+	if s.scope.MachineConfig.UserDataSecret == nil {
+		vmExtSpec := &virtualmachineextensions.Spec{
+			Name:   "startupScript",
+			VMName: s.scope.Name(),
 		}
 
-		s.scope.Machine.Status.NodeRef = nodeRef
-		klog.Infof("Setting machine %s nodeRef to %s", s.scope.Name(), nodeRef.Name)
+		vmExt, err := s.virtualMachinesExtSvc.Get(ctx, vmExtSpec)
+		if err != nil && vmExt == nil {
+			return false, nil
+		}
+
+		if err != nil {
+			return false, errors.Wrapf(err, "failed to get vm extension")
+		}
+	}
+
+	switch v1beta1.VMState(*vm.ProvisioningState) {
+	case v1beta1.VMStateSucceeded:
+		klog.Infof("Machine %v is running", to.String(vm.VMID))
+	case v1beta1.VMStateUpdating:
+		klog.Infof("Machine %v is updating", to.String(vm.VMID))
+	default:
+		return false, nil
 	}
 
 	return true, nil
@@ -471,94 +484,6 @@ func coreV1Client(kubeconfig string) (corev1.CoreV1Interface, error) {
 	}
 
 	return corev1.NewForConfig(cfg)
-}
-
-func (s *Reconciler) isVMExists(ctx context.Context) (bool, error) {
-	vmSpec := &virtualmachines.Spec{
-		Name: s.scope.Name(),
-	}
-	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
-
-	if err != nil && vmInterface == nil {
-		return false, nil
-	}
-
-	if err != nil {
-		return false, errors.Wrap(err, "Failed to get vm")
-	}
-
-	vm, ok := vmInterface.(compute.VirtualMachine)
-	if !ok {
-		return false, errors.New("returned incorrect vm interface")
-	}
-
-	klog.Infof("Found vm for machine %s", s.scope.Name())
-
-	if s.scope.MachineConfig.UserDataSecret == nil {
-		vmExtSpec := &virtualmachineextensions.Spec{
-			Name:   "startupScript",
-			VMName: s.scope.Name(),
-		}
-
-		vmExt, err := s.virtualMachinesExtSvc.Get(ctx, vmExtSpec)
-		if err != nil && vmExt == nil {
-			return false, nil
-		}
-
-		if err != nil {
-			return false, errors.Wrapf(err, "failed to get vm extension")
-		}
-	}
-
-	vmState := v1beta1.VMState(*vm.ProvisioningState)
-
-	s.scope.MachineStatus.VMID = vm.ID
-	s.scope.MachineStatus.VMState = &vmState
-	return true, nil
-}
-
-func getNodeReference(scope *actuators.MachineScope) (*apicorev1.ObjectReference, error) {
-	if scope.MachineStatus.VMID == nil {
-		return nil, errors.Errorf("instance id is empty for machine %s", scope.Machine.Name)
-	}
-
-	instanceID := *scope.MachineStatus.VMID
-
-	if scope.ClusterConfig == nil {
-		return nil, errors.Errorf("failed to retrieve corev1 client for empty kubeconfig %s", scope.Cluster.Name)
-	}
-
-	coreClient, err := coreV1Client(scope.ClusterConfig.AdminKubeconfig)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve corev1 client for cluster %s", scope.Cluster.Name)
-	}
-
-	listOpt := metav1.ListOptions{}
-
-	for {
-		nodeList, err := coreClient.Nodes().List(listOpt)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to query cluster nodes")
-		}
-
-		for _, node := range nodeList.Items {
-			// TODO(vincepri): Improve this comparison without relying on substrings.
-			if strings.Contains(node.Spec.ProviderID, instanceID) {
-				return &apicorev1.ObjectReference{
-					Kind:       node.Kind,
-					APIVersion: node.APIVersion,
-					Name:       node.Name,
-				}, nil
-			}
-		}
-
-		listOpt.Continue = nodeList.Continue
-		if listOpt.Continue == "" {
-			break
-		}
-	}
-
-	return nil, errors.Errorf("no node found for machine %s", scope.Name())
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {
