@@ -51,6 +51,7 @@ go_test(
     srcs = [
         "actuator_test.go",
         "conditions_test.go",
+        "reconciler_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
