@@ -395,7 +395,7 @@
 
 [[projects]]
   branch = "openshift-4.2-cluster-api-0.1.0"
-  digest = "1:39b28a2133488606e41fd0f6f13ec4239169424432fb0eb0dadb9d6f8ee4bf91"
+  digest = "1:e4cc8b4a309af144c12f7e010efe4de2a3068cbb141a856bc2e662608683d3f3"
   name = "github.com/openshift/cluster-api"
   packages = [
     "cmd/clusterctl/clientcmd",
@@ -429,7 +429,7 @@
     "pkg/util",
   ]
   pruneopts = "T"
-  revision = "e911af77e9a33cfb45f82ba9778876d715cdb4ea"
+  revision = "f8de78af80fcecf1fd69e35005b591dc9e1df61a"
 
 [[projects]]
   branch = "master"
