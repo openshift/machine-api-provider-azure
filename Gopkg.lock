@@ -514,6 +514,14 @@
   version = "v1.2.2"
 
 [[projects]]
+  digest = "1:274f67cb6fed9588ea2521ecdac05a6d62a8c51c074c1fccc6a49a40ba80e925"
+  name = "github.com/satori/go.uuid"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
+  version = "v1.2.0"
+
+[[projects]]
   digest = "1:3e39bafd6c2f4bf3c76c3bfd16a2e09e016510ad5db90dc02b88e2f565d6d595"
   name = "github.com/spf13/afero"
   packages = [
@@ -1286,6 +1294,7 @@
     "github.com/openshift/cluster-api/pkg/controller/machine",
     "github.com/openshift/cluster-api/pkg/errors",
     "github.com/pkg/errors",
+    "github.com/satori/go.uuid",
     "github.com/spf13/cobra",
     "golang.org/x/crypto/ssh",
     "k8s.io/api/core/v1",
@@ -1297,7 +1306,9 @@
     "k8s.io/apimachinery/pkg/util/json",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/typed/core/v1",
+    "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/util/cert",
     "k8s.io/cluster-bootstrap/token/util",
