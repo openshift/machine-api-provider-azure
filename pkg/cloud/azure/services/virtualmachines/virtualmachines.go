@@ -45,6 +45,7 @@ type Spec struct {
 	OSDisk          v1beta1.OSDisk
 	CustomData      string
 	ManagedIdentity string
+	Tags            map[string]string
 }
 
 // Get provides information about a virtual network.
@@ -138,6 +139,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	virtualMachine := compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.ClusterConfig.Location),
+		Tags:     getTagListFromSpec(vmSpec),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypes(vmSpec.Size),
@@ -200,6 +202,18 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("successfully created vm %s ", vmSpec.Name)
 	return err
+}
+
+func getTagListFromSpec(spec *Spec) map[string]*string {
+	if len(spec.Tags) < 1 {
+		return nil
+	}
+
+	tagList := map[string]*string{}
+	for key, element := range spec.Tags {
+		tagList[key] = to.StringPtr(element)
+	}
+	return tagList
 }
 
 // Delete deletes the virtual network with the provided name.

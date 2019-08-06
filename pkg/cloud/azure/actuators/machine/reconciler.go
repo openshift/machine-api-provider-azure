@@ -641,6 +641,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			OSDisk:          s.scope.MachineConfig.OSDisk,
 			Image:           s.scope.MachineConfig.Image,
 			Zone:            zone,
+			Tags:            s.scope.MachineConfig.Tags,
 			ManagedIdentity: azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity),
 		}
 

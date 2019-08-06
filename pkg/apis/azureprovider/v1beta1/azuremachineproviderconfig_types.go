@@ -48,13 +48,14 @@ type AzureMachineProviderSpec struct {
 	// CredentialsSecret is a reference to the secret with Azure credentials.
 	CredentialsSecret *corev1.SecretReference `json:"credentialsSecret,omitempty"`
 
-	Location      string `json:"location,omitempty"`
-	VMSize        string `json:"vmSize,omitempty"`
-	Image         Image  `json:"image"`
-	OSDisk        OSDisk `json:"osDisk"`
-	SSHPublicKey  string `json:"sshPublicKey,omitempty"`
-	SSHPrivateKey string `json:"sshPrivateKey,omitempty"`
-	PublicIP      bool   `json:"publicIP"`
+	Location      string            `json:"location,omitempty"`
+	VMSize        string            `json:"vmSize,omitempty"`
+	Image         Image             `json:"image"`
+	OSDisk        OSDisk            `json:"osDisk"`
+	SSHPublicKey  string            `json:"sshPublicKey,omitempty"`
+	SSHPrivateKey string            `json:"sshPrivateKey,omitempty"`
+	PublicIP      bool              `json:"publicIP"`
+	Tags          map[string]string `json:"tags,omitempty"`
 
 	// Subnet to use for this instance
 	Subnet string `json:"subnet"`
