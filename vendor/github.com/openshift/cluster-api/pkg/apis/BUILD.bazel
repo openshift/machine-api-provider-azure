@@ -7,12 +7,11 @@ go_library(
         "addtoscheme_machine_v1beta1.go",
         "apis.go",
     ],
-    importmap = "sigs.k8s.io/cluster-api-provider-azure/vendor/github.com/openshift/cluster-api/pkg/apis",
     importpath = "github.com/openshift/cluster-api/pkg/apis",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1:go_default_library",
-        "//vendor/github.com/openshift/cluster-api/pkg/apis/machine/v1beta1:go_default_library",
+        "//pkg/apis/cluster/v1alpha1:go_default_library",
+        "//pkg/apis/machine/v1beta1:go_default_library",
         "//vendor/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],
 )

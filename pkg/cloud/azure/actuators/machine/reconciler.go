@@ -30,17 +30,12 @@ import (
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/converters"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/certificates"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/config"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
@@ -48,7 +43,6 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	controllerconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 const (
@@ -122,28 +116,6 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 
 	if err := s.createVirtualMachine(ctx, nicName); err != nil {
 		return errors.Wrapf(err, "failed to create vm %s ", s.scope.Machine.Name)
-	}
-
-	if s.scope.MachineConfig.UserDataSecret == nil {
-		bootstrapToken, err := s.checkControlPlaneMachines()
-		if err != nil {
-			return errors.Wrap(err, "failed to check control plane machines in cluster")
-		}
-
-		scriptData, err := config.GetVMStartupScript(s.scope, bootstrapToken)
-		if err != nil {
-			return errors.Wrapf(err, "failed to get vm startup script")
-		}
-
-		vmExtSpec := &virtualmachineextensions.Spec{
-			Name:       "startupScript",
-			VMName:     s.scope.Machine.Name,
-			ScriptData: base64.StdEncoding.EncodeToString([]byte(scriptData)),
-		}
-		err = s.virtualMachinesExtSvc.CreateOrUpdate(ctx, vmExtSpec)
-		if err != nil {
-			return errors.Wrap(err, "failed to create vm extension")
-		}
 	}
 
 	return nil
@@ -494,92 +466,6 @@ func isMachineOutdated(machineSpec *v1beta1.AzureMachineProviderSpec, vm *v1beta
 
 	// No immutable state changes found.
 	return false
-}
-
-func (s *Reconciler) isNodeJoin() (bool, error) {
-	clusterMachines, err := s.scope.MachineClient.List(metav1.ListOptions{})
-	if err != nil {
-		return false, errors.Wrapf(err, "failed to retrieve machines in cluster")
-	}
-
-	switch set := s.scope.Machine.ObjectMeta.Labels[v1beta1.MachineRoleLabel]; set {
-	case v1beta1.Node:
-		return true, nil
-	case v1beta1.ControlPlane:
-		for _, cm := range clusterMachines.Items {
-			if cm.ObjectMeta.Labels[v1beta1.MachineRoleLabel] == v1beta1.ControlPlane {
-				continue
-			}
-			vmInterface, err := s.virtualMachinesSvc.Get(context.Background(), &virtualmachines.Spec{Name: cm.Name})
-			if err != nil && vmInterface == nil {
-				klog.V(2).Infof("Machine %s should join the controlplane: false", s.scope.Name())
-				return false, nil
-			}
-
-			if err != nil {
-				return false, errors.Wrapf(err, "failed to verify existence of machine %s", cm.Name)
-			}
-
-			vmExtSpec := &virtualmachineextensions.Spec{
-				Name:   "startupScript",
-				VMName: cm.Name,
-			}
-
-			vmExt, err := s.virtualMachinesExtSvc.Get(context.Background(), vmExtSpec)
-			if err != nil && vmExt == nil {
-				klog.V(2).Infof("Machine %s should join the controlplane: false", cm.Name)
-				return false, nil
-			}
-
-			klog.V(2).Infof("Machine %s should join the controlplane: true", s.scope.Name())
-			return true, nil
-		}
-
-		return len(clusterMachines.Items) > 0, nil
-	default:
-		return false, errors.Errorf("Unknown value %s for label `set` on machine %s, skipping machine creation", set, s.scope.Name())
-	}
-}
-
-func (s *Reconciler) checkControlPlaneMachines() (string, error) {
-	isJoin, err := s.isNodeJoin()
-	if err != nil {
-		return "", errors.Wrapf(err, "failed to determine whether machine should join cluster")
-	}
-
-	var bootstrapToken string
-	if isJoin {
-		if s.scope.ClusterConfig == nil {
-			return "", errors.Errorf("failed to retrieve corev1 client for empty kubeconfig")
-		}
-		bootstrapToken, err = certificates.CreateNewBootstrapToken(s.scope.ClusterConfig.AdminKubeconfig, DefaultBootstrapTokenTTL)
-		if err != nil {
-			return "", errors.Wrapf(err, "failed to create new bootstrap token")
-		}
-	}
-	return bootstrapToken, nil
-}
-
-func coreV1Client(kubeconfig string) (corev1.CoreV1Interface, error) {
-	if kubeconfig == "" {
-		cfg, err := controllerconfig.GetConfig()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get config")
-		}
-		return corev1.NewForConfig(cfg)
-	}
-	clientConfig, err := clientcmd.NewClientConfigFromBytes([]byte(kubeconfig))
-
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get client config for cluster")
-	}
-
-	cfg, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get client config for cluster")
-	}
-
-	return corev1.NewForConfig(cfg)
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {

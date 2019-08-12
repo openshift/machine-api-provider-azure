@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/deployer"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -49,8 +48,6 @@ const (
 
 // Actuator is responsible for performing machine reconciliation.
 type Actuator struct {
-	*deployer.Deployer
-
 	client        client.MachineV1beta1Interface
 	coreClient    controllerclient.Client
 	eventRecorder record.EventRecorder
@@ -69,7 +66,6 @@ type ActuatorParams struct {
 // NewActuator returns an actuator.
 func NewActuator(params ActuatorParams) *Actuator {
 	return &Actuator{
-		Deployer:          deployer.New(deployer.Params{ScopeGetter: actuators.DefaultScopeGetter}),
 		client:            params.Client,
 		coreClient:        params.CoreClient,
 		eventRecorder:     params.EventRecorder,

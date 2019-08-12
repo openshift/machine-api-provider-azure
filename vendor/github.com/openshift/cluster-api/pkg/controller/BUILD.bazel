@@ -6,11 +6,10 @@ go_library(
         "add_machineset.go",
         "controller.go",
     ],
-    importmap = "sigs.k8s.io/cluster-api-provider-azure/vendor/github.com/openshift/cluster-api/pkg/controller",
     importpath = "github.com/openshift/cluster-api/pkg/controller",
     visibility = ["//visibility:public"],
     deps = [
-        "//vendor/github.com/openshift/cluster-api/pkg/controller/machineset:go_default_library",
+        "//pkg/controller/machineset:go_default_library",
         "//vendor/sigs.k8s.io/controller-runtime/pkg/manager:go_default_library",
     ],
 )

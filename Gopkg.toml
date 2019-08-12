@@ -39,6 +39,7 @@ required = [
     "sigs.k8s.io/controller-runtime/pkg/source",
     "sigs.k8s.io/testing_frameworks/integration", # for integration testing
     "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+    "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for cluster-api's cmd/manager
 ]
 
 [[constraint]]

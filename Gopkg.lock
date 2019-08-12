@@ -2,12 +2,12 @@
 
 
 [[projects]]
-  digest = "1:4d6f036ea3fe636bcb2e89850bcdc62a771354e157cd51b8b22a2de8562bf663"
+  digest = "1:a24d4f0bfca235899423e806a033447bb840d48970ecd8e1bc409537d0289c23"
   name = "cloud.google.com/go"
   packages = ["compute/metadata"]
   pruneopts = "UT"
-  revision = "c9474f2f8deb81759839474b6bd1726bbfe1c1c4"
-  version = "v0.36.0"
+  revision = "d1af076dc3f6a314e9dd6610fe83b0f7afaff6d6"
+  version = "v0.45.1"
 
 [[projects]]
   digest = "1:b92928b73320648b38c93cacb9082c0fe3f8ac3383ad9bd537eef62c380e0e7a"
@@ -231,22 +231,6 @@
   version = "v0.2.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:97047773a250808f6a436749af47088a94ed09b7c70df29baace96548574012c"
-  name = "github.com/gophercloud/gophercloud"
-  packages = [
-    ".",
-    "openstack",
-    "openstack/identity/v2/tenants",
-    "openstack/identity/v2/tokens",
-    "openstack/identity/v3/tokens",
-    "openstack/utils",
-    "pagination",
-  ]
-  pruneopts = "UT"
-  revision = "f83aee3da90f3f337d024070e2e68b04fb035149"
-
-[[projects]]
   digest = "1:d15ee511aa0f56baacc1eb4c6b922fa1c03b38413b6be18166b996d82a0156ea"
   name = "github.com/hashicorp/golang-lru"
   packages = [
@@ -398,18 +382,6 @@
   digest = "1:31312627ff61477fbb4ef78d381bb5cec9ccca4d8731f1f2e17bffa84425d4c3"
   name = "github.com/openshift/cluster-api"
   packages = [
-    "cmd/clusterctl/clientcmd",
-    "cmd/clusterctl/clusterdeployer",
-    "cmd/clusterctl/clusterdeployer/bootstrap",
-    "cmd/clusterctl/clusterdeployer/bootstrap/existing",
-    "cmd/clusterctl/clusterdeployer/bootstrap/kind",
-    "cmd/clusterctl/clusterdeployer/bootstrap/minikube",
-    "cmd/clusterctl/clusterdeployer/clusterclient",
-    "cmd/clusterctl/clusterdeployer/provider",
-    "cmd/clusterctl/cmd",
-    "cmd/clusterctl/phases",
-    "cmd/clusterctl/providercomponents",
-    "cmd/clusterctl/validation",
     "pkg/apis",
     "pkg/apis/cluster/common",
     "pkg/apis/cluster/v1alpha1",
@@ -424,7 +396,6 @@
     "pkg/client/clientset_generated/clientset/typed/machine/v1beta1/fake",
     "pkg/controller/error",
     "pkg/controller/machine",
-    "pkg/controller/noderefutil",
     "pkg/drain",
     "pkg/errors",
     "pkg/util",
@@ -927,7 +898,7 @@
   version = "kubernetes-1.14.1"
 
 [[projects]]
-  digest = "1:f39c884b4f70f71294f6070d09033389e6de055d0c2df859a2bcab1e121923f6"
+  digest = "1:e4572cfed6d0649e9c926cebb400a79bade6fb845fecabea8e271734ac582f98"
   name = "k8s.io/client-go"
   packages = [
     "discovery",
@@ -1012,12 +983,8 @@
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/apis/clientauthentication/v1beta1",
     "pkg/version",
-    "plugin/pkg/client/auth",
-    "plugin/pkg/client/auth/azure",
     "plugin/pkg/client/auth/exec",
     "plugin/pkg/client/auth/gcp",
-    "plugin/pkg/client/auth/oidc",
-    "plugin/pkg/client/auth/openstack",
     "rest",
     "rest/watch",
     "restmapper",
@@ -1266,10 +1233,7 @@
     "github.com/golang/mock/mockgen",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
-    "github.com/openshift/cluster-api/cmd/clusterctl/clientcmd",
-    "github.com/openshift/cluster-api/cmd/clusterctl/cmd",
     "github.com/openshift/cluster-api/pkg/apis",
-    "github.com/openshift/cluster-api/pkg/apis/cluster/common",
     "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1",
     "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1",
     "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset",
@@ -1292,8 +1256,10 @@
     "k8s.io/apimachinery/pkg/util/json",
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
-    "k8s.io/client-go/kubernetes/typed/core/v1",
+    "k8s.io/client-go/plugin/pkg/client/auth/gcp",
+    "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
+    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/util/cert",
     "k8s.io/cluster-bootstrap/token/util",
