@@ -16,11 +16,7 @@ limitations under the License.
 
 package azure
 
-import (
-	"fmt"
-
-	uuid "github.com/satori/go.uuid"
-)
+import "fmt"
 
 const (
 	// DefaultUserName is the default username for created vm
@@ -83,15 +79,13 @@ func GeneratePublicIPName(clusterName, hash string) string {
 }
 
 // GenerateMachinePublicIPName generates a public IP name for a machine, based on the cluster name and a hash.
-func GenerateMachinePublicIPName(clusterName, machineName string) string {
+func GenerateMachinePublicIPName(clusterName, machineName string) (string, error) {
 	name := GeneratePublicIPName(clusterName, machineName)
 	if len(name) < 64 {
-		return name
+		return name, nil
 	}
-	hash := uuid.NewV4().String()
-	hashlen := len(hash)
 
-	return name[:63-hashlen] + hash
+	return "", fmt.Errorf("machine public IP name is longer than 63 characters")
 }
 
 // GenerateFQDN generates a fully qualified domain name, based on the public IP name and cluster location.

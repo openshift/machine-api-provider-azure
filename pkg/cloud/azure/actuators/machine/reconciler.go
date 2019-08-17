@@ -455,11 +455,18 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		return errors.Wrapf(err, "Unable to delete network interface")
 	}
 
-	err = s.publicIPSvc.Delete(ctx, &publicips.Spec{
-		Name: azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name),
-	})
-	if err != nil {
-		return errors.Wrap(err, "unable to delete Public IP")
+	if s.scope.MachineConfig.PublicIP {
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
+		if err != nil {
+			return errors.Wrap(err, "unable to create Public IP")
+		}
+
+		err = s.publicIPSvc.Delete(ctx, &publicips.Spec{
+			Name: publicIPName,
+		})
+		if err != nil {
+			return errors.Wrap(err, "unable to delete Public IP")
+		}
 	}
 
 	return nil
@@ -599,8 +606,11 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
-		err := s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
+		if err != nil {
+			return errors.Wrap(err, "unable to create Public IP")
+		}
+		err = s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
 		if err != nil {
 			return errors.Wrap(err, "unable to create Public IP")
 		}
