@@ -422,6 +422,9 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 
 	// Getting a vm object does not work here so let's assume
 	// an instance is really being deleted
+	if s.scope.Machine.Annotations == nil {
+		s.scope.Machine.Annotations = make(map[string]string)
+	}
 	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(v1beta1.VMStateDeleting)
 	s.scope.MachineStatus.VMState = &v1beta1.VMStateDeleting
 
