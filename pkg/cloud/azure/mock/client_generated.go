@@ -6,8 +6,9 @@ package mock_azure
 
 import (
 	context "context"
-	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
+
+	gomock "github.com/golang/mock/gomock"
 	azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 

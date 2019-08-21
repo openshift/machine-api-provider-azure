@@ -94,7 +94,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		subnetSpec.VnetName,
 		subnetSpec.Name,
 		network.Subnet{
-			Name:                   to.StringPtr(subnetSpec.Name),
+			Name: to.StringPtr(subnetSpec.Name),
 			SubnetPropertiesFormat: &subnetProperties,
 		},
 	)
