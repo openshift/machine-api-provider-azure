@@ -267,6 +267,10 @@ deploy: manifests
 fmt:
 	go fmt ./pkg/... ./cmd/...
 
+.PHONY: goimports
+goimports: ## Go fmt your code
+	hack/goimports.sh .
+
 # Run go vet against code
 vet:
 	go vet -composites=false ./pkg/... ./cmd/... 
