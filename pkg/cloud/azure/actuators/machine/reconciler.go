@@ -458,7 +458,13 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	if s.scope.MachineConfig.PublicIP {
 		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
 		if err != nil {
-			return errors.Wrap(err, "unable to create Public IP")
+			// Only when the generated name is longer than allowed by the Azure portal
+			// That can happen only when
+			// - machine name is changed (can't happen without creating a new CR)
+			// - cluster name is changed (could happen but then we will get different name anyway)
+			// - machine CR was created with too long public ip name (in which case no instance was created)
+			klog.Info("Generated public IP name was too long, skipping deletion of the resource")
+			return nil
 		}
 
 		err = s.publicIPSvc.Delete(ctx, &publicips.Spec{
