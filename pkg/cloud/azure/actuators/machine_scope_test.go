@@ -24,9 +24,11 @@ import (
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -172,23 +174,112 @@ func TestCredentialsSecretFailures(t *testing.T) {
 	}
 }
 
-func TestNewMachineScope(t *testing.T) {
-	machineConfig := machineproviderv1.AzureMachineProviderSpec{
+func testCredentialSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "testCredentials",
+			Namespace: "dummyNamespace",
+		},
+		Data: map[string][]byte{
+			"azure_subscription_id": []byte("dummySubID"),
+			"azure_client_id":       []byte("dummyClientID"),
+			"azure_client_secret":   []byte("dummyClientSecret"),
+			"azure_tenant_id":       []byte("dummyTenantID"),
+			"azure_resourcegroup":   []byte("dummyResourceGroup"),
+			"azure_region":          []byte("dummyRegion"),
+			"azure_resource_prefix": []byte("dummyClusterName"),
+		},
+	}
+}
+
+func testProviderSpec() *machineproviderv1.AzureMachineProviderSpec {
+	return &machineproviderv1.AzureMachineProviderSpec{
 		Location:          "test",
 		ResourceGroup:     "test",
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
-	providerSpecWithValues, err := providerSpecFromMachine(&machineConfig)
+}
+
+func testMachineWithProviderSpec(t *testing.T, providerSpec *machineproviderv1.AzureMachineProviderSpec) *machinev1.Machine {
+	providerSpecWithValues, err := providerSpecFromMachine(providerSpec)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
 	}
 
-	machineConfigNoValues := machineproviderv1.AzureMachineProviderSpec{
-		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
+	return &machinev1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{},
+		},
+		Spec: machinev1.MachineSpec{
+			ProviderSpec: *providerSpecWithValues,
+		},
 	}
-	providerSpecNoValues, err := providerSpecFromMachine(&machineConfigNoValues)
+}
+
+func testMachine(t *testing.T) *machinev1.Machine {
+	return testMachineWithProviderSpec(t, testProviderSpec())
+}
+
+func TestPersistMachineScope(t *testing.T) {
+	machine := testMachine(t)
+
+	params := MachineScopeParams{
+		Machine:    machine,
+		Cluster:    nil,
+		Client:     fake.NewSimpleClientset(machine).MachineV1beta1(),
+		CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, testCredentialSecret()),
+	}
+
+	scope, err := NewMachineScope(params)
 	if err != nil {
-		t.Fatalf("error encoding provider config: %v", err)
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	nodeAddresses := []corev1.NodeAddress{
+		{
+			Type:    corev1.NodeHostName,
+			Address: "hostname",
+		},
+	}
+
+	scope.Machine.Annotations["test"] = "testValue"
+	scope.MachineStatus.VMID = pointer.StringPtr("vmid")
+	scope.Machine.Status.Addresses = make([]corev1.NodeAddress, len(nodeAddresses))
+	copy(nodeAddresses, scope.Machine.Status.Addresses)
+
+	if err = scope.Persist(); err != nil {
+		t.Errorf("Expected MachineScope.Persist to success, got error: %v", err)
+	}
+
+	updatedMachine, err := params.Client.Machines(params.Machine.Namespace).Get(params.Machine.Name, metav1.GetOptions{})
+	if err != nil {
+		t.Errorf("Unable to get updated machine: %v", err)
+	}
+
+	if !equality.Semantic.DeepEqual(updatedMachine.Status.Addresses, nodeAddresses) {
+		t.Errorf("Expected node addresses to equal, updated addresses %#v, expected addresses: %#v", updatedMachine.Status.Addresses, nodeAddresses)
+	}
+
+	if updatedMachine.Annotations["test"] != "testValue" {
+		t.Errorf("Expected annotation 'test' to equal 'testValue', got %q instead", updatedMachine.Annotations["test"])
+	}
+
+	machineStatus, err := machineproviderv1.MachineStatusFromProviderStatus(updatedMachine.Status.ProviderStatus)
+	if err != nil {
+		t.Errorf("failed to get machine provider status: %v", err)
+	}
+
+	if machineStatus.VMID == nil {
+		t.Errorf("Expected VMID to be 'vmid', got nil instead")
+	} else if *machineStatus.VMID != "vmid" {
+		t.Errorf("Expected VMID to be 'vmid', got %q instead", *machineStatus.VMID)
+	}
+}
+
+func TestNewMachineScope(t *testing.T) {
+	machineConfigNoValues := &machineproviderv1.AzureMachineProviderSpec{
+		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 
 	testCases := []struct {
@@ -198,56 +289,14 @@ func TestNewMachineScope(t *testing.T) {
 		expectedResourceGroup string
 	}{
 		{
-			machine: &machinev1.Machine{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-				},
-				Spec: machinev1.MachineSpec{
-					ProviderSpec: *providerSpecWithValues,
-				},
-			},
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testCredentials",
-					Namespace: "dummyNamespace",
-				},
-				Data: map[string][]byte{
-					"azure_subscription_id": []byte("dummySubID"),
-					"azure_client_id":       []byte("dummyClientID"),
-					"azure_client_secret":   []byte("dummyClientSecret"),
-					"azure_tenant_id":       []byte("dummyTenantID"),
-					"azure_resourcegroup":   []byte("dummyResourceGroup"),
-					"azure_region":          []byte("dummyRegion"),
-					"azure_resource_prefix": []byte("dummyClusterName"),
-				},
-			},
+			machine:               testMachine(t),
+			secret:                testCredentialSecret(),
 			expectedLocation:      "test",
 			expectedResourceGroup: "test",
 		},
 		{
-			machine: &machinev1.Machine{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "test",
-				},
-				Spec: machinev1.MachineSpec{
-					ProviderSpec: *providerSpecNoValues,
-				},
-			},
-			secret: &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "testCredentials",
-					Namespace: "dummyNamespace",
-				},
-				Data: map[string][]byte{
-					"azure_subscription_id": []byte("dummySubID"),
-					"azure_client_id":       []byte("dummyClientID"),
-					"azure_client_secret":   []byte("dummyClientSecret"),
-					"azure_tenant_id":       []byte("dummyTenantID"),
-					"azure_resourcegroup":   []byte("dummyResourceGroup"),
-					"azure_region":          []byte("dummyRegion"),
-					"azure_resource_prefix": []byte("dummyClusterName"),
-				},
-			},
+			machine:               testMachineWithProviderSpec(t, machineConfigNoValues),
+			secret:                testCredentialSecret(),
 			expectedLocation:      "dummyRegion",
 			expectedResourceGroup: "dummyResourceGroup",
 		},

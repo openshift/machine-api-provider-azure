@@ -10,10 +10,7 @@ go_library(
     ],
     importpath = "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure",
     visibility = ["//visibility:public"],
-    deps = [
-        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
-        "//vendor/github.com/satori/go.uuid:go_default_library",
-    ],
+    deps = ["//vendor/github.com/Azure/go-autorest/autorest:go_default_library"],
 )
 
 go_test(

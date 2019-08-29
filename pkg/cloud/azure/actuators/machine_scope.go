@@ -28,6 +28,8 @@ import (
 	machineclient "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
@@ -103,12 +105,18 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 	}
 
 	return &MachineScope{
-		Scope:         scope,
-		Machine:       params.Machine,
+		Scope: scope,
+		// Deep copy the machine since it's change outside of the machine scope
+		// by consumers of the machine scope (e.g. reconciler).
+		Machine:       params.Machine.DeepCopy(),
 		MachineClient: machineClient,
 		CoreClient:    params.CoreClient,
 		MachineConfig: machineConfig,
 		MachineStatus: machineStatus,
+		// Once set, they can not be changed. Otherwise, status change computation
+		// might be invalid and result in skipping the status update.
+		origMachine:       params.Machine.DeepCopy(),
+		origMachineStatus: machineStatus.DeepCopy(),
 	}, nil
 }
 
@@ -121,6 +129,13 @@ type MachineScope struct {
 	CoreClient    controllerclient.Client
 	MachineConfig *v1beta1.AzureMachineProviderSpec
 	MachineStatus *v1beta1.AzureMachineProviderStatus
+
+	// origMachine captures original value of machine before it is updated (to
+	// skip object updated if nothing is changed)
+	origMachine *machinev1.Machine
+	// origMachineStatus captures original value of machine provider status
+	// before it is updated (to skip object updated if nothing is changed)
+	origMachineStatus *v1beta1.AzureMachineProviderStatus
 }
 
 // Name returns the machine name.
@@ -143,25 +158,44 @@ func (m *MachineScope) Location() string {
 	return m.Scope.Location()
 }
 
-func (m *MachineScope) storeMachineSpec(machine *machinev1.Machine) (*machinev1.Machine, error) {
+func (m *MachineScope) storeMachineSpec() error {
 	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	machine.Spec.ProviderSpec.Value = ext
-	return m.MachineClient.Update(machine)
+	m.Machine.Spec.ProviderSpec.Value = ext
+	latestMachine, err := m.MachineClient.Update(m.Machine)
+	if err != nil {
+		return err
+	}
+
+	m.Machine = latestMachine
+	return nil
 }
 
-func (m *MachineScope) storeMachineStatus(machine *machinev1.Machine) (*machinev1.Machine, error) {
-	ext, err := v1beta1.EncodeMachineStatus(m.MachineStatus)
-	if err != nil {
-		return nil, err
+func (m *MachineScope) storeMachineStatus() error {
+	if equality.Semantic.DeepEqual(m.MachineStatus, m.origMachineStatus) && equality.Semantic.DeepEqual(m.Machine.Status.Addresses, m.origMachine.Status.Addresses) {
+		klog.Infof("%s: status unchanged", m.Machine.Name)
+		return nil
 	}
 
-	m.Machine.Status.DeepCopyInto(&machine.Status)
-	machine.Status.ProviderStatus = ext
-	return m.MachineClient.UpdateStatus(machine)
+	klog.V(4).Infof("Storing machine status for %q, resourceVersion: %v, generation: %v", m.Machine.Name, m.Machine.ResourceVersion, m.Machine.Generation)
+	ext, err := v1beta1.EncodeMachineStatus(m.MachineStatus)
+	if err != nil {
+		return err
+	}
+
+	m.Machine.Status.ProviderStatus = ext
+
+	time := metav1.Now()
+	m.Machine.Status.LastUpdated = &time
+	latestMachine, err := m.MachineClient.UpdateStatus(m.Machine)
+	if err != nil {
+		return err
+	}
+	m.Machine = latestMachine
+	return err
 }
 
 // Persist the machine spec and machine status.
@@ -170,15 +204,26 @@ func (m *MachineScope) Persist() error {
 		return fmt.Errorf("machine client is empty")
 	}
 
-	latestMachine, err := m.storeMachineSpec(m.Machine)
-	if err != nil {
+	// The machine status needs to be updated first since
+	// the next call to storeMachineSpec updates entire machine
+	// object. If done in the reverse order, the machine status
+	// could be updated without setting the LastUpdated field
+	// in the machine status. The following might occur:
+	// 1. machine object is updated (including its status)
+	// 2. the machine object is updated by different component/user meantime
+	// 3. storeMachineStatus is called but fails since the machine object
+	//    is outdated. The operation is reconciled but given the status
+	//    was already set in the previous call, the status is no longer updated
+	//    since the status updated condition is already false. Thus,
+	//    the LastUpdated is not set/updated properly.
+	if err := m.storeMachineStatus(); err != nil {
+		return fmt.Errorf("[machinescope] failed to store provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+	}
+
+	if err := m.storeMachineSpec(); err != nil {
 		return fmt.Errorf("[machinescope] failed to update machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
-	_, err = m.storeMachineStatus(latestMachine)
-	if err != nil {
-		return fmt.Errorf("[machinescope] failed to store provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
-	}
 	return nil
 }
 
