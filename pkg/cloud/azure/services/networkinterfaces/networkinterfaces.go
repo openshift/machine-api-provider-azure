@@ -145,7 +145,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
 				IPConfigurations: &[]network.InterfaceIPConfiguration{
 					{
-						Name: to.StringPtr("pipConfig"),
+						Name:                                     to.StringPtr("pipConfig"),
 						InterfaceIPConfigurationPropertiesFormat: nicConfig,
 					},
 				},

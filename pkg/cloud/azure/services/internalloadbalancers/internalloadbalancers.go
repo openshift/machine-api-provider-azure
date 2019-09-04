@@ -90,8 +90,8 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 						Name: &frontEndIPConfigName,
 						FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
 							PrivateIPAllocationMethod: network.Static,
-							Subnet:           &subnet,
-							PrivateIPAddress: to.StringPtr(internalLBSpec.IPAddress),
+							Subnet:                    &subnet,
+							PrivateIPAddress:          to.StringPtr(internalLBSpec.IPAddress),
 						},
 					},
 				},
