@@ -110,7 +110,7 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 		}
 		a.handleMachineError(machine, apierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
 		return &controllerError.RequeueAfterError{
-			RequeueAfter: time.Minute,
+			RequeueAfter: 20 * time.Second,
 		}
 	}
 
@@ -145,7 +145,7 @@ func (a *Actuator) Delete(ctx context.Context, cluster *clusterv1.Cluster, machi
 		}
 		a.handleMachineError(machine, apierrors.DeleteMachine("failed to delete machine %q: %v", machine.Name, err), deleteEventAction)
 		return &controllerError.RequeueAfterError{
-			RequeueAfter: time.Minute,
+			RequeueAfter: 20 * time.Second,
 		}
 	}
 
@@ -182,7 +182,7 @@ func (a *Actuator) Update(ctx context.Context, cluster *clusterv1.Cluster, machi
 		}
 		a.handleMachineError(machine, apierrors.UpdateMachine("failed to update machine %q: %v", machine.Name, err), updateEventAction)
 		return &controllerError.RequeueAfterError{
-			RequeueAfter: time.Minute,
+			RequeueAfter: 20 * time.Second,
 		}
 	}
 
