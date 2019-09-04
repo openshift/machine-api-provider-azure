@@ -27,6 +27,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -652,6 +653,10 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			return errors.Errorf("MachineConfig managedIdentity is missing on machine %s", s.scope.Machine.Name)
 		}
 
+		if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
+			return errors.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
+		}
+
 		vmSpec = &virtualmachines.Spec{
 			Name:            s.scope.Machine.Name,
 			NICName:         nicName,
@@ -663,6 +668,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			Tags:            s.scope.MachineConfig.Tags,
 			ManagedIdentity: azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity),
 		}
+
+		if vmSpec.Tags == nil {
+			vmSpec.Tags = map[string]string{}
+		}
+
+		vmSpec.Tags[fmt.Sprintf("kubernetes.io-cluster-%v", s.scope.Machine.Labels[machinev1.MachineClusterIDLabel])] = "owned"
 
 		userData, userDataErr := s.getCustomUserData()
 		if userDataErr != nil {

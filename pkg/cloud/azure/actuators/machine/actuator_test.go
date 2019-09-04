@@ -143,6 +143,7 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	scope.Network().APIServerIP.DNSName = "DummyDNSName"
 	labels := make(map[string]string)
 	labels[machineproviderv1.MachineRoleLabel] = label
+	labels[machinev1.MachineClusterIDLabel] = "clusterID"
 	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
 	c := fake.NewSimpleClientset(m).MachineV1beta1()
