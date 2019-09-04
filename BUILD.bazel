@@ -1,4 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("//build:run_in_workspace_with_goroot.bzl", "workspace_binary")
 
@@ -96,26 +95,3 @@ filegroup(
 exports_files(glob([
     "WORKSPACE",
 ]))
-
-go_library(
-    name = "go_default_library",
-    srcs = ["test.go"],
-    importpath = "sigs.k8s.io/cluster-api-provider-azure",
-    deps = [
-        "//vendor/github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest/azure:go_default_library",
-        "//vendor/github.com/Azure/go-autorest/autorest/azure/auth:go_default_library",
-        "//vendor/k8s.io/api/core/v1:go_default_library",
-        "//vendor/k8s.io/client-go/rest:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd:go_default_library",
-        "//vendor/k8s.io/client-go/tools/clientcmd/api:go_default_library",
-        "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/sigs.k8s.io/controller-runtime/pkg/client:go_default_library",
-    ],
-)
-
-go_binary(
-    name = "cluster-api-provider-azure",
-    embed = [":go_default_library"],
-)
