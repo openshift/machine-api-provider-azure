@@ -379,7 +379,7 @@
 
 [[projects]]
   branch = "openshift-4.2-cluster-api-0.1.0"
-  digest = "1:31312627ff61477fbb4ef78d381bb5cec9ccca4d8731f1f2e17bffa84425d4c3"
+  digest = "1:3981936e2b498f98977288a69942aded35aec7465b3dd87c301d8a25466e9910"
   name = "github.com/openshift/cluster-api"
   packages = [
     "pkg/apis",
@@ -401,7 +401,7 @@
     "pkg/util",
   ]
   pruneopts = "T"
-  revision = "072f7d777dc81aac0dd222686e1516dd9e7db38b"
+  revision = "655e2d6ccdd5774442da004081f933cd8f1f3273"
 
 [[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
@@ -1257,9 +1257,7 @@
     "k8s.io/client-go/kubernetes",
     "k8s.io/client-go/kubernetes/scheme",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
-    "k8s.io/client-go/rest",
     "k8s.io/client-go/tools/clientcmd",
-    "k8s.io/client-go/tools/clientcmd/api",
     "k8s.io/client-go/tools/record",
     "k8s.io/client-go/util/cert",
     "k8s.io/cluster-bootstrap/token/util",
