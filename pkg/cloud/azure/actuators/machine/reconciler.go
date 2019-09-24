@@ -498,6 +498,14 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		networkInterfaceSpec.InternalLoadBalancerName = s.scope.MachineConfig.InternalLoadBalancer
 	}
 
+	if s.scope.MachineConfig.SecurityGroup != "" {
+		networkInterfaceSpec.SecurityGroupName = s.scope.MachineConfig.SecurityGroup
+	}
+
+	if len(s.scope.MachineConfig.ApplicationSecurityGroups) > 0 {
+		networkInterfaceSpec.ApplicationSecurityGroupNames = s.scope.MachineConfig.ApplicationSecurityGroups
+	}
+
 	if s.scope.MachineConfig.PublicIP {
 		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
 		if err != nil {
