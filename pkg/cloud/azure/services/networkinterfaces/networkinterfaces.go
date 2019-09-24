@@ -24,22 +24,26 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicloadbalancers"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/securitygroups"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/subnets"
 )
 
 // Spec specification for routetable
 type Spec struct {
-	Name                     string
-	SubnetName               string
-	VnetName                 string
-	StaticIPAddress          string
-	PublicLoadBalancerName   string
-	InternalLoadBalancerName string
-	NatRule                  *int
-	PublicIP                 string
+	Name                          string
+	SubnetName                    string
+	VnetName                      string
+	StaticIPAddress               string
+	PublicLoadBalancerName        string
+	InternalLoadBalancerName      string
+	NatRule                       *int
+	PublicIP                      string
+	SecurityGroupName             string
+	ApplicationSecurityGroupNames []string
 }
 
 // Get provides information about a network interface.
@@ -64,6 +68,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid network interface specification")
 	}
 
+	nicProp := network.InterfacePropertiesFormat{}
 	nicConfig := &network.InterfaceIPConfigurationPropertiesFormat{}
 
 	subnetInterface, err := subnets.NewService(s.Scope).Get(ctx, &subnets.Spec{Name: nicSpec.SubnetName, VnetName: nicSpec.VnetName})
@@ -137,19 +142,51 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	}
 	nicConfig.LoadBalancerBackendAddressPools = &backendAddressPools
 
+	if nicSpec.SecurityGroupName != "" {
+		securityGroupInterface, sgerr := securitygroups.NewService(s.Scope).Get(ctx, &securitygroups.Spec{Name: nicSpec.SecurityGroupName})
+		if sgerr != nil {
+			return sgerr
+		}
+
+		sg, ok := securityGroupInterface.(network.SecurityGroup)
+		if !ok {
+			return errors.New("security group get returned invalid network interface")
+		}
+		nicProp.NetworkSecurityGroup = &network.SecurityGroup{ID: sg.ID}
+	}
+
+	if len(nicSpec.ApplicationSecurityGroupNames) > 0 {
+		asgSvc := applicationsecuritygroups.NewService(s.Scope)
+
+		groups := make([]network.ApplicationSecurityGroup, len(nicSpec.ApplicationSecurityGroupNames))
+		for _, asgName := range nicSpec.ApplicationSecurityGroupNames {
+			asgInterface, asgerr := asgSvc.Get(ctx, &applicationsecuritygroups.Spec{Name: asgName})
+			if err != nil {
+				return asgerr
+			}
+			asg, ok := asgInterface.(network.ApplicationSecurityGroup)
+			if !ok {
+				return errors.New("application security group get returned invalid network interface")
+			}
+			groups = append(groups, network.ApplicationSecurityGroup{
+				ID: asg.ID,
+			})
+		}
+		nicConfig.ApplicationSecurityGroups = &groups
+	}
+
+	nicProp.IPConfigurations = &[]network.InterfaceIPConfiguration{
+		{
+			Name:                                     to.StringPtr("pipConfig"),
+			InterfaceIPConfigurationPropertiesFormat: nicConfig,
+		},
+	}
 	f, err := s.Client.CreateOrUpdate(ctx,
 		s.Scope.ClusterConfig.ResourceGroup,
 		nicSpec.Name,
 		network.Interface{
-			Location: to.StringPtr(s.Scope.ClusterConfig.Location),
-			InterfacePropertiesFormat: &network.InterfacePropertiesFormat{
-				IPConfigurations: &[]network.InterfaceIPConfiguration{
-					{
-						Name:                                     to.StringPtr("pipConfig"),
-						InterfaceIPConfigurationPropertiesFormat: nicConfig,
-					},
-				},
-			},
+			Location:                  to.StringPtr(s.Scope.ClusterConfig.Location),
+			InterfacePropertiesFormat: &nicProp,
 		})
 
 	if err != nil {
