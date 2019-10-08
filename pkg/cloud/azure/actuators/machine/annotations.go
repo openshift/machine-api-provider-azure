@@ -19,14 +19,14 @@ package machine
 import (
 	"encoding/json"
 
-	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
+	machine "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 )
 
 // updateMachineAnnotationJSON updates the `annotation` on `machine` with
 // `content`. `content` in this case should be a `map[string]interface{}`
 // suitable for turning into JSON. This `content` map will be marshalled into a
 // JSON string before being set as the given `annotation`.
-func (a *Actuator) updateMachineAnnotationJSON(machine *clusterv1.Machine, annotation string, content map[string]interface{}) error {
+func (a *Actuator) updateMachineAnnotationJSON(machine *machine.Machine, annotation string, content map[string]interface{}) error {
 	b, err := json.Marshal(content)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (a *Actuator) updateMachineAnnotationJSON(machine *clusterv1.Machine, annot
 
 // updateMachineAnnotation updates the `annotation` on the given `machine` with
 // `content`.
-func (a *Actuator) updateMachineAnnotation(machine *clusterv1.Machine, annotation string, content string) {
+func (a *Actuator) updateMachineAnnotation(machine *machine.Machine, annotation string, content string) {
 	// Get the annotations
 	annotations := machine.GetAnnotations()
 
@@ -52,7 +52,7 @@ func (a *Actuator) updateMachineAnnotation(machine *clusterv1.Machine, annotatio
 // Returns a map[string]interface from a JSON annotation.
 // This method gets the given `annotation` from the `machine` and unmarshalls it
 // from a JSON string into a `map[string]interface{}`.
-func (a *Actuator) machineAnnotationJSON(machine *clusterv1.Machine, annotation string) (map[string]interface{}, error) {
+func (a *Actuator) machineAnnotationJSON(machine *machine.Machine, annotation string) (map[string]interface{}, error) {
 	out := map[string]interface{}{}
 
 	jsonAnnotation := a.machineAnnotation(machine, annotation)
@@ -69,6 +69,6 @@ func (a *Actuator) machineAnnotationJSON(machine *clusterv1.Machine, annotation 
 }
 
 // Fetches the specific machine annotation.
-func (a *Actuator) machineAnnotation(machine *clusterv1.Machine, annotation string) string {
+func (a *Actuator) machineAnnotation(machine *machine.Machine, annotation string) string {
 	return machine.GetAnnotations()[annotation]
 }
