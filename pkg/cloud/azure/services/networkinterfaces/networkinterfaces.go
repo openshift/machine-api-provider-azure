@@ -158,7 +158,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if len(nicSpec.ApplicationSecurityGroupNames) > 0 {
 		asgSvc := applicationsecuritygroups.NewService(s.Scope)
 
-		groups := make([]network.ApplicationSecurityGroup, len(nicSpec.ApplicationSecurityGroupNames))
+		var groups []network.ApplicationSecurityGroup
 		for _, asgName := range nicSpec.ApplicationSecurityGroupNames {
 			asgInterface, asgerr := asgSvc.Get(ctx, &applicationsecuritygroups.Spec{Name: asgName})
 			if err != nil {
