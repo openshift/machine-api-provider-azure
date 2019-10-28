@@ -24,12 +24,14 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake"
+	controllerError "github.com/openshift/cluster-api/pkg/controller/error"
 	"github.com/openshift/cluster-api/pkg/controller/machine"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -606,7 +608,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Create(context.TODO(), nil, machine)
 			},
-			event: "Warning FailedCreate CreateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
 		},
 		{
 			name:       "Create machine event failed (reconciler)",
@@ -736,6 +738,94 @@ func TestMachineEvents(t *testing.T) {
 			pipSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			tc.operation(machineActuator, tc.machine)
+
+			select {
+			case event := <-eventsChannel:
+				if event != tc.event {
+					t.Errorf("Expected %q event, got %q", tc.event, event)
+				}
+			default:
+				t.Errorf("Expected %q event, got none", tc.event)
+			}
+		})
+	}
+}
+
+func TestStatusCodeBasedCreationErrors(t *testing.T) {
+	machine, err := stubMachine()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name       string
+		operation  func(actuator *Actuator, machine *machinev1.Machine)
+		event      string
+		statusCode uint
+		requeable  bool
+	}{
+		{
+			name:       "InvalidConfig",
+			event:      "Warning FailedCreate InvalidConfiguration: failed to reconcile machine \"azure-actuator-testing-machine\": compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=400",
+			statusCode: 400,
+			requeable:  false,
+		},
+		{
+			name:       "CreateMachine",
+			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine : failed to create or get machine: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
+			statusCode: 300,
+			requeable:  true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cs := controllerfake.NewFakeClient(stubAzureCredentialsSecret(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "azure-actuator-user-data-secret",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"userData": []byte("S3CR3T"),
+				},
+			})
+
+			mockCtrl := gomock.NewController(t)
+			networkSvc := mock_azure.NewMockService(mockCtrl)
+			vmSvc := mock_azure.NewMockService(mockCtrl)
+
+			eventsChannel := make(chan string, 1)
+
+			machineActuator := NewActuator(ActuatorParams{
+				Client:     fake.NewSimpleClientset(machine).MachineV1beta1(),
+				CoreClient: cs,
+				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
+					return &Reconciler{
+						scope:                scope,
+						networkInterfacesSvc: networkSvc,
+						virtualMachinesSvc:   vmSvc,
+					}
+				},
+				// use fake recorder and store an event into one item long buffer for subsequent check
+				EventRecorder: &record.FakeRecorder{
+					Events: eventsChannel,
+				},
+			})
+
+			networkSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+			azureErr := autorest.NewError("compute.VirtualMachinesClient", "CreateOrUpdate", "MOCK")
+			azureErr.StatusCode = tc.statusCode
+			wrapErr := errors.Wrapf(azureErr, "failed to create or get machine")
+			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
+			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, autorest.NewError("compute.VirtualMachinesClient", "Get", "MOCK")).Times(1)
+
+			_, ok := machineActuator.Create(context.TODO(), nil, machine).(*controllerError.RequeueAfterError)
+			if ok && !tc.requeable {
+				t.Error("Error is not requeable but was requeued")
+			}
+			if !ok && tc.requeable {
+				t.Error("Error is requeable but was not requeued")
+			}
 
 			select {
 			case event := <-eventsChannel:

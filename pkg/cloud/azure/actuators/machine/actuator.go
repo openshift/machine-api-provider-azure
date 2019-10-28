@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Azure/go-autorest/autorest"
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	client "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1"
@@ -95,7 +96,8 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return a.handleMachineError(machine, apierrors.CreateMachine("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
+		return a.handleMachineError(machine, apierrors.InvalidMachineConfiguration("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
+
 	}
 
 	err = a.reconcilerBuilder(scope).Create(context.Background())
@@ -104,7 +106,16 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 		if err := scope.Persist(); err != nil {
 			klog.Errorf("Error storing machine info: %v", err)
 		}
+
+		if err, ok := errors.Cause(err).(autorest.DetailedError); ok {
+			statusCode, ok := err.StatusCode.(uint)
+			if ok && statusCode >= 400 && statusCode < 500 {
+				return a.handleMachineError(machine, apierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, err), createEventAction)
+			}
+		}
+
 		a.handleMachineError(machine, apierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
+
 		return &controllerError.RequeueAfterError{
 			RequeueAfter: 20 * time.Second,
 		}

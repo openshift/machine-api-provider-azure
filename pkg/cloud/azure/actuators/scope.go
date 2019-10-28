@@ -18,12 +18,12 @@ package actuators
 
 import (
 	"context"
-	"fmt"
 	"os"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
 	client "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/cluster/v1alpha1"
+	apierrors "github.com/openshift/cluster-api/pkg/errors"
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
@@ -68,7 +68,7 @@ func NewScope(params ScopeParams) (*Scope, error) {
 
 	subscriptionID := os.Getenv("AZURE_SUBSCRIPTION_ID")
 	if subscriptionID == "" {
-		return nil, fmt.Errorf("error creating azure services. Environment variable AZURE_SUBSCRIPTION_ID is not set")
+		return nil, apierrors.InvalidMachineConfiguration("error creating azure services. Environment variable AZURE_SUBSCRIPTION_ID is not set")
 	}
 	params.AzureClients.SubscriptionID = subscriptionID
 

@@ -26,6 +26,7 @@ import (
 	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
 	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
 	machineclient "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1"
+	apierrors "github.com/openshift/cluster-api/pkg/errors"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -74,7 +75,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 
 	machineConfig, err := MachineConfigFromProviderSpec(params.Client, params.Machine.Spec.ProviderSpec)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get machine config")
+		return nil, apierrors.InvalidMachineConfiguration(err.Error(), "failed to get machine config")
 	}
 
 	machineStatus, err := v1beta1.MachineStatusFromProviderStatus(params.Machine.Status.ProviderStatus)
