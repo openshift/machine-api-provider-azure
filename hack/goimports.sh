@@ -9,6 +9,9 @@ if [ "$IS_CONTAINER" != "" ]; then
 else
   docker run -it --rm \
     --env IS_CONTAINER=TRUE \
+    --env GO111MODULE="$GO111MODULE" \
+    --env GOFLAGS="$GOFLAGS" \
+    --env GOPROXY="$GOPROXY" \
     --volume "${PWD}:/go/src/sigs.k8s.io/${REPO_NAME}:z" \
     --workdir "/go/src/sigs.k8s.io/${REPO_NAME}" \
     openshift/origin-release:golang-1.12 \

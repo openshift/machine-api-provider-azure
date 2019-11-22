@@ -15,28 +15,26 @@
 # If you update this file, please follow
 # https://suva.sh/posts/well-documented-makefiles
 
+GO111MODULE = on
+export GO111MODULE
+GOFLAGS += -mod=vendor
+export GOFLAGS
+GOPROXY ?=
+export GOPROXY
+
 .DEFAULT_GOAL:=help
 
 help:  ## Display this help
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-.PHONY: dep-ensure
-dep-ensure: check-install ## Ensure dependencies are up to date
-	@echo Checking status of dependencies
-	@${DEP} status 2>&1 > /dev/null || make dep-install
-	@echo Finished verifying dependencies
-
 verify:
 	./hack/verify_boilerplate.py
 
+.PHONY: vendor
 vendor:
-	dep version || go get -u github.com/golang/dep/cmd/dep
-	dep ensure -v
-vendor-update:
-	dep version || go get -u github.com/golang/dep/cmd/dep
-	dep ensure -v -update
-vendor-validate:
-	dep check
+	go mod tidy
+	go mod vendor
+	go mod verify
 
 .PHONY: fmt
 fmt:
@@ -48,7 +46,7 @@ goimports: ## Go fmt your code
 
 .PHONY: vet
 vet:
-	go vet -composites=false ./pkg/... ./cmd/... 
+	go vet -composites=false ./pkg/... ./cmd/...
 
 .PHONY: verify-boilerplate
 verify-boilerplate:
