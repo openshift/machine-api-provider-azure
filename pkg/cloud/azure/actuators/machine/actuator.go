@@ -108,7 +108,7 @@ func (a *Actuator) Create(ctx context.Context, cluster *clusterv1.Cluster, machi
 		}
 
 		if err, ok := errors.Cause(err).(autorest.DetailedError); ok {
-			statusCode, ok := err.StatusCode.(uint)
+			statusCode, ok := err.StatusCode.(int)
 			if ok && statusCode >= 400 && statusCode < 500 {
 				return a.handleMachineError(machine, apierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, err), createEventAction)
 			}

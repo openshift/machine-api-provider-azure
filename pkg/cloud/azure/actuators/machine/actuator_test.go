@@ -761,7 +761,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 		name       string
 		operation  func(actuator *Actuator, machine *machinev1.Machine)
 		event      string
-		statusCode uint
+		statusCode interface{}
 		requeable  bool
 	}{
 		{
