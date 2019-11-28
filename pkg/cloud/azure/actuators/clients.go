@@ -17,26 +17,11 @@ limitations under the License.
 package actuators
 
 import (
-	"fmt"
-	"hash/fnv"
-
 	"github.com/Azure/go-autorest/autorest"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 
 // AzureClients contains all the Azure clients used by the scopes.
 type AzureClients struct {
 	SubscriptionID string
 	Authorizer     autorest.Authorizer
-}
-
-// CreateOrUpdateNetworkAPIServerIP creates or updates public ip name and dns name
-func CreateOrUpdateNetworkAPIServerIP(scope *Scope) {
-	if scope.Network().APIServerIP.Name == "" {
-		h := fnv.New32a()
-		h.Write([]byte(fmt.Sprintf("%s/%s/%s", scope.SubscriptionID, scope.ClusterConfig.ResourceGroup, scope.Cluster.Name)))
-		scope.Network().APIServerIP.Name = azure.GeneratePublicIPName(scope.Cluster.Name, fmt.Sprintf("%x", h.Sum32()))
-	}
-
-	scope.Network().APIServerIP.DNSName = azure.GenerateFQDN(scope.Network().APIServerIP.Name, scope.ClusterConfig.Location)
 }

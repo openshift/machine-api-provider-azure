@@ -27,7 +27,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
@@ -429,7 +429,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterConfig.Name, s.scope.Machine.Name)
 		if err != nil {
 			// Only when the generated name is longer than allowed by the Azure portal
 			// That can happen only when
@@ -507,7 +507,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.Cluster.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterConfig.Name, s.scope.Machine.Name)
 		if err != nil {
 			return errors.Wrap(err, "unable to create Public IP")
 		}

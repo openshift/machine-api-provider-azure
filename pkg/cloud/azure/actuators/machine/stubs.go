@@ -3,8 +3,8 @@ package machine
 import (
 	"fmt"
 
-	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	machinecontroller "github.com/openshift/cluster-api/pkg/controller/machine"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"

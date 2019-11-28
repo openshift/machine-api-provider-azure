@@ -20,9 +20,8 @@ import (
 	"testing"
 
 	"github.com/ghodss/yaml"
-	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
-	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -64,7 +63,6 @@ func TestNilClusterScope(t *testing.T) {
 	m := newMachine(t)
 	params := MachineScopeParams{
 		AzureClients: AzureClients{},
-		Cluster:      nil,
 		CoreClient:   nil,
 		Machine:      m,
 		Client:       fake.NewSimpleClientset(m).MachineV1beta1(),
@@ -91,7 +89,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 			"azure_resource_prefix": []byte("dummyClusterName"),
 		},
 	}
-	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
+	scope := &Scope{ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
 	err := updateScope(
 		controllerfake.NewFakeClient(credentialsSecret),
 		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
@@ -108,8 +106,8 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 		t.Errorf("Expected location to be dummyRegion but found %s", scope.Location())
 	}
 
-	if scope.Cluster.Name != "dummyClusterName" {
-		t.Errorf("Expected cluster name to be dummyClusterName but found %s", scope.Cluster.Name)
+	if scope.ClusterConfig.Name != "dummyClusterName" {
+		t.Errorf("Expected cluster name to be dummyClusterName but found %s", scope.ClusterConfig.Name)
 	}
 
 	if scope.ClusterConfig.ResourceGroup != "dummyResourceGroup" {
@@ -118,7 +116,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 }
 
 func testCredentialFields(credentialsSecret *corev1.Secret) error {
-	scope := &Scope{Cluster: &clusterv1.Cluster{}, ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
+	scope := &Scope{ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
 	return updateScope(
 		controllerfake.NewFakeClient(credentialsSecret),
 		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
@@ -226,7 +224,6 @@ func TestPersistMachineScope(t *testing.T) {
 
 	params := MachineScopeParams{
 		Machine:    machine,
-		Cluster:    nil,
 		Client:     fake.NewSimpleClientset(machine).MachineV1beta1(),
 		CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, testCredentialSecret()),
 	}
@@ -305,7 +302,6 @@ func TestNewMachineScope(t *testing.T) {
 	for _, tc := range testCases {
 		scope, err := NewMachineScope(MachineScopeParams{
 			Machine:    tc.machine,
-			Cluster:    nil,
 			Client:     fake.NewSimpleClientset(tc.machine).MachineV1beta1(),
 			CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.secret),
 		})

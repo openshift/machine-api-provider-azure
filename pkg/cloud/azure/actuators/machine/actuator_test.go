@@ -28,11 +28,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
-	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
-	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/fake"
-	controllerError "github.com/openshift/cluster-api/pkg/controller/error"
-	"github.com/openshift/cluster-api/pkg/controller/machine"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/machine-api-operator/pkg/controller/machine"
+	controllerError "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -70,16 +69,6 @@ func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*m
 	}, nil
 }
 
-func providerSpecFromCluster(in *clusterproviderv1.AzureClusterProviderSpec) (*clusterv1.ProviderSpec, error) {
-	bytes, err := yaml.Marshal(in)
-	if err != nil {
-		return nil, err
-	}
-	return &clusterv1.ProviderSpec{
-		Value: &runtime.RawExtension{Raw: bytes},
-	}, nil
-}
-
 func newMachine(t *testing.T, machineConfig machineproviderv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
@@ -96,41 +85,9 @@ func newMachine(t *testing.T, machineConfig machineproviderv1.AzureMachineProvid
 	}
 }
 
-func newCluster(t *testing.T) *clusterv1.Cluster {
-	clusterProviderSpec := newClusterProviderSpec()
-	providerSpec, err := providerSpecFromCluster(&clusterProviderSpec)
-	if err != nil {
-		t.Fatalf("error encoding provider config: %v", err)
-	}
-
-	return &clusterv1.Cluster{
-		TypeMeta: metav1.TypeMeta{
-			Kind: "Cluster",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster-test",
-		},
-		Spec: clusterv1.ClusterSpec{
-			ClusterNetwork: clusterv1.ClusterNetworkingConfig{
-				Services: clusterv1.NetworkRanges{
-					CIDRBlocks: []string{
-						"10.96.0.0/12",
-					},
-				},
-				Pods: clusterv1.NetworkRanges{
-					CIDRBlocks: []string{
-						"192.168.0.0/16",
-					},
-				},
-			},
-			ProviderSpec: *providerSpec,
-		},
-	}
-}
 func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	scope := &actuators.Scope{
 		Context: context.Background(),
-		Cluster: newCluster(t),
 		ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{
 			ResourceGroup:       "dummyResourceGroup",
 			Location:            "dummyLocation",
@@ -140,9 +97,7 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 			SAKeyPair:           clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
 			DiscoveryHashes:     []string{"discoveryhash0"},
 		},
-		ClusterStatus: &clusterproviderv1.AzureClusterProviderStatus{},
 	}
-	scope.Network().APIServerIP.DNSName = "DummyDNSName"
 	labels := make(map[string]string)
 	labels[machineproviderv1.MachineRoleLabel] = label
 	labels[machinev1.MachineClusterIDLabel] = "clusterID"
@@ -151,8 +106,8 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	c := fake.NewSimpleClientset(m).MachineV1beta1()
 	return &actuators.MachineScope{
 		Scope:         scope,
-		Machine:       m,
 		MachineClient: c.Machines("dummyNamespace"),
+		Machine:       m,
 		MachineConfig: &machineproviderv1.AzureMachineProviderSpec{
 			Subnet:          "dummySubnet",
 			Vnet:            "dummyVnet",
@@ -606,7 +561,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: invalidAzureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Create(context.TODO(), nil, machine)
+				actuator.Create(context.TODO(), machine)
 			},
 			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
 		},
@@ -615,7 +570,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    invalidMachine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Create(context.TODO(), nil, machine)
+				actuator.Create(context.TODO(), machine)
 			},
 			event: "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine",
 		},
@@ -624,7 +579,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Create(context.TODO(), nil, machine)
+				actuator.Create(context.TODO(), machine)
 			},
 			event: fmt.Sprintf("Normal Created Created machine %q", machine.Name),
 		},
@@ -633,7 +588,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: invalidAzureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Update(context.TODO(), nil, machine)
+				actuator.Update(context.TODO(), machine)
 			},
 			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
 		},
@@ -642,7 +597,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    invalidMachine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Update(context.TODO(), nil, machine)
+				actuator.Update(context.TODO(), machine)
 			},
 			event: "Warning FailedUpdate UpdateError: failed to update machine \"azure-actuator-testing-machine\": found attempt to change immutable state",
 		},
@@ -651,7 +606,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Update(context.TODO(), nil, machine)
+				actuator.Update(context.TODO(), machine)
 			},
 			event: fmt.Sprintf("Normal Updated Updated machine %q", machine.Name),
 		},
@@ -660,7 +615,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: invalidAzureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Delete(context.TODO(), nil, machine)
+				actuator.Delete(context.TODO(), machine)
 			},
 			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
 		},
@@ -669,7 +624,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    invalidMachine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Delete(context.TODO(), nil, machine)
+				actuator.Delete(context.TODO(), machine)
 			},
 			event: "Warning FailedDelete DeleteError: failed to delete machine \"azure-actuator-testing-machine\": MachineConfig vnet is missing on machine azure-actuator-testing-machine",
 		},
@@ -678,7 +633,7 @@ func TestMachineEvents(t *testing.T) {
 			machine:    machine,
 			credSecret: azureCredentialsSecret,
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Delete(context.TODO(), nil, machine)
+				actuator.Delete(context.TODO(), machine)
 			},
 			event: fmt.Sprintf("Normal Deleted Deleted machine %q", machine.Name),
 		},
@@ -819,7 +774,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
 			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, autorest.NewError("compute.VirtualMachinesClient", "Get", "MOCK")).Times(1)
 
-			_, ok := machineActuator.Create(context.TODO(), nil, machine).(*controllerError.RequeueAfterError)
+			_, ok := machineActuator.Create(context.TODO(), machine).(*controllerError.RequeueAfterError)
 			if ok && !tc.requeable {
 				t.Error("Error is not requeable but was requeued")
 			}

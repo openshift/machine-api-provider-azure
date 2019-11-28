@@ -23,10 +23,9 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	clusterv1 "github.com/openshift/cluster-api/pkg/apis/cluster/v1alpha1"
-	machinev1 "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
-	machineclient "github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset/typed/machine/v1beta1"
-	apierrors "github.com/openshift/cluster-api/pkg/errors"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machineclient "github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/typed/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -59,7 +58,6 @@ const (
 // MachineScopeParams defines the input parameters used to create a new MachineScope.
 type MachineScopeParams struct {
 	AzureClients
-	Cluster    *clusterv1.Cluster
 	Machine    *machinev1.Machine
 	Client     machineclient.MachineV1beta1Interface
 	CoreClient controllerclient.Client
@@ -68,12 +66,12 @@ type MachineScopeParams struct {
 // NewMachineScope creates a new MachineScope from the supplied parameters.
 // This is meant to be called for each machine actuator operation.
 func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
-	scope, err := NewScope(ScopeParams{AzureClients: params.AzureClients, Client: nil, Cluster: params.Cluster})
+	scope, err := NewScope(ScopeParams{AzureClients: params.AzureClients})
 	if err != nil {
 		return nil, err
 	}
 
-	machineConfig, err := MachineConfigFromProviderSpec(params.Client, params.Machine.Spec.ProviderSpec)
+	machineConfig, err := MachineConfigFromProviderSpec(params.Machine.Spec.ProviderSpec)
 	if err != nil {
 		return nil, apierrors.InvalidMachineConfiguration(err.Error(), "failed to get machine config")
 	}
@@ -229,7 +227,7 @@ func (m *MachineScope) Persist() error {
 }
 
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.
-func MachineConfigFromProviderSpec(clusterClient machineclient.MachineClassesGetter, providerConfig machinev1.ProviderSpec) (*v1beta1.AzureMachineProviderSpec, error) {
+func MachineConfigFromProviderSpec(providerConfig machinev1.ProviderSpec) (*v1beta1.AzureMachineProviderSpec, error) {
 	var config v1beta1.AzureMachineProviderSpec
 	if providerConfig.Value != nil {
 		klog.V(4).Info("Decoding ProviderConfig from Value")
@@ -321,7 +319,7 @@ func updateScope(coreClient controllerclient.Client, credentialsSecret *apicorev
 		return errors.Errorf("failed to create azure session: %v", err)
 	}
 
-	scope.Cluster.ObjectMeta.Name = string(clusterName)
+	scope.ClusterConfig.ObjectMeta.Name = string(clusterName)
 	scope.Authorizer = authorizer
 	scope.SubscriptionID = string(subscriptionID)
 	scope.ClusterConfig.ResourceGroup = string(resourceGroup)

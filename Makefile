@@ -41,7 +41,7 @@ fmt:
 	go fmt ./pkg/... ./cmd/...
 
 .PHONY: goimports
-goimports: ## Go fmt your code
+    goimports: ## Go fmt your code
 	hack/goimports.sh .
 
 .PHONY: vet

@@ -19,12 +19,12 @@ package main
 import (
 	"flag"
 
-	clusterapis "github.com/openshift/cluster-api/pkg/apis"
-	"github.com/openshift/cluster-api/pkg/client/clientset_generated/clientset"
-	capimachine "github.com/openshift/cluster-api/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	"github.com/openshift/machine-api-operator/pkg/controller/machine"
+	clientset "github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/typed/machine/v1beta1"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine"
+	actuator "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/record"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -62,10 +62,10 @@ func main() {
 	record.InitFromRecorder(mgr.GetEventRecorderFor("azure-controller"))
 
 	// Initialize machine actuator.
-	machineActuator := machine.NewActuator(machine.ActuatorParams{
-		Client:            cs.MachineV1beta1(),
+	machineActuator := actuator.NewActuator(actuator.ActuatorParams{
+		Client:            cs,
 		CoreClient:        mgr.GetClient(),
-		ReconcilerBuilder: machine.NewReconciler,
+		ReconcilerBuilder: actuator.NewReconciler,
 		EventRecorder:     mgr.GetEventRecorderFor("azure-controller"),
 	})
 
@@ -73,11 +73,11 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	if err := clusterapis.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := v1beta1.AddToScheme(mgr.GetScheme()); err != nil {
 		klog.Fatal(err)
 	}
 
-	capimachine.AddWithActuator(mgr, machineActuator)
+	machine.AddWithActuator(mgr, machineActuator)
 
 	if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
 		klog.Fatalf("Failed to run manager: %v", err)

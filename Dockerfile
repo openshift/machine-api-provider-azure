@@ -23,7 +23,7 @@ COPY vendor/ vendor/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./machine-controller-manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./manager ./vendor/github.com/openshift/cluster-api/cmd/manager
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./manager ./vendor/github.com/openshift/machine-api-operator/cmd/machineset
 
 # Copy the controller-manager into a thin image
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base

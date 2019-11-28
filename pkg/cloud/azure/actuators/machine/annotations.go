@@ -19,7 +19,7 @@ package machine
 import (
 	"encoding/json"
 
-	machine "github.com/openshift/cluster-api/pkg/apis/machine/v1beta1"
+	machine "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 )
 
 // updateMachineAnnotationJSON updates the `annotation` on `machine` with
