@@ -543,24 +543,23 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			return errors.Wrapf(err, "failed to get zone")
 		}
 
-		if s.scope.MachineConfig.ManagedIdentity == "" {
-			return errors.Errorf("MachineConfig managedIdentity is missing on machine %s", s.scope.Machine.Name)
-		}
-
 		if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
 			return errors.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
 		}
 
 		vmSpec = &virtualmachines.Spec{
-			Name:            s.scope.Machine.Name,
-			NICName:         nicName,
-			SSHKeyData:      string(decoded),
-			Size:            s.scope.MachineConfig.VMSize,
-			OSDisk:          s.scope.MachineConfig.OSDisk,
-			Image:           s.scope.MachineConfig.Image,
-			Zone:            zone,
-			Tags:            s.scope.MachineConfig.Tags,
-			ManagedIdentity: azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity),
+			Name:       s.scope.Machine.Name,
+			NICName:    nicName,
+			SSHKeyData: string(decoded),
+			Size:       s.scope.MachineConfig.VMSize,
+			OSDisk:     s.scope.MachineConfig.OSDisk,
+			Image:      s.scope.MachineConfig.Image,
+			Zone:       zone,
+			Tags:       s.scope.MachineConfig.Tags,
+		}
+
+		if s.scope.MachineConfig.ManagedIdentity != "" {
+			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
 		}
 
 		if vmSpec.Tags == nil {
