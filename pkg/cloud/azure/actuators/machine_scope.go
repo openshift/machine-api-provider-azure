@@ -25,7 +25,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	machineclient "github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/typed/machine/v1beta1"
 	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -59,7 +58,6 @@ const (
 type MachineScopeParams struct {
 	AzureClients
 	Machine    *machinev1.Machine
-	Client     machineclient.MachineV1beta1Interface
 	CoreClient controllerclient.Client
 }
 
@@ -80,8 +78,6 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get machine provider status")
 	}
-
-	machineClient := params.Client.Machines(params.Machine.Namespace)
 
 	if machineConfig.CredentialsSecret != nil {
 		if err = updateScope(params.CoreClient, machineConfig.CredentialsSecret, scope); err != nil {
@@ -108,7 +104,6 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		// Deep copy the machine since it's change outside of the machine scope
 		// by consumers of the machine scope (e.g. reconciler).
 		Machine:       params.Machine.DeepCopy(),
-		MachineClient: machineClient,
 		CoreClient:    params.CoreClient,
 		MachineConfig: machineConfig,
 		MachineStatus: machineStatus,
@@ -124,7 +119,6 @@ type MachineScope struct {
 	*Scope
 
 	Machine       *machinev1.Machine
-	MachineClient machineclient.MachineInterface
 	CoreClient    controllerclient.Client
 	MachineConfig *v1beta1.AzureMachineProviderSpec
 	MachineStatus *v1beta1.AzureMachineProviderStatus
@@ -164,12 +158,11 @@ func (m *MachineScope) storeMachineSpec() error {
 	}
 
 	m.Machine.Spec.ProviderSpec.Value = ext
-	latestMachine, err := m.MachineClient.Update(m.Machine)
+	err = m.CoreClient.Update(m.Context, m.Machine)
 	if err != nil {
 		return err
 	}
 
-	m.Machine = latestMachine
 	return nil
 }
 
@@ -189,20 +182,16 @@ func (m *MachineScope) storeMachineStatus() error {
 
 	time := metav1.Now()
 	m.Machine.Status.LastUpdated = &time
-	latestMachine, err := m.MachineClient.UpdateStatus(m.Machine)
+	err = m.CoreClient.Status().Update(m.Context, m.Machine)
 	if err != nil {
 		return err
 	}
-	m.Machine = latestMachine
+
 	return err
 }
 
 // Persist the machine spec and machine status.
 func (m *MachineScope) Persist() error {
-	if m.MachineClient == nil {
-		return fmt.Errorf("machine client is empty")
-	}
-
 	// The machine status needs to be updated first since
 	// the next call to storeMachineSpec updates entire machine
 	// object. If done in the reverse order, the machine status

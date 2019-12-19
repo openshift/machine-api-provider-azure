@@ -21,7 +21,6 @@ import (
 
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
-	clientset "github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/typed/machine/v1beta1"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis"
 	actuator "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine"
@@ -53,17 +52,11 @@ func main() {
 		klog.Fatalf("Failed to set up overall controller manager: %v", err)
 	}
 
-	cs, err := clientset.NewForConfig(cfg)
-	if err != nil {
-		klog.Fatalf("Failed to create client from configuration: %v", err)
-	}
-
 	// Initialize event recorder.
 	record.InitFromRecorder(mgr.GetEventRecorderFor("azure-controller"))
 
 	// Initialize machine actuator.
 	machineActuator := actuator.NewActuator(actuator.ActuatorParams{
-		Client:            cs,
 		CoreClient:        mgr.GetClient(),
 		ReconcilerBuilder: actuator.NewReconciler,
 		EventRecorder:     mgr.GetEventRecorderFor("azure-controller"),

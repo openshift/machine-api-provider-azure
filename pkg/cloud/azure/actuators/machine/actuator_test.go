@@ -31,12 +31,13 @@ import (
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	controllerError "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	"github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/fake"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/klog"
 	"k8s.io/utils/pointer"
 	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -51,6 +52,12 @@ import (
 var (
 	_ machine.Actuator = (*Actuator)(nil)
 )
+
+func init() {
+	if err := machinev1.AddToScheme(scheme.Scheme); err != nil {
+		klog.Fatal(err)
+	}
+}
 
 func newClusterProviderSpec() clusterproviderv1.AzureClusterProviderSpec {
 	return clusterproviderv1.AzureClusterProviderSpec{
@@ -103,11 +110,9 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	labels[machinev1.MachineClusterIDLabel] = "clusterID"
 	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
-	c := fake.NewSimpleClientset(m).MachineV1beta1()
 	return &actuators.MachineScope{
-		Scope:         scope,
-		MachineClient: c.Machines("dummyNamespace"),
-		Machine:       m,
+		Scope:   scope,
+		Machine: m,
 		MachineConfig: &machineproviderv1.AzureMachineProviderSpec{
 			Subnet:          "dummySubnet",
 			Vnet:            "dummyVnet",
@@ -641,7 +646,11 @@ func TestMachineEvents(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClient(tc.credSecret)
+			cs := controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.credSecret)
+
+			if err := cs.Create(context.TODO(), machine); err != nil {
+				t.Fatal(err)
+			}
 
 			mockCtrl := gomock.NewController(t)
 			azSvc := mock_azure.NewMockService(mockCtrl)
@@ -654,7 +663,6 @@ func TestMachineEvents(t *testing.T) {
 			eventsChannel := make(chan string, 1)
 
 			machineActuator := NewActuator(ActuatorParams{
-				Client:     fake.NewSimpleClientset(tc.machine).MachineV1beta1(),
 				CoreClient: cs,
 				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
 					return &Reconciler{
@@ -752,7 +760,6 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			eventsChannel := make(chan string, 1)
 
 			machineActuator := NewActuator(ActuatorParams{
-				Client:     fake.NewSimpleClientset(machine).MachineV1beta1(),
 				CoreClient: cs,
 				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
 					return &Reconciler{

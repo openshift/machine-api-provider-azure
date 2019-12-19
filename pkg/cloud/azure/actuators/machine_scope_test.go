@@ -21,17 +21,23 @@ import (
 
 	"github.com/ghodss/yaml"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	"github.com/openshift/machine-api-operator/pkg/generated/clientset/versioned/fake"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog"
 	"k8s.io/utils/pointer"
 	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
 	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+func init() {
+	if err := machinev1.AddToScheme(scheme.Scheme); err != nil {
+		klog.Fatal(err)
+	}
+}
 
 func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
@@ -65,7 +71,6 @@ func TestNilClusterScope(t *testing.T) {
 		AzureClients: AzureClients{},
 		CoreClient:   nil,
 		Machine:      m,
-		Client:       fake.NewSimpleClientset(m).MachineV1beta1(),
 	}
 	_, err := NewMachineScope(params)
 	if err != nil {
@@ -224,7 +229,6 @@ func TestPersistMachineScope(t *testing.T) {
 
 	params := MachineScopeParams{
 		Machine:    machine,
-		Client:     fake.NewSimpleClientset(machine).MachineV1beta1(),
 		CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, testCredentialSecret()),
 	}
 
@@ -245,24 +249,23 @@ func TestPersistMachineScope(t *testing.T) {
 	scope.Machine.Status.Addresses = make([]corev1.NodeAddress, len(nodeAddresses))
 	copy(nodeAddresses, scope.Machine.Status.Addresses)
 
+	if err := params.CoreClient.Create(scope.Context, scope.Machine); err != nil {
+		t.Fatal(err)
+	}
+
 	if err = scope.Persist(); err != nil {
 		t.Errorf("Expected MachineScope.Persist to success, got error: %v", err)
 	}
 
-	updatedMachine, err := params.Client.Machines(params.Machine.Namespace).Get(params.Machine.Name, metav1.GetOptions{})
-	if err != nil {
-		t.Errorf("Unable to get updated machine: %v", err)
+	if !equality.Semantic.DeepEqual(scope.Machine.Status.Addresses, nodeAddresses) {
+		t.Errorf("Expected node addresses to equal, updated addresses %#v, expected addresses: %#v", scope.Machine.Status.Addresses, nodeAddresses)
 	}
 
-	if !equality.Semantic.DeepEqual(updatedMachine.Status.Addresses, nodeAddresses) {
-		t.Errorf("Expected node addresses to equal, updated addresses %#v, expected addresses: %#v", updatedMachine.Status.Addresses, nodeAddresses)
+	if scope.Machine.Annotations["test"] != "testValue" {
+		t.Errorf("Expected annotation 'test' to equal 'testValue', got %q instead", scope.Machine.Annotations["test"])
 	}
 
-	if updatedMachine.Annotations["test"] != "testValue" {
-		t.Errorf("Expected annotation 'test' to equal 'testValue', got %q instead", updatedMachine.Annotations["test"])
-	}
-
-	machineStatus, err := machineproviderv1.MachineStatusFromProviderStatus(updatedMachine.Status.ProviderStatus)
+	machineStatus, err := machineproviderv1.MachineStatusFromProviderStatus(scope.Machine.Status.ProviderStatus)
 	if err != nil {
 		t.Errorf("failed to get machine provider status: %v", err)
 	}
@@ -302,7 +305,6 @@ func TestNewMachineScope(t *testing.T) {
 	for _, tc := range testCases {
 		scope, err := NewMachineScope(MachineScopeParams{
 			Machine:    tc.machine,
-			Client:     fake.NewSimpleClientset(tc.machine).MachineV1beta1(),
 			CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.secret),
 		})
 		if err != nil {
