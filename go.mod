@@ -8,7 +8,6 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.7.0
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
-	github.com/coreos/etcd v3.3.15+incompatible // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/mock v1.3.1
 	github.com/openshift/machine-api-operator v0.2.1-0.20191128180243-986b771e661d
