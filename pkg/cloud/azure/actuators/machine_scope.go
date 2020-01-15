@@ -109,8 +109,9 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		MachineStatus: machineStatus,
 		// Once set, they can not be changed. Otherwise, status change computation
 		// might be invalid and result in skipping the status update.
-		origMachine:       params.Machine.DeepCopy(),
-		origMachineStatus: machineStatus.DeepCopy(),
+		origMachine:        params.Machine.DeepCopy(),
+		origMachineStatus:  machineStatus.DeepCopy(),
+		machineToBePatched: controllerclient.MergeFrom(params.Machine.DeepCopy()),
 	}, nil
 }
 
@@ -129,6 +130,8 @@ type MachineScope struct {
 	// origMachineStatus captures original value of machine provider status
 	// before it is updated (to skip object updated if nothing is changed)
 	origMachineStatus *v1beta1.AzureMachineProviderStatus
+
+	machineToBePatched controllerclient.Patch
 }
 
 // Name returns the machine name.
@@ -151,22 +154,18 @@ func (m *MachineScope) Location() string {
 	return m.Scope.Location()
 }
 
-func (m *MachineScope) storeMachineSpec() error {
+func (m *MachineScope) setMachineSpec() error {
 	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
 	if err != nil {
 		return err
 	}
 
 	m.Machine.Spec.ProviderSpec.Value = ext
-	err = m.CoreClient.Update(m.Context, m.Machine)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
 
-func (m *MachineScope) storeMachineStatus() error {
+func (m *MachineScope) setMachineStatus() error {
 	if equality.Semantic.DeepEqual(m.MachineStatus, m.origMachineStatus) && equality.Semantic.DeepEqual(m.Machine.Status.Addresses, m.origMachine.Status.Addresses) {
 		klog.Infof("%s: status unchanged", m.Machine.Name)
 		return nil
@@ -182,12 +181,27 @@ func (m *MachineScope) storeMachineStatus() error {
 
 	time := metav1.Now()
 	m.Machine.Status.LastUpdated = &time
-	err = m.CoreClient.Status().Update(m.Context, m.Machine)
-	if err != nil {
+
+	return err
+}
+
+// PatchMachine patch machine and machine status
+func (m *MachineScope) PatchMachine() error {
+	klog.V(3).Infof("%v: patching machine", m.Machine.GetName())
+
+	// patch machine
+	if err := m.CoreClient.Patch(context.Background(), m.Machine, m.machineToBePatched); err != nil {
+		klog.Errorf("Failed to patch machine %q: %v", m.Machine.GetName(), err)
 		return err
 	}
 
-	return err
+	// patch status
+	if err := m.CoreClient.Status().Patch(context.Background(), m.Machine, m.machineToBePatched); err != nil {
+		klog.Errorf("Failed to patch machine status %q: %v", m.Machine.GetName(), err)
+		return err
+	}
+
+	return nil
 }
 
 // Persist the machine spec and machine status.
@@ -204,12 +218,16 @@ func (m *MachineScope) Persist() error {
 	//    was already set in the previous call, the status is no longer updated
 	//    since the status updated condition is already false. Thus,
 	//    the LastUpdated is not set/updated properly.
-	if err := m.storeMachineStatus(); err != nil {
-		return fmt.Errorf("[machinescope] failed to store provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+	if err := m.setMachineStatus(); err != nil {
+		return fmt.Errorf("[machinescope] failed to set provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
-	if err := m.storeMachineSpec(); err != nil {
-		return fmt.Errorf("[machinescope] failed to update machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+	if err := m.setMachineStatus(); err != nil {
+		return fmt.Errorf("[machinescope] failed to set machine status %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+	}
+
+	if err := m.PatchMachine(); err != nil {
+		return fmt.Errorf("[machinescope] failed to patch machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
 	return nil

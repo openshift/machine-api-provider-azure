@@ -17,9 +17,9 @@ limitations under the License.
 package actuators
 
 import (
+	"encoding/json"
 	"testing"
 
-	"github.com/ghodss/yaml"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -40,7 +40,7 @@ func init() {
 }
 
 func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
-	bytes, err := yaml.Marshal(in)
+	bytes, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
 	}
