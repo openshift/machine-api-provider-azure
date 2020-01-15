@@ -55,3 +55,7 @@ verify-boilerplate:
 .PHONY: test-e2e
 test-e2e:
 	hack/e2e.sh
+
+.PHONY: unit
+unit: # Run unit test
+	go test -race -cover ./cmd/... ./pkg/...
