@@ -15,12 +15,32 @@
 # If you update this file, please follow
 # https://suva.sh/posts/well-documented-makefiles
 
+DBG ?= 0
+
+ifeq ($(DBG),1)
+GOGCFLAGS ?= -gcflags=all="-N -l"
+endif
+
+VERSION     ?= $(shell git describe --always --abbrev=7)
+REPO_PATH   ?= sigs.k8s.io/cluster-api-provider-azure
+LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags -static
+
 GO111MODULE = on
 export GO111MODULE
 GOFLAGS += -mod=vendor
 export GOFLAGS
 GOPROXY ?=
 export GOPROXY
+
+NO_DOCKER ?= 0
+ifeq ($(NO_DOCKER), 1)
+  DOCKER_CMD =
+  IMAGE_BUILD_CMD = imagebuilder
+  CGO_ENABLED = 1
+else
+  DOCKER_CMD := docker run --rm -e CGO_ENABLED=1 -v "$(PWD)":/go/src/sigs.k8s.io/cluster-api-provider-azure:Z -w /go/src/sigs.k8s.io/cluster-api-provider-azure openshift/origin-release:golang-1.12
+  IMAGE_BUILD_CMD = docker build
+endif
 
 .DEFAULT_GOAL:=help
 
@@ -56,6 +76,13 @@ verify-boilerplate:
 test-e2e:
 	hack/e2e.sh
 
+.PHONY: build
+build: ## build binaries
+	$(DOCKER_CMD) go build $(GOGCFLAGS) -o "bin/machine-controller-manager" \
+               -ldflags "$(LD_FLAGS)" "$(REPO_PATH)/cmd/manager"
+	$(DOCKER_CMD) go build $(GOGCFLAGS) -o bin/manager -ldflags '-extldflags "-static"' \
+               "$(REPO_PATH)/vendor/github.com/openshift/machine-api-operator/cmd/machineset"
+
 .PHONY: unit
 unit: # Run unit test
-	go test -race -cover ./cmd/... ./pkg/...
+	$(DOCKER_CMD) go test -race -cover ./cmd/... ./pkg/...
