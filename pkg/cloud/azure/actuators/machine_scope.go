@@ -189,11 +189,15 @@ func (m *MachineScope) setMachineStatus() error {
 func (m *MachineScope) PatchMachine() error {
 	klog.V(3).Infof("%v: patching machine", m.Machine.GetName())
 
+	statusCopy := *m.Machine.Status.DeepCopy()
+
 	// patch machine
 	if err := m.CoreClient.Patch(context.Background(), m.Machine, m.machineToBePatched); err != nil {
 		klog.Errorf("Failed to patch machine %q: %v", m.Machine.GetName(), err)
 		return err
 	}
+
+	m.Machine.Status = statusCopy
 
 	// patch status
 	if err := m.CoreClient.Status().Patch(context.Background(), m.Machine, m.machineToBePatched); err != nil {
