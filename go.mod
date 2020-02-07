@@ -10,16 +10,16 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0
 	github.com/golang/mock v1.3.1
-	github.com/openshift/machine-api-operator v0.2.1-0.20191128180243-986b771e661d
+	github.com/openshift/machine-api-operator v0.2.1-0.20200212112539-a9085e24cf62
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.5
-	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
-	k8s.io/api v0.0.0-20191121015604-11707872ac1c
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	k8s.io/api v0.17.2
 	k8s.io/apiextensions-apiserver v0.0.0-20191121021419-88daf26ec3b8 // indirect
-	k8s.io/apimachinery v0.0.0-20191121015412-41065c7a8c2a
+	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20191114184206-e782cd3c129f
+	k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc
 	sigs.k8s.io/controller-runtime v0.4.0
 	sigs.k8s.io/controller-tools v0.2.4
 	sigs.k8s.io/yaml v1.1.0
