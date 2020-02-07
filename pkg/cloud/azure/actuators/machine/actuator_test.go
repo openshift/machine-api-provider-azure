@@ -598,15 +598,6 @@ func TestMachineEvents(t *testing.T) {
 			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
 		},
 		{
-			name:       "Update machine event failed (reconciler)",
-			machine:    invalidMachine,
-			credSecret: azureCredentialsSecret,
-			operation: func(actuator *Actuator, machine *machinev1.Machine) {
-				actuator.Update(context.TODO(), machine)
-			},
-			event: "Warning FailedUpdate UpdateError: failed to update machine \"azure-actuator-testing-machine\": found attempt to change immutable state",
-		},
-		{
 			name:       "Update machine event succeed",
 			machine:    machine,
 			credSecret: azureCredentialsSecret,

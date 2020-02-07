@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/converters"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
@@ -134,13 +133,6 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	vm, ok := vmInterface.(compute.VirtualMachine)
 	if !ok {
 		return errors.New("returned incorrect vm interface")
-	}
-
-	// We can now compare the various Azure state to the state we were passed.
-	// We will check immutable state first, in order to fail quickly before
-	// moving on to state that we can mutate.
-	if isMachineOutdated(s.scope.MachineConfig, converters.SDKToVM(vm)) {
-		return errors.Errorf("found attempt to change immutable state")
 	}
 
 	// TODO: Uncomment after implementing tagging.
@@ -449,23 +441,6 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-// isMachineOutdated checks that no immutable fields have been updated in an
-// Update request.
-// Returns a bool indicating if an attempt to change immutable state occurred.
-//  - true:  An attempt to change immutable state occurred.
-//  - false: Immutable state was untouched.
-func isMachineOutdated(machineSpec *v1beta1.AzureMachineProviderSpec, vm *v1beta1.VM) bool {
-	// VM Size
-	if !strings.EqualFold(machineSpec.VMSize, vm.VMSize) {
-		return true
-	}
-
-	// TODO: Add additional checks for immutable fields
-
-	// No immutable state changes found.
-	return false
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {
