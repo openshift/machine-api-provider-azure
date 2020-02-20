@@ -18,6 +18,7 @@ package networkinterfaces
 
 import (
 	"context"
+	"net"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -181,6 +182,25 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			InterfaceIPConfigurationPropertiesFormat: nicConfig,
 		},
 	}
+
+	if subnetHasIPv6(subnet) {
+		klog.V(2).Infof("Found IPv6 address space. Adding IPv6 configuration to nic: %s", nicSpec.Name)
+		nicConfigIPv6 := &network.InterfaceIPConfigurationPropertiesFormat{}
+
+		nicConfigIPv6.Subnet = &network.Subnet{ID: subnet.ID}
+		nicConfigIPv6.PrivateIPAllocationMethod = network.Dynamic
+		nicConfigIPv6.PrivateIPAddressVersion = network.IPv6
+
+		ipConfigs := append(*nicProp.IPConfigurations,
+			network.InterfaceIPConfiguration{
+				Name:                                     to.StringPtr("pipConfig-v6"),
+				InterfaceIPConfigurationPropertiesFormat: nicConfigIPv6,
+			},
+		)
+
+		nicProp.IPConfigurations = &ipConfigs
+	}
+
 	f, err := s.Client.CreateOrUpdate(ctx,
 		s.Scope.ClusterConfig.ResourceGroup,
 		nicSpec.Name,
@@ -233,4 +253,30 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	}
 	klog.V(2).Infof("successfully deleted nic %s", nicSpec.Name)
 	return err
+}
+
+func subnetHasIPv6(subnet network.Subnet) bool {
+	var prefixes []string
+
+	if subnet.AddressPrefix != nil {
+		prefixes = append(prefixes, *subnet.AddressPrefix)
+	}
+
+	if subnet.AddressPrefixes != nil {
+		prefixes = append(prefixes, *subnet.AddressPrefixes...)
+	}
+
+	for _, prefix := range prefixes {
+		ip, _, err := net.ParseCIDR(prefix)
+		if err != nil {
+			klog.Errorf("Error parsing subnet address prefix: %v", err)
+			continue
+		}
+
+		if ip != nil && ip.To4() == nil {
+			return true // Found an IPv6 subnet.
+		}
+	}
+
+	return false
 }
