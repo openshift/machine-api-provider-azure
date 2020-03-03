@@ -70,7 +70,6 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 				PublicIPAllocationMethod: network.Static,
 				DNSSettings: &network.PublicIPAddressDNSSettings{
 					DomainNameLabel: to.StringPtr(strings.ToLower(ipName)),
-					Fqdn:            to.StringPtr(s.Scope.Network().APIServerIP.DNSName),
 				},
 			},
 		},
