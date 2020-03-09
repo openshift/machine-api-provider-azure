@@ -9,7 +9,10 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0
+	github.com/go-logr/logr v0.1.0
 	github.com/golang/mock v1.3.1
+	github.com/onsi/ginkgo v1.11.0
+	github.com/onsi/gomega v1.7.0
 	github.com/openshift/machine-api-operator v0.2.1-0.20200212112539-a9085e24cf62
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.5
