@@ -13,7 +13,7 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
-	github.com/openshift/machine-api-operator v0.2.1-0.20200212112539-a9085e24cf62
+	github.com/openshift/machine-api-operator v0.2.1-0.20200312191013-b6f5c3baf5c0
 	github.com/pkg/errors v0.8.1
 	github.com/spf13/cobra v0.0.5
 	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
@@ -22,6 +22,7 @@ require (
 	k8s.io/apimachinery v0.17.2
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
 	k8s.io/klog v1.0.0
+	k8s.io/kubectl v0.0.0-20200124035537-9f7d91504e51
 	k8s.io/utils v0.0.0-20191217005138-9e5e9d854fcc
 	sigs.k8s.io/controller-runtime v0.4.0
 	sigs.k8s.io/controller-tools v0.2.4
