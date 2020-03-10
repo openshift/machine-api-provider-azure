@@ -27,7 +27,7 @@ LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags -static
 
 GO111MODULE = on
 export GO111MODULE
-GOFLAGS += -mod=vendor
+GOFLAGS ?= -mod=vendor
 export GOFLAGS
 GOPROXY ?=
 export GOPROXY
@@ -82,7 +82,15 @@ build: ## build binaries
                -ldflags "$(LD_FLAGS)" "$(REPO_PATH)/cmd/manager"
 	$(DOCKER_CMD) go build $(GOGCFLAGS) -o bin/manager -ldflags '-extldflags "-static"' \
                "$(REPO_PATH)/vendor/github.com/openshift/machine-api-operator/cmd/machineset"
+.PHONY: test
+test: ## Run tests
+	@echo -e "\033[32mTesting...\033[0m"
+	$(DOCKER_CMD) hack/ci-test.sh
 
+## TODO(JoelSpeed): Make CI depend on `test` target and rename `unit-internal` to `unit` to restore original behaviour
 .PHONY: unit
-unit: # Run unit test
+unit: test
+
+.PHONY: unit-internal
+unit-internal: # Run unit test
 	$(DOCKER_CMD) go test -race -cover ./cmd/... ./pkg/...
