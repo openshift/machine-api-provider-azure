@@ -80,8 +80,7 @@ test-e2e:
 build: ## build binaries
 	$(DOCKER_CMD) go build $(GOGCFLAGS) -o "bin/machine-controller-manager" \
                -ldflags "$(LD_FLAGS)" "$(REPO_PATH)/cmd/manager"
-	$(DOCKER_CMD) go build $(GOGCFLAGS) -o bin/manager -ldflags '-extldflags "-static"' \
-               "$(REPO_PATH)/vendor/github.com/openshift/machine-api-operator/cmd/machineset"
+
 .PHONY: test
 test: ## Run tests
 	@echo -e "\033[32mTesting...\033[0m"
