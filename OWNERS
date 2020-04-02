@@ -2,10 +2,7 @@
 
 approvers:
   - enxebre
-reviewers:
-  - enxebre
-  - ingvagabund
   - michaelgugino
-  - serbrech
-  - juan-lee
-  - awesomenix
+  - alexander-demichev
+  - JoelSpeed
+  - elmiko
