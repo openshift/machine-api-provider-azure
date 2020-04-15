@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -42,10 +43,29 @@ func main() {
 		"",
 		"Namespace that the controller watches to reconcile machine-api objects. If unspecified, the controller watches for machine-api objects across all namespaces.",
 	)
+
 	healthAddr := flag.String(
 		"health-addr",
 		":9440",
 		"The address for health checking.",
+	)
+
+	leaderElectResourceNamespace := flag.String(
+		"leader-elect-resource-namespace",
+		"",
+		"The namespace of resource object that is used for locking during leader election. If unspecified and running in cluster, defaults to the service account namespace for the controller. Required for leader-election outside of a cluster.",
+	)
+
+	leaderElect := flag.Bool(
+		"leader-elect",
+		false,
+		"Start a leader election client and gain leadership before executing the main loop. Enable this when running replicated components for high availability.",
+	)
+
+	leaderElectLeaseDuration := flag.Duration(
+		"leader-elect-lease-duration",
+		15*time.Second,
+		"The duration that non-leader candidates will wait after observing a leadership renewal until attempting to acquire leadership of a led but unrenewed leader slot. This is effectively the maximum duration that a leader can be stopped before it is replaced by another candidate. This is only applicable if leader election is enabled.",
 	)
 
 	klog.InitFlags(nil)
@@ -55,7 +75,11 @@ func main() {
 	cfg := config.GetConfigOrDie()
 
 	opts := manager.Options{
-		HealthProbeBindAddress: *healthAddr,
+		HealthProbeBindAddress:  *healthAddr,
+		LeaderElection:          *leaderElect,
+		LeaderElectionNamespace: *leaderElectResourceNamespace,
+		LeaderElectionID:        "cluster-api-provider-azure-leader",
+		LeaseDuration:           leaderElectLeaseDuration,
 	}
 
 	if *watchNamespace != "" {
