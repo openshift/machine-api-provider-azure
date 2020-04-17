@@ -473,14 +473,14 @@ func TestCustomUserData(t *testing.T) {
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
-			Namespace: "dummyNamespace",
+			Namespace: fakeScope.Namespace(),
 		},
 		Data: map[string][]byte{
 			"userData": []byte("test-userdata"),
 		},
 	}
 	fakeScope.CoreClient = controllerfake.NewFakeClient(userDataSecret)
-	fakeScope.MachineConfig.UserDataSecret = &corev1.SecretReference{Name: "testCustomUserData"}
+	fakeScope.MachineConfig.UserDataSecret = &corev1.SecretReference{Name: userDataSecret.Name, Namespace: fakeScope.Namespace()}
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{}
 	if err := fakeReconciler.Create(context.Background()); err != nil {
@@ -568,7 +568,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Create(context.TODO(), machine)
 			},
-			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
 		},
 		{
 			name:       "Create machine event failed (reconciler)",
@@ -595,7 +595,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Update(context.TODO(), machine)
 			},
-			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
 		},
 		{
 			name:       "Update machine event succeed",
@@ -613,7 +613,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Delete(context.TODO(), machine)
 			},
-			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id /azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
 		},
 		{
 			name:       "Delete machine event failed (reconciler)",
@@ -639,7 +639,8 @@ func TestMachineEvents(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			cs := controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.credSecret)
 
-			if err := cs.Create(context.TODO(), machine); err != nil {
+			m := tc.machine.DeepCopy()
+			if err := cs.Create(context.TODO(), m); err != nil {
 				t.Fatal(err)
 			}
 
@@ -691,7 +692,7 @@ func TestMachineEvents(t *testing.T) {
 			networkSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			pipSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
-			tc.operation(machineActuator, tc.machine)
+			tc.operation(machineActuator, m)
 
 			select {
 			case event := <-eventsChannel:
@@ -726,7 +727,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 		},
 		{
 			name:       "CreateMachine",
-			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine : failed to create or get machine: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
+			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create or get machine: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
 			statusCode: 300,
 			requeable:  true,
 		},

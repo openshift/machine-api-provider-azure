@@ -34,8 +34,8 @@ runcmd:
 func stubProviderConfig() *providerspecv1.AzureMachineProviderSpec {
 	var natRule int
 	return &providerspecv1.AzureMachineProviderSpec{
-		UserDataSecret:       &corev1.SecretReference{Name: userDataSecretName},
-		CredentialsSecret:    &corev1.SecretReference{Name: azureCredentialsSecretName},
+		UserDataSecret:       &corev1.SecretReference{Name: userDataSecretName, Namespace: defaultNamespace},
+		CredentialsSecret:    &corev1.SecretReference{Name: azureCredentialsSecretName, Namespace: defaultNamespace},
 		Location:             "eastus2",
 		VMSize:               "Standard_B2ms",
 		Image:                providerspecv1.Image{ResourceID: "/resourceGroups/os4-common/providers/Microsoft.Compute/images/test1-controlplane-0-image-20190529150403"},
@@ -72,7 +72,7 @@ func stubMachine() (*machinev1.Machine, error) {
 		},
 
 		Spec: machinev1.MachineSpec{
-			ObjectMeta: metav1.ObjectMeta{
+			ObjectMeta: machinev1.ObjectMeta{
 				Labels: map[string]string{
 					"node-role.kubernetes.io/master": "",
 					"node-role.kubernetes.io/infra":  "",
