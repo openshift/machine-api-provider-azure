@@ -16,7 +16,10 @@ limitations under the License.
 
 package azure
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 const (
 	// DefaultUserName is the default username for created vm
@@ -85,7 +88,7 @@ func GenerateMachinePublicIPName(clusterName, machineName string) (string, error
 		return name, nil
 	}
 
-	return "", fmt.Errorf("machine public IP name is longer than 63 characters")
+	return "", errors.New("machine public IP name is longer than 63 characters")
 }
 
 // GenerateFQDN generates a fully qualified domain name, based on the public IP name and cluster location.

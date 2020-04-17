@@ -18,10 +18,10 @@ package groups
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
@@ -44,12 +44,12 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("deleting resource group %s", s.Scope.ClusterConfig.ResourceGroup)
 	future, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete resource group %s", s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete resource group %s: %w", s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot delete, future response")
+		return fmt.Errorf("cannot delete, future response: %w", err)
 	}
 
 	_, err = future.Result(s.Client)

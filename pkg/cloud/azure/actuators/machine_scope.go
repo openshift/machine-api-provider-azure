@@ -18,6 +18,7 @@ package actuators
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -25,7 +26,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -75,12 +75,12 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 
 	machineStatus, err := v1beta1.MachineStatusFromProviderStatus(params.Machine.Status.ProviderStatus)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get machine provider status")
+		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
 
 	if machineConfig.CredentialsSecret != nil {
 		if err = updateScope(params.CoreClient, machineConfig.CredentialsSecret, scope); err != nil {
-			return nil, errors.Wrap(err, "failed to update cluster")
+			return nil, fmt.Errorf("failed to update cluster: %w", err)
 		}
 	}
 
@@ -270,37 +270,37 @@ func updateScope(coreClient controllerclient.Client, credentialsSecret *apicorev
 
 	subscriptionID, ok := secret.Data[AzureCredsSubscriptionIDKey]
 	if !ok {
-		return errors.Errorf("Azure subscription id %v did not contain key %v",
+		return fmt.Errorf("Azure subscription id %v did not contain key %v",
 			secretType.String(), AzureCredsSubscriptionIDKey)
 	}
 	clientID, ok := secret.Data[AzureCredsClientIDKey]
 	if !ok {
-		return errors.Errorf("Azure client id %v did not contain key %v",
+		return fmt.Errorf("Azure client id %v did not contain key %v",
 			secretType.String(), AzureCredsClientIDKey)
 	}
 	clientSecret, ok := secret.Data[AzureCredsClientSecretKey]
 	if !ok {
-		return errors.Errorf("Azure client secret %v did not contain key %v",
+		return fmt.Errorf("Azure client secret %v did not contain key %v",
 			secretType.String(), AzureCredsClientSecretKey)
 	}
 	tenantID, ok := secret.Data[AzureCredsTenantIDKey]
 	if !ok {
-		return errors.Errorf("Azure tenant id %v did not contain key %v",
+		return fmt.Errorf("Azure tenant id %v did not contain key %v",
 			secretType.String(), AzureCredsTenantIDKey)
 	}
 	resourceGroup, ok := secret.Data[AzureCredsResourceGroupKey]
 	if !ok {
-		return errors.Errorf("Azure resource group %v did not contain key %v",
+		return fmt.Errorf("Azure resource group %v did not contain key %v",
 			secretType.String(), AzureCredsResourceGroupKey)
 	}
 	region, ok := secret.Data[AzureCredsRegionKey]
 	if !ok {
-		return errors.Errorf("Azure region %v did not contain key %v",
+		return fmt.Errorf("Azure region %v did not contain key %v",
 			secretType.String(), AzureCredsRegionKey)
 	}
 	clusterName, ok := secret.Data[AzureResourcePrefix]
 	if !ok {
-		return errors.Errorf("Azure resource prefix %v did not contain key %v",
+		return fmt.Errorf("Azure resource prefix %v did not contain key %v",
 			secretType.String(), AzureResourcePrefix)
 	}
 
@@ -322,7 +322,7 @@ func updateScope(coreClient controllerclient.Client, credentialsSecret *apicorev
 
 	authorizer, err := autorest.NewBearerAuthorizer(token), nil
 	if err != nil {
-		return errors.Errorf("failed to create azure session: %v", err)
+		return fmt.Errorf("failed to create azure session: %v", err)
 	}
 
 	scope.ClusterConfig.ObjectMeta.Name = string(clusterName)

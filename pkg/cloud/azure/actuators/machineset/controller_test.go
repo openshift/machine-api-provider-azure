@@ -15,6 +15,7 @@ package machineset
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -180,7 +181,7 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 			return err
 		}
 		if len(machineSets.Items) > 0 {
-			return fmt.Errorf("MachineSets not deleted")
+			return errors.New("MachineSets not deleted")
 		}
 		return nil
 	}, timeout).Should(Succeed())

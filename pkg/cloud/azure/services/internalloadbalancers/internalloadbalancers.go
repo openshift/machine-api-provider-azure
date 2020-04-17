@@ -18,11 +18,11 @@ package internalloadbalancers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/subnets"
@@ -45,7 +45,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	//lbName := fmt.Sprintf("%s-api-internallb", s.Scope.Cluster.Name)
 	lb, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, internalLBSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "load balancer %s not found", internalLBSpec.Name)
+		return nil, fmt.Errorf("load balancer %s not found: %w", internalLBSpec.Name, err)
 	} else if err != nil {
 		return lb, err
 	}
@@ -137,12 +137,12 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		})
 
 	if err != nil {
-		return errors.Wrap(err, "cannot create load balancer")
+		return fmt.Errorf("cannot create load balancer: %w", err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot get internal load balancer create or update future response")
+		return fmt.Errorf("cannot get internal load balancer create or update future response: %w", err)
 	}
 
 	_, err = future.Result(s.Client)
@@ -163,17 +163,17 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete internal load balancer %s in resource group %s", internalLBSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete internal load balancer %s in resource group %s: %w", internalLBSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully deleted internal load balancer %s", internalLBSpec.Name)
 	return err

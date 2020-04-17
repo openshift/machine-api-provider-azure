@@ -18,10 +18,11 @@ package routetables
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
@@ -39,7 +40,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	routeTable, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, routeTableSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "route table %s not found", routeTableSpec.Name)
+		return nil, fmt.Errorf("route table %s not found: %w", routeTableSpec.Name, err)
 	} else if err != nil {
 		return routeTable, err
 	}
@@ -63,17 +64,17 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		},
 	)
 	if err != nil {
-		return errors.Wrapf(err, "failed to create route table %s in resource group %s", routeTableSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to create route table %s in resource group %s: %w", routeTableSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully created route table %s", routeTableSpec.Name)
 	return err
@@ -92,17 +93,17 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete route table %s in resource group %s", routeTableSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete route table %s in resource group %s: %w", routeTableSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully deleted route table %s", routeTableSpec.Name)
 	return err

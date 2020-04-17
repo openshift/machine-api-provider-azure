@@ -18,11 +18,12 @@ package networkinterfaces
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
@@ -55,7 +56,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	nic, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, nicSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "network interface %s not found", nicSpec.Name)
+		return nil, fmt.Errorf("network interface %s not found: %w", nicSpec.Name, err)
 	} else if err != nil {
 		return nic, err
 	}
@@ -210,17 +211,17 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		})
 
 	if err != nil {
-		return errors.Wrapf(err, "failed to create network interface %s in resource group %s", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to create network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully created network interface %s", nicSpec.Name)
 	return err
@@ -239,17 +240,17 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete network interface %s in resource group %s", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully deleted nic %s", nicSpec.Name)
 	return err

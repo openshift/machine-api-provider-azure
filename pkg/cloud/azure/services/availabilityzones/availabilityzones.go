@@ -18,9 +18,9 @@ package availabilityzones
 
 import (
 	"context"
+	"errors"
 	"strings"
 
-	"github.com/pkg/errors"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 

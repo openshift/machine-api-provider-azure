@@ -18,11 +18,11 @@ package publicloadbalancers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
@@ -42,7 +42,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	lb, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, publicLBSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "load balancer %s not found", publicLBSpec.Name)
+		return nil, fmt.Errorf("load balancer %s not found: %w", publicLBSpec.Name, err)
 	} else if err != nil {
 		return lb, err
 	}
@@ -174,12 +174,12 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		})
 
 	if err != nil {
-		return errors.Wrap(err, "cannot create public load balancer")
+		return fmt.Errorf("cannot create public load balancer: %w", err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get public load balancer create or update future response")
+		return fmt.Errorf("cannot get public load balancer create or update future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
@@ -200,17 +200,17 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete public load balancer %s in resource group %s", publicLBSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete public load balancer %s in resource group %s: %w", publicLBSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot create, future response")
+		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
 	_, err = f.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("deleted public load balancer %s", publicLBSpec.Name)
 	return err

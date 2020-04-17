@@ -18,10 +18,11 @@ package virtualmachineextensions
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
@@ -41,7 +42,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	vmExt, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, vmExtSpec.VMName, vmExtSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "vm extension %s not found", vmExtSpec.Name)
+		return nil, fmt.Errorf("vm extension %s not found: %w", vmExtSpec.Name, err)
 	} else if err != nil {
 		return vmExt, err
 	}
@@ -75,17 +76,17 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			},
 		})
 	if err != nil {
-		return errors.Wrapf(err, "cannot create vm extension")
+		return fmt.Errorf("cannot create vm extension: %w", err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrapf(err, "cannot get the extension create or update future response")
+		return fmt.Errorf("cannot get the extension create or update future response: %w", err)
 	}
 
 	_, err = future.Result(s.Client)
 	if err != nil {
-		return errors.Wrapf(err, "cannot create vm")
+		return fmt.Errorf("cannot create vm: %w", err)
 	}
 
 	// if *vmExt.ProvisioningState != string(compute.ProvisioningStateSucceeded) {
@@ -110,12 +111,12 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete vm extension %s in resource group %s", vmExtSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete vm extension %s in resource group %s: %w", vmExtSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot delete, future response")
+		return fmt.Errorf("cannot delete, future response: %w", err)
 	}
 
 	_, err = future.Result(s.Client)

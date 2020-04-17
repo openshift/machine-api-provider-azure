@@ -18,9 +18,10 @@ package disks
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
@@ -53,14 +54,14 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete disk %s in resource group %s", diskSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete disk %s in resource group %s: %w", diskSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	// Do not wait until the operation completes. Just check the result
 	// so the call to Delete actuator operation is async.
 	_, err = future.Result(s.Client)
 	if err != nil {
-		return errors.Wrap(err, "result error")
+		return fmt.Errorf("result error: %w", err)
 	}
 	klog.V(2).Infof("successfully deleted disk %s", diskSpec.Name)
 	return err

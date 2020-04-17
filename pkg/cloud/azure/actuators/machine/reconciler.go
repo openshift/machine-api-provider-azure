@@ -19,6 +19,7 @@ package machine
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"path"
 	"strings"
@@ -28,7 +29,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	"github.com/pkg/errors"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -110,11 +110,11 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 
 	nicName := azure.GenerateNetworkInterfaceName(s.scope.Machine.Name)
 	if err := s.createNetworkInterface(ctx, nicName); err != nil {
-		return errors.Wrapf(err, "failed to create nic %s for machine %s", nicName, s.scope.Machine.Name)
+		return fmt.Errorf("failed to create nic %s for machine %s: %w", nicName, s.scope.Machine.Name, err)
 	}
 
 	if err := s.createVirtualMachine(ctx, nicName); err != nil {
-		return errors.Wrapf(err, "failed to create vm %s ", s.scope.Machine.Name)
+		return fmt.Errorf("failed to create vm %s: %w", s.scope.Machine.Name, err)
 	}
 
 	return nil
@@ -127,7 +127,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	}
 	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
 	if err != nil {
-		return errors.Errorf("failed to get vm: %+v", err)
+		return fmt.Errorf("failed to get vm: %+v", err)
 	}
 
 	vm, ok := vmInterface.(compute.VirtualMachine)
@@ -140,7 +140,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	/*
 		_, err = a.ensureTags(computeSvc, machine, scope.MachineStatus.VMID, scope.MachineConfig.AdditionalTags)
 		if err != nil {
-			return errors.Errorf("failed to ensure tags: %+v", err)
+			return fmt.Errorf("failed to ensure tags: %+v", err)
 		}
 	*/
 
@@ -164,7 +164,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 
 	if vm.NetworkProfile != nil && vm.NetworkProfile.NetworkInterfaces != nil {
 		if s.scope.MachineConfig.Vnet == "" {
-			return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
+			return fmt.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 		}
 
 		for _, iface := range *vm.NetworkProfile.NetworkInterfaces {
@@ -341,12 +341,12 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	}
 
 	if err != nil {
-		return false, errors.Wrap(err, "Failed to get vm")
+		return false, fmt.Errorf("Failed to get vm: %w", err)
 	}
 
 	vm, ok := vmInterface.(compute.VirtualMachine)
 	if !ok {
-		return false, errors.Errorf("returned incorrect vm interface: %T", vmInterface)
+		return false, fmt.Errorf("returned incorrect vm interface: %T", vmInterface)
 	}
 
 	klog.Infof("Found vm for machine %s", s.scope.Name())
@@ -363,7 +363,7 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 		}
 
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to get vm extension")
+			return false, fmt.Errorf("failed to get vm extension: %w", err)
 		}
 	}
 
@@ -395,7 +395,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 
 	err := s.virtualMachinesSvc.Delete(ctx, vmSpec)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete machine")
+		return fmt.Errorf("failed to delete machine: %w", err)
 	}
 
 	osDiskSpec := &disks.Spec{
@@ -403,11 +403,11 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 	err = s.disksSvc.Delete(ctx, osDiskSpec)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete OS disk")
+		return fmt.Errorf("failed to delete OS disk: %w", err)
 	}
 
 	if s.scope.MachineConfig.Vnet == "" {
-		return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
+		return fmt.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec := &networkinterfaces.Spec{
@@ -417,7 +417,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 
 	err = s.networkInterfacesSvc.Delete(ctx, networkInterfaceSpec)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to delete network interface")
+		return fmt.Errorf("Unable to delete network interface: %w", err)
 	}
 
 	if s.scope.MachineConfig.PublicIP {
@@ -436,7 +436,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 			Name: publicIPName,
 		})
 		if err != nil {
-			return errors.Wrap(err, "unable to delete Public IP")
+			return fmt.Errorf("unable to delete Public IP: %w", err)
 		}
 	}
 
@@ -449,7 +449,7 @@ func (s *Reconciler) getZone(ctx context.Context) (string, error) {
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
 	if s.scope.MachineConfig.Vnet == "" {
-		return errors.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
+		return fmt.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec := &networkinterfaces.Spec{
@@ -458,7 +458,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.Subnet == "" {
-		return errors.Errorf("MachineConfig subnet is missing on machine %s, skipping machine creation", s.scope.Machine.Name)
+		return fmt.Errorf("MachineConfig subnet is missing on machine %s, skipping machine creation", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec.SubnetName = s.scope.MachineConfig.Subnet
@@ -484,18 +484,18 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	if s.scope.MachineConfig.PublicIP {
 		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterConfig.Name, s.scope.Machine.Name)
 		if err != nil {
-			return errors.Wrap(err, "unable to create Public IP")
+			return fmt.Errorf("unable to create Public IP: %w", err)
 		}
 		err = s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
 		if err != nil {
-			return errors.Wrap(err, "unable to create Public IP")
+			return fmt.Errorf("unable to create Public IP: %w", err)
 		}
 		networkInterfaceSpec.PublicIP = publicIPName
 	}
 
 	err := s.networkInterfacesSvc.CreateOrUpdate(ctx, networkInterfaceSpec)
 	if err != nil {
-		return errors.Wrap(err, "unable to create VM network interface")
+		return fmt.Errorf("unable to create VM network interface: %w", err)
 	}
 
 	return err
@@ -504,7 +504,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) error {
 	decoded, err := base64.StdEncoding.DecodeString(s.scope.MachineConfig.SSHPublicKey)
 	if err != nil {
-		errors.Wrapf(err, "failed to decode ssh public key")
+		return fmt.Errorf("failed to decode ssh public key: %w", err)
 	}
 
 	vmSpec := &virtualmachines.Spec{
@@ -515,11 +515,11 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 	if err != nil && vmInterface == nil {
 		zone, err := s.getZone(ctx)
 		if err != nil {
-			return errors.Wrapf(err, "failed to get zone")
+			return fmt.Errorf("failed to get zone: %w", err)
 		}
 
 		if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
-			return errors.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
+			return fmt.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
 		}
 
 		vmSpec = &virtualmachines.Spec{
@@ -545,7 +545,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 		userData, userDataErr := s.getCustomUserData()
 		if userDataErr != nil {
-			return errors.Wrapf(userDataErr, "failed to get custom script data")
+			return fmt.Errorf("failed to get custom script data: %w", userDataErr)
 		}
 
 		if userData != "" {
@@ -554,17 +554,17 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 		err = s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec)
 		if err != nil {
-			return errors.Wrapf(err, "failed to create or get machine")
+			return fmt.Errorf("failed to create or get machine: %w", err)
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "failed to get vm")
+		return fmt.Errorf("failed to get vm: %w", err)
 	} else {
 		vm, ok := vmInterface.(compute.VirtualMachine)
 		if !ok {
 			return errors.New("returned incorrect vm interface")
 		}
 		if vm.ProvisioningState == nil {
-			return errors.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
+			return fmt.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
 		}
 
 		vmState := getVMState(vm)
@@ -577,11 +577,11 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 			// If VM failed provisioning, delete it so it can be recreated
 			err = s.Delete(ctx)
 			if err != nil {
-				return errors.Wrapf(err, "failed to delete machine")
+				return fmt.Errorf("failed to delete machine: %w", err)
 			}
-			return errors.Errorf("vm %s is deleted, retry creating in next reconcile", s.scope.Machine.Name)
+			return fmt.Errorf("vm %s is deleted, retry creating in next reconcile", s.scope.Machine.Name)
 		} else if *vm.ProvisioningState != "Succeeded" {
-			return errors.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.ProvisioningState)
+			return fmt.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.ProvisioningState)
 		}
 	}
 
@@ -595,11 +595,11 @@ func (s *Reconciler) getCustomUserData() (string, error) {
 	var userDataSecret apicorev1.Secret
 
 	if err := s.scope.CoreClient.Get(context.Background(), client.ObjectKey{Namespace: s.scope.Namespace(), Name: s.scope.MachineConfig.UserDataSecret.Name}, &userDataSecret); err != nil {
-		return "", errors.Wrapf(err, "error getting user data secret %s in namespace %s", s.scope.MachineConfig.UserDataSecret.Name, s.scope.Namespace())
+		return "", fmt.Errorf("error getting user data secret %s in namespace %s: %w", s.scope.MachineConfig.UserDataSecret.Name, s.scope.Namespace(), err)
 	}
 	data, exists := userDataSecret.Data["userData"]
 	if !exists {
-		return "", errors.Errorf("Secret %v/%v does not have userData field set. Thus, no user data applied when creating an instance.", s.scope.Namespace(), s.scope.MachineConfig.UserDataSecret.Name)
+		return "", fmt.Errorf("Secret %v/%v does not have userData field set. Thus, no user data applied when creating an instance.", s.scope.Namespace(), s.scope.MachineConfig.UserDataSecret.Name)
 	}
 
 	return base64.StdEncoding.EncodeToString(data), nil

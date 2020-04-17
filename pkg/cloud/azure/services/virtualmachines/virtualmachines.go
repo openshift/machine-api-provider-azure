@@ -21,12 +21,12 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2018-10-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -56,7 +56,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	vm, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, vmSpec.Name, compute.InstanceView)
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "vm %s not found", vmSpec.Name)
+		return nil, fmt.Errorf("vm %s not found: %w", vmSpec.Name, err)
 	} else if err != nil {
 		return vm, err
 	}
@@ -87,19 +87,19 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if sshKeyData == "" {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
-			return errors.Wrap(perr, "Failed to generate private key")
+			return fmt.Errorf("Failed to generate private key: %w", perr)
 		}
 
 		publicRsaKey, perr := ssh.NewPublicKey(&privateKey.PublicKey)
 		if perr != nil {
-			return errors.Wrap(perr, "Failed to generate public key")
+			return fmt.Errorf("Failed to generate public key: %w", perr)
 		}
 		sshKeyData = string(ssh.MarshalAuthorizedKey(publicRsaKey))
 	}
 
 	randomPassword, err := GenerateRandomString(32)
 	if err != nil {
-		return errors.Wrapf(err, "failed to generate random string")
+		return fmt.Errorf("failed to generate random string: %w", err)
 	}
 
 	imageReference := &compute.ImageReference{
@@ -190,7 +190,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		vmSpec.Name,
 		virtualMachine)
 	if err != nil {
-		return errors.Wrapf(err, "cannot create vm")
+		return fmt.Errorf("cannot create vm: %w", err)
 	}
 
 	// Do not wait until the operation completes. Just check the result
@@ -229,7 +229,7 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete vm %s in resource group %s", vmSpec.Name, s.Scope.ClusterConfig.ResourceGroup)
+		return fmt.Errorf("failed to delete vm %s in resource group %s: %w", vmSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
 	}
 
 	// Do not wait until the operation completes. Just check the result

@@ -18,10 +18,11 @@ package virtualnetworks
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"github.com/pkg/errors"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
@@ -40,7 +41,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	vnet, err := s.Client.Get(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, vnetSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, errors.Wrapf(err, "vnet %s not found", vnetSpec.Name)
+		return nil, fmt.Errorf("vnet %s not found: %w", vnetSpec.Name, err)
 	} else if err != nil {
 		return vnet, err
 	}
@@ -107,12 +108,12 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete vnet %s in resource group %s", vnetSpec.Name, s.Scope.ClusterConfig.NetworkResourceGroup)
+		return fmt.Errorf("failed to delete vnet %s in resource group %s: %w", vnetSpec.Name, s.Scope.ClusterConfig.NetworkResourceGroup, err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
 	if err != nil {
-		return errors.Wrap(err, "cannot delete, future response")
+		return fmt.Errorf("cannot delete, future response: %w", err)
 	}
 
 	_, err = future.Result(s.Client)
