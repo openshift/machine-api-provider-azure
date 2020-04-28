@@ -24,8 +24,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
-	controllerError "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
@@ -71,7 +70,7 @@ func NewActuator(params ActuatorParams) *Actuator {
 
 // Set corresponding event based on error. It also returns the original error
 // for convenience, so callers can do "return handleMachineError(...)".
-func (a *Actuator) handleMachineError(machine *machinev1.Machine, err *apierrors.MachineError, eventAction string) error {
+func (a *Actuator) handleMachineError(machine *machinev1.Machine, err *machineapierrors.MachineError, eventAction string) error {
 	if eventAction != noEventAction {
 		a.eventRecorder.Eventf(machine, corev1.EventTypeWarning, "Failed"+eventAction, "%v: %v", err.Reason, err.Message)
 	}
@@ -89,7 +88,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return a.handleMachineError(machine, apierrors.InvalidMachineConfiguration("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
+		return a.handleMachineError(machine, machineapierrors.InvalidMachineConfiguration("failed to create machine %q scope: %v", machine.Name, err), createEventAction)
 
 	}
 
@@ -104,13 +103,18 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 		if errors.As(err, &detailedError) {
 			statusCode, ok := detailedError.StatusCode.(int)
 			if ok && statusCode >= 400 && statusCode < 500 {
-				return a.handleMachineError(machine, apierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, detailedError), createEventAction)
+				return a.handleMachineError(machine, machineapierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, detailedError), createEventAction)
 			}
 		}
 
-		a.handleMachineError(machine, apierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
+		var machineErr *machineapierrors.MachineError
+		if errors.As(err, &machineErr) {
+			return a.handleMachineError(machine, machineapierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, err), createEventAction)
+		}
 
-		return &controllerError.RequeueAfterError{
+		a.handleMachineError(machine, machineapierrors.CreateMachine("failed to reconcile machine %qs: %v", machine.Name, err), createEventAction)
+
+		return &machineapierrors.RequeueAfterError{
 			RequeueAfter: 20 * time.Second,
 		}
 	}
@@ -133,7 +137,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return a.handleMachineError(machine, apierrors.DeleteMachine("failed to create machine %q scope: %v", machine.Name, err), deleteEventAction)
+		return a.handleMachineError(machine, machineapierrors.DeleteMachine("failed to create machine %q scope: %v", machine.Name, err), deleteEventAction)
 	}
 
 	err = a.reconcilerBuilder(scope).Delete(context.Background())
@@ -142,8 +146,8 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 		if err := scope.Persist(); err != nil {
 			klog.Errorf("Error storing machine info: %v", err)
 		}
-		a.handleMachineError(machine, apierrors.DeleteMachine("failed to delete machine %q: %v", machine.Name, err), deleteEventAction)
-		return &controllerError.RequeueAfterError{
+		a.handleMachineError(machine, machineapierrors.DeleteMachine("failed to delete machine %q: %v", machine.Name, err), deleteEventAction)
+		return &machineapierrors.RequeueAfterError{
 			RequeueAfter: 20 * time.Second,
 		}
 	}
@@ -168,7 +172,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		CoreClient: a.coreClient,
 	})
 	if err != nil {
-		return a.handleMachineError(machine, apierrors.UpdateMachine("failed to create machine %q scope: %v", machine.Name, err), updateEventAction)
+		return a.handleMachineError(machine, machineapierrors.UpdateMachine("failed to create machine %q scope: %v", machine.Name, err), updateEventAction)
 	}
 
 	err = a.reconcilerBuilder(scope).Update(context.Background())
@@ -177,8 +181,8 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		if err := scope.Persist(); err != nil {
 			klog.Errorf("Error storing machine info: %v", err)
 		}
-		a.handleMachineError(machine, apierrors.UpdateMachine("failed to update machine %q: %v", machine.Name, err), updateEventAction)
-		return &controllerError.RequeueAfterError{
+		a.handleMachineError(machine, machineapierrors.UpdateMachine("failed to update machine %q: %v", machine.Name, err), updateEventAction)
+		return &machineapierrors.RequeueAfterError{
 			RequeueAfter: 20 * time.Second,
 		}
 	}

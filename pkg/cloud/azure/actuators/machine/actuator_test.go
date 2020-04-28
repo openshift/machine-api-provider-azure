@@ -21,6 +21,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -31,7 +32,7 @@ import (
 	"github.com/golang/mock/gomock"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
-	controllerError "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -577,7 +578,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Create(context.TODO(), machine)
 			},
-			event: "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine",
+			event: "Warning FailedCreate InvalidConfiguration: failed to reconcile machine \"azure-actuator-testing-machine\": failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine",
 		},
 		{
 			name:       "Create machine event succeed",
@@ -773,7 +774,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
 			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, autorest.NewError("compute.VirtualMachinesClient", "Get", "MOCK")).Times(1)
 
-			_, ok := machineActuator.Create(context.TODO(), machine).(*controllerError.RequeueAfterError)
+			_, ok := machineActuator.Create(context.TODO(), machine).(*machineapierrors.RequeueAfterError)
 			if ok && !tc.requeable {
 				t.Error("Error is not requeable but was requeued")
 			}
@@ -788,6 +789,100 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 				}
 			default:
 				t.Errorf("Expected %q event, got none", tc.event)
+			}
+		})
+	}
+}
+
+func TestInvalidConfigurationCreationErrors(t *testing.T) {
+	cases := []struct {
+		name          string
+		mutateMachine func(*machinev1.Machine)
+		mutatePC      func(*providerspecv1.AzureMachineProviderSpec)
+		expectedErr   error
+	}{
+		{
+			name: "Machine Name too long with PublicIP",
+			mutateMachine: func(m *machinev1.Machine) {
+				m.Name = "MachineNameOverSixtyChars" + "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+			},
+			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+				s.PublicIP = true
+			},
+			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\": failed to create nic MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-nic for machine MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ: unable to create Public IP: machine public IP name is longer than 63 characters"),
+		},
+		{
+			name: "Machine Config missing vnet",
+			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+				s.Vnet = ""
+			},
+			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"azure-actuator-testing-machine\": failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine"),
+		},
+		{
+			name: "Machine Config missing subnet",
+			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+				s.Subnet = ""
+			},
+			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"azure-actuator-testing-machine\": failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig subnet is missing on machine azure-actuator-testing-machine, skipping machine creation"),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cs := controllerfake.NewFakeClient(stubAzureCredentialsSecret(), &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "azure-actuator-user-data-secret",
+					Namespace: "default",
+				},
+				Data: map[string][]byte{
+					"userData": []byte("S3CR3T"),
+				},
+			})
+
+			mockCtrl := gomock.NewController(t)
+			networkSvc := mock_azure.NewMockService(mockCtrl)
+			vmSvc := mock_azure.NewMockService(mockCtrl)
+
+			eventsChannel := make(chan string, 1)
+
+			machineActuator := NewActuator(ActuatorParams{
+				CoreClient: cs,
+				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
+					return &Reconciler{
+						scope:                scope,
+						networkInterfacesSvc: networkSvc,
+						virtualMachinesSvc:   vmSvc,
+					}
+				},
+				// use fake recorder and store an event into one item long buffer for subsequent check
+				EventRecorder: &record.FakeRecorder{
+					Events: eventsChannel,
+				},
+			})
+
+			machine, err := stubMachine()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tc.mutateMachine != nil {
+				tc.mutateMachine(machine)
+			}
+
+			if tc.mutatePC != nil {
+				machinePC := stubProviderConfig()
+				tc.mutatePC(machinePC)
+
+				providerSpec, err := providerspecv1.EncodeMachineSpec(machinePC)
+				if err != nil {
+					t.Fatalf("unexpected error encoding providerspec: %v", err)
+				}
+				machine.Spec.ProviderSpec.Value = providerSpec
+			}
+
+			err = machineActuator.Create(context.TODO(), machine)
+			if !reflect.DeepEqual(err, tc.expectedErr) {
+				t.Errorf("Expected: %#v, Got: %#v", tc.expectedErr, err)
 			}
 		})
 	}
