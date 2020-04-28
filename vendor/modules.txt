@@ -164,7 +164,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/machine-api-operator v0.2.1-0.20200312191013-b6f5c3baf5c0 => github.com/joelspeed/machine-api-operator v0.2.1-0.20200417102748-367ae647375f
+# github.com/openshift/machine-api-operator v0.2.1-0.20200424185446-b9f8d296e5f7
 github.com/openshift/machine-api-operator/pkg/apis/machine
 github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1
 github.com/openshift/machine-api-operator/pkg/controller/machine
@@ -278,7 +278,7 @@ gopkg.in/tomb.v1
 gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.0-20190905181640-827449938966
 gopkg.in/yaml.v3
-# k8s.io/api v0.18.0
+# k8s.io/api v0.18.2
 k8s.io/api/admission/v1
 k8s.io/api/admission/v1beta1
 k8s.io/api/admissionregistration/v1
@@ -322,7 +322,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apiextensions-apiserver v0.18.0
+# k8s.io/apiextensions-apiserver v0.18.2
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1
@@ -330,7 +330,7 @@ k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1
 k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1
-# k8s.io/apimachinery v0.18.0
+# k8s.io/apimachinery v0.18.2
 k8s.io/apimachinery/pkg/api/equality
 k8s.io/apimachinery/pkg/api/errors
 k8s.io/apimachinery/pkg/api/meta
@@ -397,7 +397,7 @@ k8s.io/cli-runtime/pkg/kustomize/k8sdeps/transformer/patch
 k8s.io/cli-runtime/pkg/kustomize/k8sdeps/validator
 k8s.io/cli-runtime/pkg/printers
 k8s.io/cli-runtime/pkg/resource
-# k8s.io/client-go v0.18.0
+# k8s.io/client-go v0.18.2
 k8s.io/client-go/discovery
 k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/dynamic
@@ -485,7 +485,7 @@ k8s.io/client-go/util/homedir
 k8s.io/client-go/util/jsonpath
 k8s.io/client-go/util/keyutil
 k8s.io/client-go/util/workqueue
-# k8s.io/component-base v0.18.0
+# k8s.io/component-base v0.18.2
 k8s.io/component-base/version
 # k8s.io/klog v1.0.0
 k8s.io/klog
@@ -553,7 +553,7 @@ sigs.k8s.io/controller-runtime/pkg/webhook/admission
 sigs.k8s.io/controller-runtime/pkg/webhook/conversion
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/certwatcher
 sigs.k8s.io/controller-runtime/pkg/webhook/internal/metrics
-# sigs.k8s.io/controller-tools v0.2.8
+# sigs.k8s.io/controller-tools v0.3.0
 sigs.k8s.io/controller-tools/cmd/controller-gen
 sigs.k8s.io/controller-tools/pkg/crd
 sigs.k8s.io/controller-tools/pkg/crd/markers

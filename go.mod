@@ -13,17 +13,15 @@ require (
 	github.com/golang/mock v1.3.1
 	github.com/onsi/ginkgo v1.12.0
 	github.com/onsi/gomega v1.8.1
-	github.com/openshift/machine-api-operator v0.2.1-0.20200312191013-b6f5c3baf5c0
+	github.com/openshift/machine-api-operator v0.2.1-0.20200424185446-b9f8d296e5f7
 	github.com/spf13/cobra v0.0.5
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
-	k8s.io/api v0.18.0
-	k8s.io/apimachinery v0.18.0
-	k8s.io/client-go v0.18.0
+	k8s.io/api v0.18.2
+	k8s.io/apimachinery v0.18.2
+	k8s.io/client-go v0.18.2
 	k8s.io/klog v1.0.0
 	k8s.io/utils v0.0.0-20200324210504-a9aa75ae1b89
 	sigs.k8s.io/controller-runtime v0.5.1-0.20200327213554-2d4c4877f906
-	sigs.k8s.io/controller-tools v0.2.8
+	sigs.k8s.io/controller-tools v0.3.0
 	sigs.k8s.io/yaml v1.2.0
 )
-
-replace github.com/openshift/machine-api-operator => github.com/joelspeed/machine-api-operator v0.2.1-0.20200417102748-367ae647375f
