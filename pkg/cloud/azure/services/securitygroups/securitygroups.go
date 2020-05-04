@@ -39,7 +39,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return network.SecurityGroup{}, errors.New("invalid security groups specification")
 	}
-	securityGroup, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, nsgSpec.Name, "")
+	securityGroup, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, nsgSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("security group %s not found: %w", nsgSpec.Name, err)
 	} else if err != nil {
@@ -92,17 +92,17 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("creating security group %s", nsgSpec.Name)
 	f, err := s.Client.CreateOrUpdate(
 		ctx,
-		s.Scope.ClusterConfig.ResourceGroup,
+		s.Scope.MachineConfig.ResourceGroup,
 		nsgSpec.Name,
 		network.SecurityGroup{
-			Location: to.StringPtr(s.Scope.ClusterConfig.Location),
+			Location: to.StringPtr(s.Scope.MachineConfig.Location),
 			SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
 				SecurityRules: securityRules,
 			},
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create security group %s in resource group %s: %w", nsgSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to create security group %s in resource group %s: %w", nsgSpec.Name, s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
@@ -125,13 +125,13 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid security groups specification")
 	}
 	klog.V(2).Infof("deleting security group %s", nsgSpec.Name)
-	f, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup, nsgSpec.Name)
+	f, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, nsgSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete security group %s in resource group %s: %w", nsgSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to delete security group %s in resource group %s: %w", nsgSpec.Name, s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)

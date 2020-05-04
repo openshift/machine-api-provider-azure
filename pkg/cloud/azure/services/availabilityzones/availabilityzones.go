@@ -44,7 +44,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	for _, resSku := range res.Values() {
 		if strings.EqualFold(*resSku.Name, skusSpec.VMSize) {
 			for _, locationInfo := range *resSku.LocationInfo {
-				if strings.EqualFold(*locationInfo.Location, s.Scope.ClusterConfig.Location) {
+				if strings.EqualFold(*locationInfo.Location, s.Scope.MachineConfig.Location) {
 					zones = *locationInfo.Zones
 				}
 			}

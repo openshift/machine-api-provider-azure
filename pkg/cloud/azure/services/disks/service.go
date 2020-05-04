@@ -28,7 +28,7 @@ var _ azure.Service = (*Service)(nil)
 // Service provides operations on resource groups
 type Service struct {
 	Client compute.DisksClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
@@ -40,7 +40,7 @@ func getDisksClient(subscriptionID string, authorizer autorest.Authorizer) compu
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.Scope) *Service {
+func NewService(scope *actuators.MachineScope) *Service {
 	return &Service{
 		Client: getDisksClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

@@ -43,7 +43,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 		return network.LoadBalancer{}, errors.New("invalid internal load balancer specification")
 	}
 	//lbName := fmt.Sprintf("%s-api-internallb", s.Scope.Cluster.Name)
-	lb, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, internalLBSpec.Name, "")
+	lb, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, internalLBSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("load balancer %s not found: %w", internalLBSpec.Name, err)
 	} else if err != nil {
@@ -62,7 +62,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	probeName := "tcpHTTPSProbe"
 	frontEndIPConfigName := "controlplane-internal-lbFrontEnd"
 	backEndAddressPoolName := "controlplane-internal-backEndPool"
-	idPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers", s.Scope.SubscriptionID, s.Scope.ClusterConfig.ResourceGroup)
+	idPrefix := fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Network/loadBalancers", s.Scope.SubscriptionID, s.Scope.MachineConfig.ResourceGroup)
 	lbName := internalLBSpec.Name
 
 	klog.V(2).Infof("getting subnet %s", internalLBSpec.SubnetName)
@@ -79,11 +79,11 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	// https://docs.microsoft.com/en-us/azure/load-balancer/load-balancer-standard-availability-zones#zone-redundant-by-default
 	future, err := s.Client.CreateOrUpdate(ctx,
-		s.Scope.ClusterConfig.ResourceGroup,
+		s.Scope.MachineConfig.ResourceGroup,
 		lbName,
 		network.LoadBalancer{
 			Sku:      &network.LoadBalancerSku{Name: network.LoadBalancerSkuNameStandard},
-			Location: to.StringPtr(s.Scope.ClusterConfig.Location),
+			Location: to.StringPtr(s.Scope.MachineConfig.Location),
 			LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
 				FrontendIPConfigurations: &[]network.FrontendIPConfiguration{
 					{
@@ -157,13 +157,13 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid internal load balancer specification")
 	}
 	klog.V(2).Infof("deleting internal load balancer %s", internalLBSpec.Name)
-	f, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup, internalLBSpec.Name)
+	f, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, internalLBSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete internal load balancer %s in resource group %s: %w", internalLBSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to delete internal load balancer %s in resource group %s: %w", internalLBSpec.Name, s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)

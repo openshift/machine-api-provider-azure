@@ -22,7 +22,7 @@ spec:
           node-role.kubernetes.io/compute: ""
       providerSpec:
         value:
-          apiVersion: azureprovider/v1alpha1
+          apiVersion: azureprovider/v1beta1
           kind: AzureMachineProviderSpec
           roles:
           - Master

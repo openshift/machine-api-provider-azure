@@ -26,7 +26,7 @@ import (
 // Service provides operations on resource groups
 type Service struct {
 	Client compute.VirtualMachinesClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getVirtualNetworksClient creates a new groups client from subscriptionid.
@@ -38,7 +38,7 @@ func getVirtualMachinesClient(subscriptionID string, authorizer autorest.Authori
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.Scope) azure.Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
 		Client: getVirtualMachinesClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

@@ -40,8 +40,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 	"k8s.io/utils/pointer"
-	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
-	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
@@ -60,14 +58,7 @@ func init() {
 	}
 }
 
-func newClusterProviderSpec() clusterproviderv1.AzureClusterProviderSpec {
-	return clusterproviderv1.AzureClusterProviderSpec{
-		ResourceGroup: "resource-group-test",
-		Location:      "southcentralus",
-	}
-}
-
-func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -77,7 +68,7 @@ func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*m
 	}, nil
 }
 
-func newMachine(t *testing.T, machineConfig machineproviderv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
+func newMachine(t *testing.T, machineConfig providerspecv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -94,32 +85,22 @@ func newMachine(t *testing.T, machineConfig machineproviderv1.AzureMachineProvid
 }
 
 func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
-	scope := &actuators.Scope{
-		Context: context.Background(),
-		ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{
-			ResourceGroup:       "dummyResourceGroup",
-			Location:            "dummyLocation",
-			CAKeyPair:           clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			EtcdCAKeyPair:       clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			FrontProxyCAKeyPair: clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			SAKeyPair:           clusterproviderv1.KeyPair{Cert: []byte("cert"), Key: []byte("key")},
-			DiscoveryHashes:     []string{"discoveryhash0"},
-		},
-	}
 	labels := make(map[string]string)
-	labels[machineproviderv1.MachineRoleLabel] = label
+	labels[providerspecv1.MachineRoleLabel] = label
 	labels[machinev1.MachineClusterIDLabel] = "clusterID"
-	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
+	machineConfig := providerspecv1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
 	return &actuators.MachineScope{
-		Scope:   scope,
+		Context: context.Background(),
 		Machine: m,
-		MachineConfig: &machineproviderv1.AzureMachineProviderSpec{
+		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+			ResourceGroup:   "dummyResourceGroup",
+			Location:        "dummyLocation",
 			Subnet:          "dummySubnet",
 			Vnet:            "dummyVnet",
 			ManagedIdentity: "dummyIdentity",
 		},
-		MachineStatus: &machineproviderv1.AzureMachineProviderStatus{},
+		MachineStatus: &providerspecv1.AzureMachineProviderStatus{},
 	}
 }
 
@@ -131,7 +112,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 		ProvisioningState: "Succeeded",
 	}
 	return &Reconciler{
-		scope:                 newFakeScope(t, machineproviderv1.ControlPlane),
+		scope:                 newFakeScope(t, providerspecv1.ControlPlane),
 		availabilityZonesSvc:  fakeSuccessSvc,
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
@@ -405,7 +386,7 @@ func (s *FakeAvailabilityZonesService) Delete(ctx context.Context, spec azure.Sp
 }
 
 func TestAvailabilityZones(t *testing.T) {
-	fakeScope := newFakeScope(t, machineproviderv1.ControlPlane)
+	fakeScope := newFakeScope(t, providerspecv1.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
@@ -449,7 +430,7 @@ func TestGetZone(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeScope := newFakeScope(t, machineproviderv1.ControlPlane)
+		fakeScope := newFakeScope(t, providerspecv1.ControlPlane)
 		fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 		fakeReconciler.scope.MachineConfig.Zone = tc.inputZone
 
@@ -470,7 +451,7 @@ func TestGetZone(t *testing.T) {
 }
 
 func TestCustomUserData(t *testing.T) {
-	fakeScope := newFakeScope(t, machineproviderv1.Node)
+	fakeScope := newFakeScope(t, providerspecv1.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
@@ -499,7 +480,7 @@ func TestCustomUserData(t *testing.T) {
 }
 
 func TestCustomDataFailures(t *testing.T) {
-	fakeScope := newFakeScope(t, machineproviderv1.Node)
+	fakeScope := newFakeScope(t, providerspecv1.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",

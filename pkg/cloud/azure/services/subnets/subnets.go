@@ -44,7 +44,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return network.Subnet{}, errors.New("Invalid Subnet Specification")
 	}
-	subnet, err := s.Client.Get(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, subnetSpec.VnetName, subnetSpec.Name, "")
+	subnet, err := s.Client.Get(ctx, s.Scope.MachineConfig.NetworkResourceGroup, subnetSpec.VnetName, subnetSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("subnet %s not found: %w", subnetSpec.Name, err)
 	} else if err != nil {
@@ -91,7 +91,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("creating subnet %s in vnet %s", subnetSpec.Name, subnetSpec.VnetName)
 	f, err := s.Client.CreateOrUpdate(
 		ctx,
-		s.Scope.ClusterConfig.NetworkResourceGroup,
+		s.Scope.MachineConfig.NetworkResourceGroup,
 		subnetSpec.VnetName,
 		subnetSpec.Name,
 		network.Subnet{
@@ -100,7 +100,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create subnet %s in resource group %s: %w", subnetSpec.Name, s.Scope.ClusterConfig.NetworkResourceGroup, err)
+		return fmt.Errorf("failed to create subnet %s in resource group %s: %w", subnetSpec.Name, s.Scope.MachineConfig.NetworkResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
@@ -123,13 +123,13 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("Invalid Subnet Specification")
 	}
 	klog.V(2).Infof("deleting subnet %s in vnet %s", subnetSpec.Name, subnetSpec.VnetName)
-	f, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.NetworkResourceGroup, subnetSpec.VnetName, subnetSpec.Name)
+	f, err := s.Client.Delete(ctx, s.Scope.MachineConfig.NetworkResourceGroup, subnetSpec.VnetName, subnetSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete route table %s in resource group %s: %w", subnetSpec.Name, s.Scope.ClusterConfig.NetworkResourceGroup, err)
+		return fmt.Errorf("failed to delete route table %s in resource group %s: %w", subnetSpec.Name, s.Scope.MachineConfig.NetworkResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)

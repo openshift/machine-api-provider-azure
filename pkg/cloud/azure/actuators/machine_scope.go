@@ -18,7 +18,6 @@ package actuators
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/Azure/go-autorest/autorest"
@@ -63,11 +62,6 @@ type MachineScopeParams struct {
 // NewMachineScope creates a new MachineScope from the supplied parameters.
 // This is meant to be called for each machine actuator operation.
 func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
-	scope, err := NewScope(ScopeParams{AzureClients: params.AzureClients})
-	if err != nil {
-		return nil, err
-	}
-
 	machineConfig, err := MachineConfigFromProviderSpec(params.Machine.Spec.ProviderSpec)
 	if err != nil {
 		return nil, apierrors.InvalidMachineConfiguration(err.Error(), "failed to get machine config")
@@ -78,28 +72,10 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
 
-	if machineConfig.CredentialsSecret != nil {
-		if err = updateScope(params.CoreClient, machineConfig.CredentialsSecret, scope); err != nil {
-			return nil, fmt.Errorf("failed to update cluster: %w", err)
-		}
-	}
+	machineScope := &MachineScope{
+		Context:      context.Background(),
+		AzureClients: params.AzureClients,
 
-	scope.ClusterConfig.NetworkResourceGroup = scope.ClusterConfig.ResourceGroup
-
-	if machineConfig.ResourceGroup != "" {
-		scope.ClusterConfig.ResourceGroup = machineConfig.ResourceGroup
-	}
-
-	if machineConfig.NetworkResourceGroup != "" {
-		scope.ClusterConfig.NetworkResourceGroup = machineConfig.NetworkResourceGroup
-	}
-
-	if machineConfig.Location != "" {
-		scope.ClusterConfig.Location = machineConfig.Location
-	}
-
-	return &MachineScope{
-		Scope: scope,
 		// Deep copy the machine since it's change outside of the machine scope
 		// by consumers of the machine scope (e.g. reconciler).
 		Machine:       params.Machine.DeepCopy(),
@@ -111,12 +87,19 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		origMachine:        params.Machine.DeepCopy(),
 		origMachineStatus:  machineStatus.DeepCopy(),
 		machineToBePatched: controllerclient.MergeFrom(params.Machine.DeepCopy()),
-	}, nil
+	}
+
+	if err = updateFromSecret(params.CoreClient, machineScope); err != nil {
+		return nil, fmt.Errorf("failed to update cluster: %w", err)
+	}
+
+	return machineScope, nil
 }
 
 // MachineScope defines a scope defined around a machine and its cluster.
 type MachineScope struct {
-	*Scope
+	context.Context
+	AzureClients
 
 	Machine       *machinev1.Machine
 	CoreClient    controllerclient.Client
@@ -150,18 +133,7 @@ func (m *MachineScope) Role() string {
 
 // Location returns the machine location.
 func (m *MachineScope) Location() string {
-	return m.Scope.Location()
-}
-
-func (m *MachineScope) setMachineSpec() error {
-	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
-	if err != nil {
-		return err
-	}
-
-	m.Machine.Spec.ProviderSpec.Value = ext
-
-	return nil
+	return m.MachineConfig.Location
 }
 
 func (m *MachineScope) setMachineStatus() error {
@@ -254,12 +226,15 @@ func unmarshalProviderSpec(spec *runtime.RawExtension) (*v1beta1.AzureMachinePro
 	return &config, nil
 }
 
-func updateScope(coreClient controllerclient.Client, credentialsSecret *apicorev1.SecretReference, scope *Scope) error {
-	if credentialsSecret == nil {
-		return errors.New("provided empty credentials secret")
+func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) error {
+	if scope.MachineConfig.CredentialsSecret == nil {
+		return nil
 	}
 
-	secretType := types.NamespacedName{Namespace: credentialsSecret.Namespace, Name: credentialsSecret.Name}
+	secretType := types.NamespacedName{
+		Namespace: scope.MachineConfig.CredentialsSecret.Namespace,
+		Name:      scope.MachineConfig.CredentialsSecret.Name,
+	}
 	var secret apicorev1.Secret
 	if err := coreClient.Get(
 		context.Background(),
@@ -325,11 +300,21 @@ func updateScope(coreClient controllerclient.Client, credentialsSecret *apicorev
 		return fmt.Errorf("failed to create azure session: %v", err)
 	}
 
-	scope.ClusterConfig.ObjectMeta.Name = string(clusterName)
+	if scope.MachineConfig.ResourceGroup == "" {
+		scope.MachineConfig.ResourceGroup = string(resourceGroup)
+	}
+
+	if scope.MachineConfig.NetworkResourceGroup == "" {
+		scope.MachineConfig.NetworkResourceGroup = string(resourceGroup)
+	}
+
+	if scope.MachineConfig.Location == "" {
+		scope.MachineConfig.Location = string(region)
+	}
+
+	scope.MachineConfig.ObjectMeta.Name = string(clusterName)
 	scope.Authorizer = authorizer
 	scope.SubscriptionID = string(subscriptionID)
-	scope.ClusterConfig.ResourceGroup = string(resourceGroup)
-	scope.ClusterConfig.Location = string(region)
 
 	return nil
 }

@@ -28,23 +28,23 @@ import (
 
 // Get provides information about a resource group.
 func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
-	return s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup)
+	return s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup)
 }
 
 // CreateOrUpdate creates or updates a resource group.
 func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
-	klog.V(2).Infof("creating resource group %s", s.Scope.ClusterConfig.ResourceGroup)
-	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.ClusterConfig.ResourceGroup, resources.Group{Location: to.StringPtr(s.Scope.ClusterConfig.Location)})
-	klog.V(2).Infof("successfully created resource group %s", s.Scope.ClusterConfig.ResourceGroup)
+	klog.V(2).Infof("creating resource group %s", s.Scope.MachineConfig.ResourceGroup)
+	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, resources.Group{Location: to.StringPtr(s.Scope.MachineConfig.Location)})
+	klog.V(2).Infof("successfully created resource group %s", s.Scope.MachineConfig.ResourceGroup)
 	return err
 }
 
 // Delete deletes the resource group with the provided name.
 func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
-	klog.V(2).Infof("deleting resource group %s", s.Scope.ClusterConfig.ResourceGroup)
-	future, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup)
+	klog.V(2).Infof("deleting resource group %s", s.Scope.MachineConfig.ResourceGroup)
+	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup)
 	if err != nil {
-		return fmt.Errorf("failed to delete resource group %s: %w", s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to delete resource group %s: %w", s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = future.WaitForCompletionRef(ctx, s.Client.Client)
@@ -54,6 +54,6 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 
 	_, err = future.Result(s.Client)
 
-	klog.V(2).Infof("successfully deleted resource group %s", s.Scope.ClusterConfig.ResourceGroup)
+	klog.V(2).Infof("successfully deleted resource group %s", s.Scope.MachineConfig.ResourceGroup)
 	return err
 }

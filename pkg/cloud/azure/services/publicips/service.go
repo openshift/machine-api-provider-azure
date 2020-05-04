@@ -26,7 +26,7 @@ import (
 // Service provides operations on resource groups
 type Service struct {
 	Client network.PublicIPAddressesClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getPublicIPsClient creates a new groups client from subscriptionid.
@@ -38,7 +38,7 @@ func getPublicIPAddressesClient(subscriptionID string, authorizer autorest.Autho
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.Scope) azure.Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
 		Client: getPublicIPAddressesClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

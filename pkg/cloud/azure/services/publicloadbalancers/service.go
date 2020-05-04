@@ -26,7 +26,7 @@ import (
 // Service provides operations on resource groups
 type Service struct {
 	Client network.LoadBalancersClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
@@ -38,7 +38,7 @@ func getLoadbalancersClient(subscriptionID string, authorizer autorest.Authorize
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.Scope) azure.Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
 		Client: getLoadbalancersClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

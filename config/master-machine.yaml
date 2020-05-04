@@ -11,7 +11,7 @@ spec:
     controlPlane: 1.13.4
   providerSpec:
     value:
-      apiVersion: azureprovider/v1alpha1
+      apiVersion: azureprovider/v1beta1
       kind: AzureMachineProviderSpec
       roles:
       - Master

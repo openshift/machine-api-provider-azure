@@ -28,8 +28,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog"
 	"k8s.io/utils/pointer"
-	clusterproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1alpha1"
-	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -39,7 +38,7 @@ func init() {
 	}
 }
 
-func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -50,7 +49,7 @@ func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (*m
 }
 
 func newMachine(t *testing.T) *machinev1.Machine {
-	machineConfig := machineproviderv1.AzureMachineProviderSpec{}
+	machineConfig := providerspecv1.AzureMachineProviderSpec{}
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -85,19 +84,22 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 			Namespace: "dummyNamespace",
 		},
 		Data: map[string][]byte{
-			"azure_subscription_id": []byte("dummySubID"),
-			"azure_client_id":       []byte("dummyClientID"),
-			"azure_client_secret":   []byte("dummyClientSecret"),
-			"azure_tenant_id":       []byte("dummyTenantID"),
-			"azure_resourcegroup":   []byte("dummyResourceGroup"),
-			"azure_region":          []byte("dummyRegion"),
-			"azure_resource_prefix": []byte("dummyClusterName"),
+			AzureCredsSubscriptionIDKey: []byte("dummySubID"),
+			AzureCredsClientIDKey:       []byte("dummyClientID"),
+			AzureCredsClientSecretKey:   []byte("dummyClientSecret"),
+			AzureCredsTenantIDKey:       []byte("dummyTenantID"),
+			AzureCredsResourceGroupKey:  []byte("dummyResourceGroup"),
+			AzureCredsRegionKey:         []byte("dummyRegion"),
+			AzureResourcePrefix:         []byte("dummyClusterName"),
 		},
 	}
-	scope := &Scope{ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
-	err := updateScope(
+	scope := &MachineScope{
+		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
+		},
+	}
+	err := updateFromSecret(
 		controllerfake.NewFakeClient(credentialsSecret),
-		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		scope)
 	if err != nil {
 		t.Errorf("Expected New credentials secrets to succeed: %v", err)
@@ -111,20 +113,23 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 		t.Errorf("Expected location to be dummyRegion but found %s", scope.Location())
 	}
 
-	if scope.ClusterConfig.Name != "dummyClusterName" {
-		t.Errorf("Expected cluster name to be dummyClusterName but found %s", scope.ClusterConfig.Name)
+	if scope.MachineConfig.Name != "dummyClusterName" {
+		t.Errorf("Expected cluster name to be dummyClusterName but found %s", scope.MachineConfig.Name)
 	}
 
-	if scope.ClusterConfig.ResourceGroup != "dummyResourceGroup" {
-		t.Errorf("Expected resourcegroup to be dummyResourceGroup but found %s", scope.ClusterConfig.ResourceGroup)
+	if scope.MachineConfig.ResourceGroup != "dummyResourceGroup" {
+		t.Errorf("Expected resourcegroup to be dummyResourceGroup but found %s", scope.MachineConfig.ResourceGroup)
 	}
 }
 
 func testCredentialFields(credentialsSecret *corev1.Secret) error {
-	scope := &Scope{ClusterConfig: &clusterproviderv1.AzureClusterProviderSpec{}}
-	return updateScope(
+	scope := &MachineScope{
+		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
+		},
+	}
+	return updateFromSecret(
 		controllerfake.NewFakeClient(credentialsSecret),
-		&corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		scope)
 }
 
@@ -195,15 +200,15 @@ func testCredentialSecret() *corev1.Secret {
 	}
 }
 
-func testProviderSpec() *machineproviderv1.AzureMachineProviderSpec {
-	return &machineproviderv1.AzureMachineProviderSpec{
+func testProviderSpec() *providerspecv1.AzureMachineProviderSpec {
+	return &providerspecv1.AzureMachineProviderSpec{
 		Location:          "test",
 		ResourceGroup:     "test",
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 }
 
-func testMachineWithProviderSpec(t *testing.T, providerSpec *machineproviderv1.AzureMachineProviderSpec) *machinev1.Machine {
+func testMachineWithProviderSpec(t *testing.T, providerSpec *providerspecv1.AzureMachineProviderSpec) *machinev1.Machine {
 	providerSpecWithValues, err := providerSpecFromMachine(providerSpec)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -265,7 +270,7 @@ func TestPersistMachineScope(t *testing.T) {
 		t.Errorf("Expected annotation 'test' to equal 'testValue', got %q instead", scope.Machine.Annotations["test"])
 	}
 
-	machineStatus, err := machineproviderv1.MachineStatusFromProviderStatus(scope.Machine.Status.ProviderStatus)
+	machineStatus, err := providerspecv1.MachineStatusFromProviderStatus(scope.Machine.Status.ProviderStatus)
 	if err != nil {
 		t.Errorf("failed to get machine provider status: %v", err)
 	}
@@ -278,7 +283,7 @@ func TestPersistMachineScope(t *testing.T) {
 }
 
 func TestNewMachineScope(t *testing.T) {
-	machineConfigNoValues := &machineproviderv1.AzureMachineProviderSpec{
+	machineConfigNoValues := &providerspecv1.AzureMachineProviderSpec{
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 
@@ -311,11 +316,11 @@ func TestNewMachineScope(t *testing.T) {
 			t.Fatalf("Unexpected error %v", err)
 		}
 
-		if scope.ClusterConfig.Location != tc.expectedLocation {
-			t.Errorf("Expected %v, got: %v", tc.expectedLocation, scope.ClusterConfig.Location)
+		if scope.MachineConfig.Location != tc.expectedLocation {
+			t.Errorf("Expected %v, got: %v", tc.expectedLocation, scope.MachineConfig.Location)
 		}
-		if scope.ClusterConfig.ResourceGroup != tc.expectedResourceGroup {
-			t.Errorf("Expected %v, got: %v", tc.expectedResourceGroup, scope.ClusterConfig.ResourceGroup)
+		if scope.MachineConfig.ResourceGroup != tc.expectedResourceGroup {
+			t.Errorf("Expected %v, got: %v", tc.expectedResourceGroup, scope.MachineConfig.ResourceGroup)
 		}
 	}
 }

@@ -54,7 +54,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return network.Interface{}, errors.New("invalid network interface specification")
 	}
-	nic, err := s.Client.Get(ctx, s.Scope.ClusterConfig.ResourceGroup, nicSpec.Name, "")
+	nic, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, nicSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("network interface %s not found: %w", nicSpec.Name, err)
 	} else if err != nil {
@@ -203,15 +203,15 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	}
 
 	f, err := s.Client.CreateOrUpdate(ctx,
-		s.Scope.ClusterConfig.ResourceGroup,
+		s.Scope.MachineConfig.ResourceGroup,
 		nicSpec.Name,
 		network.Interface{
-			Location:                  to.StringPtr(s.Scope.ClusterConfig.Location),
+			Location:                  to.StringPtr(s.Scope.MachineConfig.Location),
 			InterfacePropertiesFormat: &nicProp,
 		})
 
 	if err != nil {
-		return fmt.Errorf("failed to create network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to create network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)
@@ -234,13 +234,13 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid network interface Specification")
 	}
 	klog.V(2).Infof("deleting nic %s", nicSpec.Name)
-	f, err := s.Client.Delete(ctx, s.Scope.ClusterConfig.ResourceGroup, nicSpec.Name)
+	f, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, nicSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to delete network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.ClusterConfig.ResourceGroup, err)
+		return fmt.Errorf("failed to delete network interface %s in resource group %s: %w", nicSpec.Name, s.Scope.MachineConfig.ResourceGroup, err)
 	}
 
 	err = f.WaitForCompletionRef(ctx, s.Client.Client)

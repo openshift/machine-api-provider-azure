@@ -77,12 +77,12 @@ type Reconciler struct {
 func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 	return &Reconciler{
 		scope:                 scope,
-		availabilityZonesSvc:  availabilityzones.NewService(scope.Scope),
-		networkInterfacesSvc:  networkinterfaces.NewService(scope.Scope),
-		virtualMachinesSvc:    virtualmachines.NewService(scope.Scope),
-		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope.Scope),
-		publicIPSvc:           publicips.NewService(scope.Scope),
-		disksSvc:              disks.NewService(scope.Scope),
+		availabilityZonesSvc:  availabilityzones.NewService(scope),
+		networkInterfacesSvc:  networkinterfaces.NewService(scope),
+		virtualMachinesSvc:    virtualmachines.NewService(scope),
+		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope),
+		publicIPSvc:           publicips.NewService(scope),
+		disksSvc:              disks.NewService(scope),
 	}
 }
 
@@ -243,7 +243,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
 		providerID := azure.GenerateMachineProviderID(
 			s.scope.SubscriptionID,
-			s.scope.ClusterConfig.ResourceGroup,
+			s.scope.MachineConfig.ResourceGroup,
 			*vm.OsProfile.ComputerName)
 		s.scope.Machine.Spec.ProviderID = &providerID
 	} else {
@@ -422,7 +422,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterConfig.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.MachineConfig.Name, s.scope.Machine.Name)
 		if err != nil {
 			// Only when the generated name is longer than allowed by the Azure portal
 			// That can happen only when
@@ -483,7 +483,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterConfig.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.MachineConfig.Name, s.scope.Machine.Name)
 		if err != nil {
 			return machineapierrors.InvalidMachineConfiguration("unable to create Public IP: %v", err)
 		}
@@ -535,7 +535,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		}
 
 		if s.scope.MachineConfig.ManagedIdentity != "" {
-			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.ClusterConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
 		}
 
 		if vmSpec.Tags == nil {

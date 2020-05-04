@@ -26,7 +26,7 @@ import (
 // Service provides operations on resource groups
 type Service struct {
 	Client network.ApplicationSecurityGroupsClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
@@ -38,7 +38,7 @@ func getApplicationSecurityGroupsClient(subscriptionID string, authorizer autore
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.Scope) azure.Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
 		Client: getApplicationSecurityGroupsClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

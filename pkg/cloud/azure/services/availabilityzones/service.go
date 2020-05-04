@@ -26,7 +26,7 @@ import (
 // Service provides operations on availability zones
 type Service struct {
 	Client compute.ResourceSkusClient
-	Scope  *actuators.Scope
+	Scope  *actuators.MachineScope
 }
 
 // getResourceSkusClient creates a new availability zones client from subscriptionid.
@@ -38,7 +38,7 @@ func getResourceSkusClient(subscriptionID string, authorizer autorest.Authorizer
 }
 
 // NewService creates a new availability zones service.
-func NewService(scope *actuators.Scope) azure.Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
 		Client: getResourceSkusClient(scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
