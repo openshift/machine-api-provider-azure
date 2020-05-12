@@ -198,7 +198,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 
 // Exists test for the existence of a machine and is invoked by the Machine Controller
 func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool, error) {
-	klog.Infof("Checking if machine %v exists", machine.Name)
+	klog.Infof("%s: actuator checking if machine exists", machine.GetName())
 
 	scope, err := actuators.NewMachineScope(actuators.MachineScopeParams{
 		Machine:    machine,
