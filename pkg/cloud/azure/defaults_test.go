@@ -39,3 +39,37 @@ func TestGenerateMachinePublicIPName(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateMachineProviderID(t *testing.T) {
+	testCases := []struct {
+		name              string
+		subscriptionID    string
+		resourceGroupName string
+		machineName       string
+		expectedID        string
+	}{
+		{
+			name:              "with all lower case strings",
+			subscriptionID:    "test-subscription-id",
+			resourceGroupName: "test-resource-group",
+			machineName:       "test-machine",
+			expectedID:        "azure:///subscriptions/test-subscription-id/resourceGroups/test-resource-group/providers/Microsoft.Compute/virtualMachines/test-machine",
+		},
+		{
+			name:              "with capitals, lower cases subsciption id and resource group name",
+			subscriptionID:    "Test-Upper-SUBSCRIPTION-Id",
+			resourceGroupName: "Test-Upper-RESOURCE-GROUP",
+			machineName:       "Test-MACHINE",
+			expectedID:        "azure:///subscriptions/test-upper-subscription-id/resourceGroups/test-upper-resource-group/providers/Microsoft.Compute/virtualMachines/Test-MACHINE",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			id := GenerateMachineProviderID(tc.subscriptionID, tc.resourceGroupName, tc.machineName)
+			if id != tc.expectedID {
+				t.Errorf("Expected Id: %s, Got Id: %s", tc.expectedID, id)
+			}
+		})
+	}
+}

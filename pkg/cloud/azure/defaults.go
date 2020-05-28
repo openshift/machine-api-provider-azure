@@ -19,6 +19,7 @@ package azure
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -108,10 +109,13 @@ func GenerateManagedIdentityName(subscriptionID, resourceGroupName, managedIdent
 // GenerateMachineProviderID generates machine provider id.
 func GenerateMachineProviderID(subscriptionID, resourceGroupName, machineName string) string {
 	// From https://github.com/kubernetes/kubernetes/blob/e09f5c40b55c91f681a46ee17f9bc447eeacee57/pkg/cloudprovider/providers/azure/azure_standard.go#L68-L75
+
+	// Convert subscriptionID and resourceGroupName to lowercase to match the ID the legacy cloud provider sets on the Node
+	// Ref: https://github.com/kubernetes/legacy-cloud-providers/blob/2c79b47a93724ada71ae2d311d3cd9dcdab3c415/azure/azure_instances.go#L375-L377
 	return fmt.Sprintf(
 		"azure:///subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/virtualMachines/%s",
-		subscriptionID,
-		resourceGroupName,
+		strings.ToLower(subscriptionID),
+		strings.ToLower(resourceGroupName),
 		machineName)
 }
 
