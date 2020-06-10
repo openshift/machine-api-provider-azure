@@ -31,11 +31,21 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 func main() {
-	watchNamespace := flag.String("namespace", "", "Namespace that the controller watches to reconcile machine-api objects. If unspecified, the controller watches for machine-api objects across all namespaces.")
+	watchNamespace := flag.String(
+		"namespace",
+		"",
+		"Namespace that the controller watches to reconcile machine-api objects. If unspecified, the controller watches for machine-api objects across all namespaces.",
+	)
+	healthAddr := flag.String(
+		"health-addr",
+		":9440",
+		"The address for health checking.",
+	)
 
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
@@ -43,7 +53,9 @@ func main() {
 
 	cfg := config.GetConfigOrDie()
 
-	opts := manager.Options{}
+	opts := manager.Options{
+		HealthProbeBindAddress: *healthAddr,
+	}
 
 	if *watchNamespace != "" {
 		opts.Namespace = *watchNamespace
@@ -86,6 +98,14 @@ func main() {
 	}).SetupWithManager(mgr, controller.Options{}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MachineSet")
 		os.Exit(1)
+	}
+
+	if err := mgr.AddReadyzCheck("ping", healthz.Ping); err != nil {
+		klog.Fatal(err)
+	}
+
+	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+		klog.Fatal(err)
 	}
 
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
