@@ -328,6 +328,10 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine)
 	if vm.Zones != nil {
 		s.scope.Machine.Labels[MachineAZLabelName] = strings.Join(*vm.Zones, ",")
 	}
+
+	if s.scope.MachineConfig.SpotVMOptions != nil {
+		s.scope.Machine.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
+	}
 }
 
 // Exists checks if machine exists
