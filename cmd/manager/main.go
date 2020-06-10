@@ -24,6 +24,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/metrics"
 	"k8s.io/klog"
 	"k8s.io/klog/klogr"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis"
@@ -48,6 +49,12 @@ func main() {
 		"health-addr",
 		":9440",
 		"The address for health checking.",
+	)
+
+	metricsAddress := flag.String(
+		"metrics-bind-address",
+		metrics.DefaultMachineMetricsAddress,
+		"Address for hosting metrics",
 	)
 
 	leaderElectResourceNamespace := flag.String(
@@ -80,6 +87,7 @@ func main() {
 		LeaderElectionNamespace: *leaderElectResourceNamespace,
 		LeaderElectionID:        "cluster-api-provider-azure-leader",
 		LeaseDuration:           leaderElectLeaseDuration,
+		MetricsBindAddress:      *metricsAddress,
 	}
 
 	if *watchNamespace != "" {

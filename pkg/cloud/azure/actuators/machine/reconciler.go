@@ -31,6 +31,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/metrics"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -410,6 +411,11 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 	err = s.disksSvc.Delete(ctx, osDiskSpec)
 	if err != nil {
+		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
+			Name:      s.scope.Machine.Name,
+			Namespace: s.scope.Machine.Namespace,
+			Reason:    err.Error(),
+		})
 		return fmt.Errorf("failed to delete OS disk: %w", err)
 	}
 
@@ -424,6 +430,11 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 
 	err = s.networkInterfacesSvc.Delete(ctx, networkInterfaceSpec)
 	if err != nil {
+		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
+			Name:      s.scope.Machine.Name,
+			Namespace: s.scope.Machine.Namespace,
+			Reason:    err.Error(),
+		})
 		return fmt.Errorf("Unable to delete network interface: %w", err)
 	}
 
@@ -443,6 +454,11 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 			Name: publicIPName,
 		})
 		if err != nil {
+			metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
+				Name:      s.scope.Machine.Name,
+				Namespace: s.scope.Machine.Namespace,
+				Reason:    err.Error(),
+			})
 			return fmt.Errorf("unable to delete Public IP: %w", err)
 		}
 	}
@@ -495,6 +511,11 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		}
 		err = s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
 		if err != nil {
+			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+				Name:      s.scope.Machine.Name,
+				Namespace: s.scope.Machine.Namespace,
+				Reason:    err.Error(),
+			})
 			return fmt.Errorf("unable to create Public IP: %w", err)
 		}
 		networkInterfaceSpec.PublicIP = publicIPName
@@ -502,6 +523,11 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 
 	err := s.networkInterfacesSvc.CreateOrUpdate(ctx, networkInterfaceSpec)
 	if err != nil {
+		metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+			Name:      s.scope.Machine.Name,
+			Namespace: s.scope.Machine.Namespace,
+			Reason:    err.Error(),
+		})
 		return fmt.Errorf("unable to create VM network interface: %w", err)
 	}
 
@@ -569,6 +595,11 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 		err = s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec)
 		if err != nil {
+			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+				Name:      s.scope.Machine.Name,
+				Namespace: s.scope.Machine.Namespace,
+				Reason:    err.Error(),
+			})
 			return fmt.Errorf("failed to create or get machine: %w", err)
 		}
 	} else if err != nil {
