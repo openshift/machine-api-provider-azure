@@ -29,7 +29,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
-	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -450,7 +450,7 @@ func (s *Reconciler) getZone(ctx context.Context) (string, error) {
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
 	if s.scope.MachineConfig.Vnet == "" {
-		return machineapierrors.InvalidMachineConfiguration("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
+		return machinecontroller.InvalidMachineConfiguration("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec := &networkinterfaces.Spec{
@@ -459,7 +459,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.Subnet == "" {
-		return machineapierrors.InvalidMachineConfiguration("MachineConfig subnet is missing on machine %s, skipping machine creation", s.scope.Machine.Name)
+		return machinecontroller.InvalidMachineConfiguration("MachineConfig subnet is missing on machine %s, skipping machine creation", s.scope.Machine.Name)
 	}
 
 	networkInterfaceSpec.SubnetName = s.scope.MachineConfig.Subnet
@@ -485,7 +485,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	if s.scope.MachineConfig.PublicIP {
 		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.MachineConfig.Name, s.scope.Machine.Name)
 		if err != nil {
-			return machineapierrors.InvalidMachineConfiguration("unable to create Public IP: %v", err)
+			return machinecontroller.InvalidMachineConfiguration("unable to create Public IP: %v", err)
 		}
 		err = s.publicIPSvc.CreateOrUpdate(ctx, &publicips.Spec{Name: publicIPName})
 		if err != nil {
