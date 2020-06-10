@@ -87,7 +87,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
 	sshKeyData := vmSpec.SSHKeyData
-	if sshKeyData == "" {
+	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.Windows {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
 			return fmt.Errorf("Failed to generate private key: %w", perr)
@@ -123,7 +123,11 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		AdminPassword: to.StringPtr(randomPassword),
 	}
 
-	if sshKeyData != "" {
+	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.Windows {
+		osProfile.WindowsConfiguration = &compute.WindowsConfiguration{
+			EnableAutomaticUpdates: to.BoolPtr(false),
+		}
+	} else if sshKeyData != "" {
 		osProfile.LinuxConfiguration = &compute.LinuxConfiguration{
 			SSH: &compute.SSHConfiguration{
 				PublicKeys: &[]compute.SSHPublicKey{
