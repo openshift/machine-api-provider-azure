@@ -61,8 +61,12 @@ fmt:
 	go fmt ./pkg/... ./cmd/...
 
 .PHONY: goimports
-    goimports: ## Go fmt your code
+goimports: ## Go fmt your code
 	hack/goimports.sh .
+
+.PHONY: generate
+generate: ## generate code (e.g. deepcopy)
+	./hack/update-generated-deep-copies.sh
 
 .PHONY: vet
 vet:
