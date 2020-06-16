@@ -46,6 +46,9 @@ type Spec struct {
 	CustomData      string
 	ManagedIdentity string
 	Tags            map[string]string
+	Priority        compute.VirtualMachinePriorityTypes
+	EvictionPolicy  compute.VirtualMachineEvictionPolicyTypes
+	BillingProfile  *compute.BillingProfile
 }
 
 // Get provides information about a virtual network.
@@ -167,6 +170,9 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					},
 				},
 			},
+			Priority:       vmSpec.Priority,
+			EvictionPolicy: vmSpec.EvictionPolicy,
+			BillingProfile: vmSpec.BillingProfile,
 		},
 	}
 
