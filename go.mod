@@ -3,9 +3,9 @@ module sigs.k8s.io/cluster-api-provider-azure
 go 1.13
 
 require (
-	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.9.2
-	github.com/Azure/go-autorest/autorest/adal v0.7.0
+	github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.10.0
+	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/ghodss/yaml v1.0.0
@@ -24,7 +24,6 @@ require (
 	k8s.io/client-go v0.18.2
 	k8s.io/code-generator v0.18.2
 	k8s.io/klog v1.0.0
-	k8s.io/kubectl v0.18.0-rc.1
 	k8s.io/utils v0.0.0-20200327001022-6496210b90e8
 	sigs.k8s.io/controller-runtime v0.6.0
 	sigs.k8s.io/controller-tools v0.3.0
@@ -32,3 +31,5 @@ require (
 )
 
 replace sigs.k8s.io/cluster-api-provider-aws => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20200612013036-1a97c62077cb
+
+replace github.com/Azure/go-autorest => github.com/Azure/go-autorest v14.0.1+incompatible

@@ -19,6 +19,7 @@ package availabilityzones
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
@@ -36,7 +37,9 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return zones, errors.New("invalid availability zones specification")
 	}
-	res, err := s.Client.List(ctx)
+
+	filter := fmt.Sprintf("location eq '%s'", s.Scope.Location())
+	res, err := s.Client.List(ctx, filter)
 	if err != nil {
 		return zones, err
 	}

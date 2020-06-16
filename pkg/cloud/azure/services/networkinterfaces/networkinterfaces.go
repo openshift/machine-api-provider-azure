@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-12-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
