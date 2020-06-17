@@ -20,6 +20,7 @@ import (
 	"flag"
 	"os"
 
+	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"k8s.io/klog"
@@ -83,6 +84,10 @@ func main() {
 	}
 
 	if err := v1beta1.AddToScheme(mgr.GetScheme()); err != nil {
+		klog.Fatal(err)
+	}
+
+	if err := configv1.AddToScheme(mgr.GetScheme()); err != nil {
 		klog.Fatal(err)
 	}
 
