@@ -30,8 +30,8 @@ type Service struct {
 }
 
 // getPublicIPsClient creates a new groups client from subscriptionid.
-func getPublicIPAddressesClient(subscriptionID string, authorizer autorest.Authorizer) network.PublicIPAddressesClient {
-	publicIPsClient := network.NewPublicIPAddressesClient(subscriptionID)
+func getPublicIPAddressesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.PublicIPAddressesClient {
+	publicIPsClient := network.NewPublicIPAddressesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	publicIPsClient.Authorizer = authorizer
 	publicIPsClient.AddToUserAgent(azure.UserAgent)
 	return publicIPsClient
@@ -40,7 +40,7 @@ func getPublicIPAddressesClient(subscriptionID string, authorizer autorest.Autho
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
-		Client: getPublicIPAddressesClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getPublicIPAddressesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

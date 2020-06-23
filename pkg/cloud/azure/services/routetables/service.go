@@ -30,8 +30,8 @@ type Service struct {
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
-func getRouteTablesClient(subscriptionID string, authorizer autorest.Authorizer) network.RouteTablesClient {
-	routeTablesClient := network.NewRouteTablesClient(subscriptionID)
+func getRouteTablesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.RouteTablesClient {
+	routeTablesClient := network.NewRouteTablesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	routeTablesClient.Authorizer = authorizer
 	routeTablesClient.AddToUserAgent(azure.UserAgent)
 	return routeTablesClient
@@ -40,7 +40,7 @@ func getRouteTablesClient(subscriptionID string, authorizer autorest.Authorizer)
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
-		Client: getRouteTablesClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getRouteTablesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

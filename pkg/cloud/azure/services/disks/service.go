@@ -32,8 +32,8 @@ type Service struct {
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
-func getDisksClient(subscriptionID string, authorizer autorest.Authorizer) compute.DisksClient {
-	disksClient := compute.NewDisksClient(subscriptionID)
+func getDisksClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.DisksClient {
+	disksClient := compute.NewDisksClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	disksClient.Authorizer = authorizer
 	disksClient.AddToUserAgent(azure.UserAgent)
 	return disksClient
@@ -42,7 +42,7 @@ func getDisksClient(subscriptionID string, authorizer autorest.Authorizer) compu
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) *Service {
 	return &Service{
-		Client: getDisksClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getDisksClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

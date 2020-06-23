@@ -22,6 +22,7 @@ import (
 
 // AzureClients contains all the Azure clients used by the scopes.
 type AzureClients struct {
-	SubscriptionID string
-	Authorizer     autorest.Authorizer
+	SubscriptionID          string
+	Authorizer              autorest.Authorizer
+	ResourceManagerEndpoint string
 }

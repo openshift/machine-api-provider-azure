@@ -23,6 +23,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	apicorev1 "k8s.io/api/core/v1"
@@ -50,6 +51,8 @@ const (
 	AzureCredsRegionKey = "azure_region"
 	// AzureResourcePrefix resource prefix for created azure resources
 	AzureResourcePrefix = "azure_resource_prefix"
+
+	globalInfrastuctureName = "cluster"
 )
 
 // MachineScopeParams defines the input parameters used to create a new MachineScope.
@@ -279,10 +282,16 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 			secretType.String(), AzureResourcePrefix)
 	}
 
-	env, err := azure.EnvironmentFromName("AzurePublicCloud")
+	cloudEnv, err := scope.getCloudEnvironment()
 	if err != nil {
 		return err
 	}
+
+	env, err := azure.EnvironmentFromName(cloudEnv)
+	if err != nil {
+		return err
+	}
+
 	oauthConfig, err := adal.NewOAuthConfig(
 		env.ActiveDirectoryEndpoint, string(tenantID))
 	if err != nil {
@@ -315,6 +324,23 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 	scope.MachineConfig.ObjectMeta.Name = string(clusterName)
 	scope.Authorizer = authorizer
 	scope.SubscriptionID = string(subscriptionID)
+	scope.ResourceManagerEndpoint = env.ResourceManagerEndpoint
 
 	return nil
+}
+
+func (scope *MachineScope) getCloudEnvironment() (string, error) {
+	infra := &configv1.Infrastructure{}
+	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
+
+	if err := scope.CoreClient.Get(context.Background(), infraName, infra); err != nil {
+		return "", err
+	}
+
+	// When cloud environment is missing default to Azure Public Cloud
+	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.Azure == nil || infra.Status.PlatformStatus.Azure.CloudName == "" {
+		return string(configv1.AzurePublicCloud), nil
+	}
+
+	return string(infra.Status.PlatformStatus.Azure.CloudName), nil
 }

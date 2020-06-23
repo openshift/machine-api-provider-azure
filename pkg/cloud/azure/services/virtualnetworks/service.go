@@ -30,8 +30,8 @@ type Service struct {
 }
 
 // getVirtualNetworksClient creates a new groups client from subscriptionid.
-func getVirtualNetworksClient(subscriptionID string, authorizer autorest.Authorizer) network.VirtualNetworksClient {
-	vnetsClient := network.NewVirtualNetworksClient(subscriptionID)
+func getVirtualNetworksClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.VirtualNetworksClient {
+	vnetsClient := network.NewVirtualNetworksClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	vnetsClient.Authorizer = authorizer
 	vnetsClient.AddToUserAgent(azure.UserAgent)
 	return vnetsClient
@@ -40,7 +40,7 @@ func getVirtualNetworksClient(subscriptionID string, authorizer autorest.Authori
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
-		Client: getVirtualNetworksClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getVirtualNetworksClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

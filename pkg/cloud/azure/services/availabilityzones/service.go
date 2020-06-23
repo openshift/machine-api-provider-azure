@@ -30,8 +30,8 @@ type Service struct {
 }
 
 // getResourceSkusClient creates a new availability zones client from subscriptionid.
-func getResourceSkusClient(subscriptionID string, authorizer autorest.Authorizer) compute.ResourceSkusClient {
-	skusClient := compute.NewResourceSkusClient(subscriptionID)
+func getResourceSkusClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.ResourceSkusClient {
+	skusClient := compute.NewResourceSkusClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	skusClient.Authorizer = authorizer
 	skusClient.AddToUserAgent(azure.UserAgent)
 	return skusClient
@@ -40,7 +40,7 @@ func getResourceSkusClient(subscriptionID string, authorizer autorest.Authorizer
 // NewService creates a new availability zones service.
 func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
-		Client: getResourceSkusClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getResourceSkusClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

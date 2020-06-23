@@ -30,8 +30,8 @@ type Service struct {
 }
 
 // getGroupsClient creates a new groups client from subscriptionid.
-func getLoadbalancersClient(subscriptionID string, authorizer autorest.Authorizer) network.LoadBalancersClient {
-	loadBalancersClient := network.NewLoadBalancersClient(subscriptionID)
+func getLoadbalancersClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.LoadBalancersClient {
+	loadBalancersClient := network.NewLoadBalancersClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	loadBalancersClient.Authorizer = authorizer
 	loadBalancersClient.AddToUserAgent(azure.UserAgent)
 	return loadBalancersClient
@@ -40,7 +40,7 @@ func getLoadbalancersClient(subscriptionID string, authorizer autorest.Authorize
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
 	return &Service{
-		Client: getLoadbalancersClient(scope.SubscriptionID, scope.Authorizer),
+		Client: getLoadbalancersClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }
