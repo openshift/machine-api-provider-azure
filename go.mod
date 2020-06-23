@@ -10,18 +10,19 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v0.1.0
 	github.com/golang/mock v1.3.1
-	github.com/onsi/ginkgo v1.12.0
-	github.com/onsi/gomega v1.8.1
-	github.com/openshift/api v0.0.0-20200424083944-0422dc17083e
+	github.com/onsi/ginkgo v1.12.1
+	github.com/onsi/gomega v1.10.1
+	github.com/openshift/api v0.0.0-20200623075207-eb651a5bb0ad
 	github.com/openshift/machine-api-operator v0.2.1-0.20200722104429-f4f9b84df9b7
 	github.com/spf13/cobra v0.0.5
+	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 
 	// kube 1.18
-	k8s.io/api v0.18.2
-	k8s.io/apimachinery v0.18.2
+	k8s.io/api v0.18.3
+	k8s.io/apimachinery v0.18.3
 	k8s.io/client-go v0.18.2
-	k8s.io/code-generator v0.18.2
+	k8s.io/code-generator v0.18.3
 	k8s.io/klog v1.0.0
 	k8s.io/utils v0.0.0-20200327001022-6496210b90e8
 	sigs.k8s.io/controller-runtime v0.6.0
