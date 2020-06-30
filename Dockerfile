@@ -28,3 +28,4 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./machine-controller-ma
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 WORKDIR /
 COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/machine-controller-manager .
+COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/bin/termination-handler .
