@@ -3,10 +3,15 @@ package machine
 import (
 	"context"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
+	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
 func TestExists(t *testing.T) {
@@ -113,4 +118,67 @@ func TestGetSpotVMOptions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSetMachineCloudProviderSpecifics(t *testing.T) {
+	testStatus := "testState"
+	testSize := compute.VirtualMachineSizeTypesBasicA4
+	testRegion := "testRegion"
+	testZone := "testZone"
+	testZones := []string{testZone}
+
+	maxPrice := "1"
+	r := Reconciler{
+		scope: &actuators.MachineScope{
+			Machine: &machinev1beta1.Machine{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "",
+					Namespace: "",
+				},
+			},
+			MachineConfig: &v1beta1.AzureMachineProviderSpec{
+				SpotVMOptions: &v1beta1.SpotVMOptions{
+					MaxPrice: &maxPrice,
+				},
+			},
+		},
+	}
+
+	vm := compute.VirtualMachine{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			ProvisioningState: &testStatus,
+			HardwareProfile: &compute.HardwareProfile{
+				VMSize: testSize,
+			},
+		},
+		Location: &testRegion,
+		Zones:    &testZones,
+	}
+
+	r.setMachineCloudProviderSpecifics(vm)
+
+	actualInstanceStateAnnotation := r.scope.Machine.Annotations[MachineInstanceStateAnnotationName]
+	if actualInstanceStateAnnotation != testStatus {
+		t.Errorf("Expected instance state annotation: %v, got: %v", actualInstanceStateAnnotation, vm.VirtualMachineProperties.ProvisioningState)
+	}
+
+	actualMachineTypeLabel := r.scope.Machine.Labels[MachineInstanceTypeLabelName]
+	if actualMachineTypeLabel != string(vm.HardwareProfile.VMSize) {
+		t.Errorf("Expected machine type label: %v, got: %v", actualMachineTypeLabel, string(vm.HardwareProfile.VMSize))
+	}
+
+	actualMachineRegionLabel := r.scope.Machine.Labels[machinecontroller.MachineRegionLabelName]
+	if actualMachineRegionLabel != *vm.Location {
+		t.Errorf("Expected machine region label: %v, got: %v", actualMachineRegionLabel, *vm.Location)
+	}
+
+	actualMachineAZLabel := r.scope.Machine.Labels[machinecontroller.MachineAZLabelName]
+	if actualMachineAZLabel != strings.Join(*vm.Zones, ",") {
+		t.Errorf("Expected machine zone label: %v, got: %v", actualMachineAZLabel, strings.Join(*vm.Zones, ","))
+	}
+
+	if _, ok := r.scope.Machine.Spec.Labels[machinecontroller.MachineInterruptibleInstanceLabelName]; !ok {
+		t.Error("Missing spot instance label in machine spec")
+	}
+
 }

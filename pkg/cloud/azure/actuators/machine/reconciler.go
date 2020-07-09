@@ -332,7 +332,10 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine)
 	}
 
 	if s.scope.MachineConfig.SpotVMOptions != nil {
-		s.scope.Machine.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
+		if s.scope.Machine.Spec.Labels == nil {
+			s.scope.Machine.Spec.Labels = make(map[string]string)
+		}
+		s.scope.Machine.Spec.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
 	}
 }
 
