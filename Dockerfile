@@ -12,20 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the manager binary
 FROM registry.svc.ci.openshift.org/openshift/release:golang-1.13 as builder
-
-# Copy in the go src
 WORKDIR /go/src/sigs.k8s.io/cluster-api-provider-azure
-COPY pkg/    pkg/
-COPY cmd/    cmd/
-COPY vendor/ vendor/
+COPY . .
+# VERSION env gets set in the openshift/release image and refers to the golang version, which interferes with our own
+RUN unset VERSION \
+  && GOPROXY=off NO_DOCKER=1 make build
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o ./machine-controller-manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager
-
-# Copy the controller-manager into a thin image
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
-WORKDIR /
-COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/machine-controller-manager .
-COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/bin/termination-handler .
+COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/bin/machine-controller-manager /
+COPY --from=builder /go/src/sigs.k8s.io/cluster-api-provider-azure/bin/termination-handler /
