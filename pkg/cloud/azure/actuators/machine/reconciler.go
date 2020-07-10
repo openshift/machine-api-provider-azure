@@ -379,11 +379,17 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 		}
 	}
 
+	// VM States come from https://docs.microsoft.com/en-us/azure/virtual-machines/windows/states-lifecycle#provisioning-states
 	switch v1beta1.VMState(*vm.ProvisioningState) {
 	case v1beta1.VMStateSucceeded:
+		// VM was created or updated successfully
 		klog.Infof("Machine %v is running", to.String(vm.VMID))
 	case v1beta1.VMStateUpdating:
+		// Some update is being applied
 		klog.Infof("Machine %v is updating", to.String(vm.VMID))
+	case v1beta1.VMStateCreating:
+		// Creation request was accepted, VM is being created
+		klog.Infof("Machine %v is creating", to.String(vm.VMID))
 	default:
 		klog.Infof("Not found vm for machine %s", s.scope.Machine.GetName())
 		return false, nil

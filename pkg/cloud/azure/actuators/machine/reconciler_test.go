@@ -42,6 +42,14 @@ func TestExists(t *testing.T) {
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
+				ProvisioningState: string(v1beta1.VMStateCreating),
+			},
+			expected: true,
+		},
+		{
+			vmService: &FakeVMService{
+				Name:              "machine-test",
+				ID:                "machine-test-ID",
 				ProvisioningState: "",
 			},
 			expected: false,
