@@ -63,6 +63,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	maxPriceEmpty := ""
 
 	testCases := []struct {
 		name           string
@@ -89,6 +90,28 @@ func TestGetSpotVMOptions(t *testing.T) {
 			evictionPolicy: "",
 			billingProfile: nil,
 		},
+		{
+			name: "not return an error if the max price is the empty string",
+			spotVMOptions: &v1beta1.SpotVMOptions{
+				MaxPrice: &maxPriceEmpty,
+			},
+			priority:       compute.Spot,
+			evictionPolicy: compute.Deallocate,
+			billingProfile: &compute.BillingProfile{
+				MaxPrice: nil,
+			},
+		},
+		{
+			name: "not return an error if the max price is nil",
+			spotVMOptions: &v1beta1.SpotVMOptions{
+				MaxPrice: nil,
+			},
+			priority:       compute.Spot,
+			evictionPolicy: compute.Deallocate,
+			billingProfile: &compute.BillingProfile{
+				MaxPrice: nil,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -108,8 +131,12 @@ func TestGetSpotVMOptions(t *testing.T) {
 
 			// only check billing profile when spotVMOptions object is not nil
 			if tc.spotVMOptions != nil {
-				if *billingProfile.MaxPrice != *tc.billingProfile.MaxPrice {
-					t.Fatalf("Expected billing profile max price %d, got: %d", billingProfile, tc.billingProfile)
+				if tc.billingProfile.MaxPrice != nil {
+					if billingProfile == nil {
+						t.Fatal("Expected billing profile to not be nil")
+					} else if *billingProfile.MaxPrice != *tc.billingProfile.MaxPrice {
+						t.Fatalf("Expected billing profile max price %d, got: %d", billingProfile, tc.billingProfile)
+					}
 				}
 			} else {
 				if billingProfile != nil {
