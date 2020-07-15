@@ -271,7 +271,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 }
 
 func getVMState(vm compute.VirtualMachine) v1beta1.VMState {
-	if vm.ProvisioningState == nil {
+	if vm.VirtualMachineProperties == nil || vm.ProvisioningState == nil {
 		return ""
 	}
 
@@ -321,9 +321,12 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine)
 
 	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(getVMState(vm))
 
-	if vm.HardwareProfile != nil {
-		s.scope.Machine.Labels[MachineInstanceTypeLabelName] = string(vm.HardwareProfile.VMSize)
+	if vm.VirtualMachineProperties != nil {
+		if vm.VirtualMachineProperties.HardwareProfile != nil {
+			s.scope.Machine.Labels[MachineInstanceTypeLabelName] = string(vm.VirtualMachineProperties.HardwareProfile.VMSize)
+		}
 	}
+
 	if vm.Location != nil {
 		s.scope.Machine.Labels[MachineRegionLabelName] = *vm.Location
 	}
@@ -335,6 +338,7 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine)
 		if s.scope.Machine.Spec.Labels == nil {
 			s.scope.Machine.Spec.Labels = make(map[string]string)
 		}
+		// Label on the Spec so that it is propogated to the Node
 		s.scope.Machine.Spec.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
 	}
 }

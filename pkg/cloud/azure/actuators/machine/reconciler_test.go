@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	machinev1beta1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	. "github.com/onsi/gomega"
+	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
@@ -157,7 +160,7 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 	maxPrice := "1"
 	r := Reconciler{
 		scope: &actuators.MachineScope{
-			Machine: &machinev1beta1.Machine{
+			Machine: &machinev1.Machine{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "",
 					Namespace: "",
@@ -208,4 +211,133 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 		t.Error("Missing spot instance label in machine spec")
 	}
 
+}
+
+func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
+	abcZones := []string{"a", "b", "c"}
+
+	testCases := []struct {
+		name                string
+		scope               func(t *testing.T) *actuators.MachineScope
+		vm                  compute.VirtualMachine
+		expectedLabels      map[string]string
+		expectedAnnotations map[string]string
+		expectedSpecLabels  map[string]string
+	}{
+		{
+			name:  "with a blank vm",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") },
+			vm:    compute.VirtualMachine{},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
+			name:  "with a running vm",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "good-worker") },
+			vm: compute.VirtualMachine{
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					ProvisioningState: pointer.StringPtr("Running"),
+				},
+			},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "good-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "Running",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
+			name:  "with a VMSize set vm",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "sized-worker") },
+			vm: compute.VirtualMachine{
+				VirtualMachineProperties: &compute.VirtualMachineProperties{
+					HardwareProfile: &compute.HardwareProfile{
+						VMSize: "big",
+					},
+				},
+			},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "sized-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+				MachineInstanceTypeLabelName:    "big",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
+			name:  "with a vm location",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "located-worker") },
+			vm: compute.VirtualMachine{
+				Location: pointer.StringPtr("nowhere"),
+			},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "located-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+				MachineRegionLabelName:          "nowhere",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
+			name:  "with a vm with zones",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "zoned-worker") },
+			vm: compute.VirtualMachine{
+				Zones: &abcZones,
+			},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "zoned-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+				MachineAZLabelName:              "a,b,c",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
+			name: "with a vm on spot",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				scope := newFakeScope(t, "spot-worker")
+				scope.MachineConfig.SpotVMOptions = &v1beta1.SpotVMOptions{}
+				return scope
+			},
+			vm: compute.VirtualMachine{},
+			expectedLabels: map[string]string{
+				providerspecv1.MachineRoleLabel: "spot-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: map[string]string{
+				machinecontroller.MachineInterruptibleInstanceLabelName: "",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			r := newFakeReconcilerWithScope(t, tc.scope(t))
+			r.setMachineCloudProviderSpecifics(tc.vm)
+
+			machine := r.scope.Machine
+			g.Expect(machine.Labels).To(Equal(tc.expectedLabels))
+			g.Expect(machine.Annotations).To(Equal(tc.expectedAnnotations))
+			g.Expect(machine.Spec.Labels).To(Equal(tc.expectedSpecLabels))
+		})
+	}
 }
