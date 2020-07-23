@@ -30,6 +30,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -52,10 +53,14 @@ var (
 	_ machine.Actuator = (*Actuator)(nil)
 )
 
+const globalInfrastuctureName = "cluster"
+
 func init() {
 	if err := machinev1.AddToScheme(scheme.Scheme); err != nil {
 		klog.Fatal(err)
 	}
+
+	configv1.AddToScheme(scheme.Scheme)
 }
 
 func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
@@ -514,6 +519,19 @@ func TestCustomDataFailures(t *testing.T) {
 }
 
 func TestMachineEvents(t *testing.T) {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastuctureName,
+		},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Azure: &configv1.AzurePlatformStatus{
+					CloudName: configv1.AzurePublicCloud,
+				},
+			},
+		},
+	}
+
 	machine, err := stubMachine()
 	if err != nil {
 		t.Fatal(err)
@@ -619,7 +637,7 @@ func TestMachineEvents(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.credSecret)
+			cs := controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.credSecret, infra)
 
 			m := tc.machine.DeepCopy()
 			if err := cs.Create(context.TODO(), m); err != nil {
@@ -689,6 +707,19 @@ func TestMachineEvents(t *testing.T) {
 }
 
 func TestStatusCodeBasedCreationErrors(t *testing.T) {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastuctureName,
+		},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Azure: &configv1.AzurePlatformStatus{
+					CloudName: configv1.AzurePublicCloud,
+				},
+			},
+		},
+	}
+
 	machine, err := stubMachine()
 	if err != nil {
 		t.Fatal(err)
@@ -725,7 +756,8 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 				Data: map[string][]byte{
 					"userData": []byte("S3CR3T"),
 				},
-			})
+			},
+				infra)
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
@@ -776,6 +808,19 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 }
 
 func TestInvalidConfigurationCreationErrors(t *testing.T) {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastuctureName,
+		},
+		Status: configv1.InfrastructureStatus{
+			PlatformStatus: &configv1.PlatformStatus{
+				Azure: &configv1.AzurePlatformStatus{
+					CloudName: configv1.AzurePublicCloud,
+				},
+			},
+		},
+	}
+
 	cases := []struct {
 		name          string
 		mutateMachine func(*machinev1.Machine)
@@ -818,7 +863,8 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 				Data: map[string][]byte{
 					"userData": []byte("S3CR3T"),
 				},
-			})
+			},
+				infra)
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
