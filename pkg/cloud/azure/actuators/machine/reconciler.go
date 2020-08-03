@@ -28,6 +28,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network"
+	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -613,6 +614,11 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 				Namespace: s.scope.Machine.Namespace,
 				Reason:    err.Error(),
 			})
+
+			var detailedError autorest.DetailedError
+			if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
+				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s", s.scope.Machine.Name)
+			}
 			return fmt.Errorf("failed to create or get machine: %w", err)
 		}
 	} else if err != nil {
