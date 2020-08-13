@@ -231,6 +231,10 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		}
 	}
 
+	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
+		virtualMachine.StorageProfile.OsDisk.ManagedDisk.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
+	}
+
 	if vmSpec.Zone != "" {
 		zones := []string{vmSpec.Zone}
 		virtualMachine.Zones = &zones

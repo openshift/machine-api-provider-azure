@@ -39,7 +39,7 @@ func stubProviderConfig() *providerspecv1.AzureMachineProviderSpec {
 		Location:             "eastus2",
 		VMSize:               "Standard_B2ms",
 		Image:                providerspecv1.Image{ResourceID: "/resourceGroups/os4-common/providers/Microsoft.Compute/images/test1-controlplane-0-image-20190529150403"},
-		OSDisk:               providerspecv1.OSDisk{OSType: "Linux", ManagedDisk: providerspecv1.ManagedDisk{StorageAccountType: "Premium_LRS"}, DiskSizeGB: 60},
+		OSDisk:               providerspecv1.OSDisk{OSType: "Linux", ManagedDisk: providerspecv1.ManagedDiskParameters{StorageAccountType: "Premium_LRS"}, DiskSizeGB: 60},
 		SSHPublicKey:         "c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFDNEd4SGQ1L0pLZVJYMGZOMCt4YzM1eXhLdmtvb0Qwb0l2RnNCdDNHNTNaSXZlTWxwNUppQTRWT0Y3YjJ4cHZmL1FHbVpmWWl4d1JYMHdUKzRWUzYxV1ZNeUdZRUhPcE9QYy85MWZTcTg4bTJZbitBYVhTUUxTbFpaVkZJTDZsK296bjlRQ3NaSXhqSlpkTW5BTlRQdlhWMWpjSVNJeDhmU0pKeWVEdlhFU2FEQ2N1VjdPZTdvd01lVVpseCtUUEhkcU85eEV1OXFuREVYUXo1SUVQQUMwTElSQnVicmJVaTRQZUJFUlFieVBQd1p0Um9NN2pFZ3RuRFhDcmxYbXo2T0N3NXNiaE1FNEJCUVliVjBOV0J3Unl2bHJReDJtYzZHNnJjODJ6OWxJMkRKQ3ZJcnNkRW43NytQZThiWm1MVU83V0sxRUFyd2xXY0FiZU1kYUFkbzcgamNoYWxvdXBAZGhjcC0yNC0xNzAuYnJxLnJlZGhhdC5jb20K",
 		PublicIP:             false,
 		Subnet:               "stub-machine-subnet",
