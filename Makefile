@@ -65,8 +65,9 @@ goimports: ## Go fmt your code
 	hack/goimports.sh .
 
 .PHONY: generate
-generate: ## generate code (e.g. deepcopy)
-	./hack/update-generated-deep-copies.sh
+generate:
+	$(DOCKER_CMD) go generate ./pkg/... ./cmd/...
+	hack/goimports.sh .
 
 .PHONY: vet
 vet:
