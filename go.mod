@@ -8,24 +8,23 @@ require (
 	github.com/Azure/go-autorest/autorest/adal v0.8.2
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-logr/logr v0.1.0
+	github.com/go-logr/logr v0.2.1
 	github.com/golang/mock v1.3.1
 	github.com/onsi/ginkgo v1.12.1
 	github.com/onsi/gomega v1.10.1
-	github.com/openshift/api v0.0.0-20200623075207-eb651a5bb0ad
-	github.com/openshift/machine-api-operator v0.2.1-0.20200722104429-f4f9b84df9b7
-	github.com/spf13/cobra v0.0.5
-	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
+	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/machine-api-operator v0.2.1-0.20200910172650-cac610d67c12
+	github.com/spf13/cobra v1.0.0
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 
 	// kube 1.18
-	k8s.io/api v0.18.3
-	k8s.io/apimachinery v0.18.3
-	k8s.io/client-go v0.18.2
-	k8s.io/code-generator v0.18.3
+	k8s.io/api v0.19.0
+	k8s.io/apimachinery v0.19.0
+	k8s.io/client-go v0.19.0
+	k8s.io/code-generator v0.19.0
 	k8s.io/klog v1.0.0
-	k8s.io/utils v0.0.0-20200327001022-6496210b90e8
-	sigs.k8s.io/controller-runtime v0.6.0
+	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
+	sigs.k8s.io/controller-runtime v0.6.2
 	sigs.k8s.io/controller-tools v0.3.0
 	sigs.k8s.io/yaml v1.2.0
 )
