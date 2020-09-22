@@ -617,7 +617,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 
 			var detailedError autorest.DetailedError
 			if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
-				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s", s.scope.Machine.Name)
+				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s: %v", s.scope.Machine.Name, err)
 			}
 			return fmt.Errorf("failed to create or get machine: %w", err)
 		}
