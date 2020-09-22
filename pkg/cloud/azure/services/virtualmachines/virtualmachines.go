@@ -34,6 +34,34 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 )
 
+const (
+	// winAutoLogonFormatString is the format string used to create the AutoLogon
+	// AdditionalUnattendContent configuration for Windows machines.
+	winAutoLogonFormatString = `<AutoLogon>
+			<Username>%s</Username>
+			<Password>
+				<Value>%s</Value>
+			</Password>
+			<Enabled>true</Enabled>
+			<LogonCount>1</LogonCount>
+		</AutoLogon>`
+
+	// winFirstLogonCommandsString is the string used to create the FirstLogonCommands
+	// AdditionalUnattendContent configuration for Windows machines.
+	winFirstLogonCommandsString = `<FirstLogonCommands>
+			<SynchronousCommand>
+				<Description>Copy user data secret contents to init script</Description>	
+				<CommandLine>cmd /c "copy C:\AzureData\CustomData.bin C:\init.ps1"</CommandLine>
+				<Order>11</Order>
+			</SynchronousCommand>
+			<SynchronousCommand>
+				<Description>Launch init script</Description>	
+				<CommandLine>powershell.exe -NonInteractive -ExecutionPolicy Bypass -File C:\init.ps1</CommandLine>
+				<Order>12</Order>
+			</SynchronousCommand>
+		</FirstLogonCommands>`
+)
+
 // Spec input specification for Get/CreateOrUpdate/Delete calls
 type Spec struct {
 	Name            string
@@ -126,6 +154,20 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.Windows {
 		osProfile.WindowsConfiguration = &compute.WindowsConfiguration{
 			EnableAutomaticUpdates: to.BoolPtr(false),
+			AdditionalUnattendContent: &[]compute.AdditionalUnattendContent{
+				{
+					PassName:      "OobeSystem",
+					ComponentName: "Microsoft-Windows-Shell-Setup",
+					SettingName:   "AutoLogon",
+					Content:       to.StringPtr(fmt.Sprintf(winAutoLogonFormatString, *osProfile.AdminUsername, *osProfile.AdminPassword)),
+				},
+				{
+					PassName:      "OobeSystem",
+					ComponentName: "Microsoft-Windows-Shell-Setup",
+					SettingName:   "FirstLogonCommands",
+					Content:       to.StringPtr(winFirstLogonCommandsString),
+				},
+			},
 		}
 	} else if sshKeyData != "" {
 		osProfile.LinuxConfiguration = &compute.LinuxConfiguration{
