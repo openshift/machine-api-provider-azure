@@ -22,7 +22,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources"
 	"github.com/Azure/go-autorest/autorest/to"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 

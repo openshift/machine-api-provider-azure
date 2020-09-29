@@ -28,7 +28,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"golang.org/x/crypto/ssh"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
