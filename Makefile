@@ -65,9 +65,11 @@ goimports: ## Go fmt your code
 	hack/goimports.sh .
 
 .PHONY: generate
-generate:
+generate: gogen goimports
+	./hack/verify-diff.sh
+
+gogen:
 	$(DOCKER_CMD) go generate ./pkg/... ./cmd/...
-	hack/goimports.sh .
 
 .PHONY: vet
 vet:
