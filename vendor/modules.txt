@@ -1,7 +1,7 @@
-# github.com/Azure/azure-sdk-for-go v42.0.0+incompatible
-github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
-github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network
-github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources
+# github.com/Azure/azure-sdk-for-go v48.0.0+incompatible
+github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute
+github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network
+github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2020-06-01/resources
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 github.com/Azure/go-ansiterm

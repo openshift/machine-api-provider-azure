@@ -24,8 +24,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
@@ -50,12 +50,12 @@ const (
 	// AdditionalUnattendContent configuration for Windows machines.
 	winFirstLogonCommandsString = `<FirstLogonCommands>
 			<SynchronousCommand>
-				<Description>Copy user data secret contents to init script</Description>	
+				<Description>Copy user data secret contents to init script</Description>
 				<CommandLine>cmd /c "copy C:\AzureData\CustomData.bin C:\init.ps1"</CommandLine>
 				<Order>11</Order>
 			</SynchronousCommand>
 			<SynchronousCommand>
-				<Description>Launch init script</Description>	
+				<Description>Launch init script</Description>
 				<CommandLine>powershell.exe -NonInteractive -ExecutionPolicy Bypass -File C:\init.ps1</CommandLine>
 				<Order>12</Order>
 			</SynchronousCommand>
@@ -279,7 +279,7 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid vm Specification")
 	}
 	klog.V(2).Infof("deleting vm %s ", vmSpec.Name)
-	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name)
+	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, nil)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
