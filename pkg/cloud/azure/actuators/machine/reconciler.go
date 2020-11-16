@@ -578,17 +578,18 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		}
 
 		vmSpec = &virtualmachines.Spec{
-			Name:           s.scope.Machine.Name,
-			NICName:        nicName,
-			SSHKeyData:     string(decoded),
-			Size:           s.scope.MachineConfig.VMSize,
-			OSDisk:         s.scope.MachineConfig.OSDisk,
-			Image:          s.scope.MachineConfig.Image,
-			Zone:           zone,
-			Tags:           s.scope.MachineConfig.Tags,
-			Priority:       priority,
-			EvictionPolicy: evictionPolicy,
-			BillingProfile: billingProfile,
+			Name:            s.scope.Machine.Name,
+			NICName:         nicName,
+			SSHKeyData:      string(decoded),
+			Size:            s.scope.MachineConfig.VMSize,
+			OSDisk:          s.scope.MachineConfig.OSDisk,
+			Image:           s.scope.MachineConfig.Image,
+			Zone:            zone,
+			Tags:            s.scope.MachineConfig.Tags,
+			Priority:        priority,
+			EvictionPolicy:  evictionPolicy,
+			BillingProfile:  billingProfile,
+			SecurityProfile: s.scope.MachineConfig.SecurityProfile,
 		}
 
 		if s.scope.MachineConfig.ManagedIdentity != "" {

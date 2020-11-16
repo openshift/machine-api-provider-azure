@@ -77,6 +77,7 @@ type Spec struct {
 	Priority        compute.VirtualMachinePriorityTypes
 	EvictionPolicy  compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile  *compute.BillingProfile
+	SecurityProfile *v1beta1.SecurityProfile
 }
 
 // Get provides information about a virtual network.
@@ -114,35 +115,49 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
+	virtualMachine, err := deriveVirtualMachineParameters(vmSpec, s.Scope.MachineConfig.Location, s.Scope.SubscriptionID, nic)
+	if err != nil {
+		return err
+	}
+
+	future, err := s.Client.CreateOrUpdate(
+		ctx,
+		s.Scope.MachineConfig.ResourceGroup,
+		vmSpec.Name,
+		*virtualMachine)
+	if err != nil {
+		return fmt.Errorf("cannot create vm: %w", err)
+	}
+
+	// Do not wait until the operation completes. Just check the result
+	// so the call to Create actuator operation is async.
+	_, err = future.Result(s.Client)
+	if err != nil {
+		return err
+	}
+
+	klog.V(2).Infof("successfully created vm %s ", vmSpec.Name)
+	return err
+}
+
+func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 	sshKeyData := vmSpec.SSHKeyData
 	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.Windows {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
-			return fmt.Errorf("Failed to generate private key: %w", perr)
+			return nil, fmt.Errorf("Failed to generate private key: %w", perr)
 		}
 
 		publicRsaKey, perr := ssh.NewPublicKey(&privateKey.PublicKey)
 		if perr != nil {
-			return fmt.Errorf("Failed to generate public key: %w", perr)
+			return nil, fmt.Errorf("Failed to generate public key: %w", perr)
 		}
 		sshKeyData = string(ssh.MarshalAuthorizedKey(publicRsaKey))
 	}
 
 	randomPassword, err := GenerateRandomString(32)
 	if err != nil {
-		return fmt.Errorf("failed to generate random string: %w", err)
-	}
-
-	imageReference := &compute.ImageReference{
-		Publisher: to.StringPtr(vmSpec.Image.Publisher),
-		Offer:     to.StringPtr(vmSpec.Image.Offer),
-		Sku:       to.StringPtr(vmSpec.Image.SKU),
-		Version:   to.StringPtr(vmSpec.Image.Version),
-	}
-	if vmSpec.Image.ResourceID != "" {
-		imageReference = &compute.ImageReference{
-			ID: to.StringPtr(fmt.Sprintf("/subscriptions/%s%s", s.Scope.SubscriptionID, vmSpec.Image.ResourceID)),
-		}
+		return nil, fmt.Errorf("failed to generate random string: %w", err)
 	}
 
 	osProfile := &compute.OSProfile{
@@ -186,8 +201,44 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		osProfile.CustomData = to.StringPtr(vmSpec.CustomData)
 	}
 
-	virtualMachine := compute.VirtualMachine{
-		Location: to.StringPtr(s.Scope.MachineConfig.Location),
+	return osProfile, nil
+}
+
+// Derive virtual machine parameters for CreateOrUpdate API call based
+// on the provided virtual machine specification, resource location,
+// subscription ID, and the network interface.
+func deriveVirtualMachineParameters(vmSpec *Spec, location string, subscription string, nic network.Interface) (*compute.VirtualMachine, error) {
+	osProfile, err := generateOSProfile(vmSpec)
+	if err != nil {
+		return nil, err
+	}
+
+	imageReference := &compute.ImageReference{
+		Publisher: to.StringPtr(vmSpec.Image.Publisher),
+		Offer:     to.StringPtr(vmSpec.Image.Offer),
+		Sku:       to.StringPtr(vmSpec.Image.SKU),
+		Version:   to.StringPtr(vmSpec.Image.Version),
+	}
+	if vmSpec.Image.ResourceID != "" {
+		imageReference = &compute.ImageReference{
+			ID: to.StringPtr(fmt.Sprintf("/subscriptions/%s%s", subscription, vmSpec.Image.ResourceID)),
+		}
+	}
+
+	var diskEncryptionSet *compute.DiskEncryptionSetParameters
+	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
+		diskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
+	}
+
+	var securityProfile *compute.SecurityProfile
+	if vmSpec.SecurityProfile != nil {
+		securityProfile = &compute.SecurityProfile{
+			EncryptionAtHost: vmSpec.SecurityProfile.EncryptionAtHost,
+		}
+	}
+
+	virtualMachine := &compute.VirtualMachine{
+		Location: to.StringPtr(location),
 		Tags:     getTagListFromSpec(vmSpec),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
@@ -202,10 +253,12 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					DiskSizeGB:   to.Int32Ptr(vmSpec.OSDisk.DiskSizeGB),
 					ManagedDisk: &compute.ManagedDiskParameters{
 						StorageAccountType: compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType),
+						DiskEncryptionSet:  diskEncryptionSet,
 					},
 				},
 			},
-			OsProfile: osProfile,
+			SecurityProfile: securityProfile,
+			OsProfile:       osProfile,
 			NetworkProfile: &compute.NetworkProfile{
 				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
 					{
@@ -231,33 +284,12 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		}
 	}
 
-	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
-		virtualMachine.StorageProfile.OsDisk.ManagedDisk.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
-	}
-
 	if vmSpec.Zone != "" {
 		zones := []string{vmSpec.Zone}
 		virtualMachine.Zones = &zones
 	}
 
-	future, err := s.Client.CreateOrUpdate(
-		ctx,
-		s.Scope.MachineConfig.ResourceGroup,
-		vmSpec.Name,
-		virtualMachine)
-	if err != nil {
-		return fmt.Errorf("cannot create vm: %w", err)
-	}
-
-	// Do not wait until the operation completes. Just check the result
-	// so the call to Create actuator operation is async.
-	_, err = future.Result(s.Client)
-	if err != nil {
-		return err
-	}
-
-	klog.V(2).Infof("successfully created vm %s ", vmSpec.Name)
-	return err
+	return virtualMachine, nil
 }
 
 func getTagListFromSpec(spec *Spec) map[string]*string {
