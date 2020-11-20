@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.13 as builder
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.15 as builder
 WORKDIR /go/src/sigs.k8s.io/cluster-api-provider-azure
 COPY . .
 # VERSION env gets set in the openshift/release image and refers to the golang version, which interferes with our own
