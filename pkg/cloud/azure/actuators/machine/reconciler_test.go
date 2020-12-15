@@ -323,8 +323,9 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			},
 			vm: compute.VirtualMachine{},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "spot-worker",
-				machinev1.MachineClusterIDLabel: "clusterID",
+				providerspecv1.MachineRoleLabel:                         "spot-worker",
+				machinev1.MachineClusterIDLabel:                         "clusterID",
+				machinecontroller.MachineInterruptibleInstanceLabelName: "",
 			},
 			expectedAnnotations: map[string]string{
 				MachineInstanceStateAnnotationName: "",

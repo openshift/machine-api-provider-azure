@@ -336,6 +336,9 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine)
 	}
 
 	if s.scope.MachineConfig.SpotVMOptions != nil {
+		// Label on the Machine so that an MHC can select spot instances
+		s.scope.Machine.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
+
 		if s.scope.Machine.Spec.Labels == nil {
 			s.scope.Machine.Spec.Labels = make(map[string]string)
 		}
