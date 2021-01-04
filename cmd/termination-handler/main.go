@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Start the termination handler
-	if err := handler.Run(ctrl.SetupSignalHandler()); err != nil {
+	if err := handler.Run(ctrl.SetupSignalHandler().Done()); err != nil {
 		klog.Fatalf("Error starting termination handler: %v", err)
 	}
 }
