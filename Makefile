@@ -33,13 +33,27 @@ GOPROXY ?=
 export GOPROXY
 
 NO_DOCKER ?= 0
+
+ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=podman
+else ifeq ($(shell command -v docker > /dev/null 2>&1 ; echo $$? ), 0)
+	ENGINE=docker
+else
+	NO_DOCKER=1
+endif
+
+USE_DOCKER ?= 0
+ifeq ($(USE_DOCKER), 1)
+	ENGINE=docker
+endif
+
 ifeq ($(NO_DOCKER), 1)
   DOCKER_CMD =
   IMAGE_BUILD_CMD = imagebuilder
   CGO_ENABLED = 1
 else
-  DOCKER_CMD := docker run --rm -e CGO_ENABLED=1 -v "$(PWD)":/go/src/sigs.k8s.io/cluster-api-provider-azure:Z -w /go/src/sigs.k8s.io/cluster-api-provider-azure openshift/origin-release:golang-1.15
-  IMAGE_BUILD_CMD = docker build
+  DOCKER_CMD := $(ENGINE)  run --rm -e CGO_ENABLED=1 -v "$(PWD)":/go/src/sigs.k8s.io/cluster-api-provider-azure:Z -w /go/src/sigs.k8s.io/cluster-api-provider-azure openshift/origin-release:golang-1.15
+  IMAGE_BUILD_CMD = $(ENGINE)  build
 endif
 
 .DEFAULT_GOAL:=help
@@ -58,11 +72,11 @@ vendor:
 
 .PHONY: fmt
 fmt:
-	go fmt ./pkg/... ./cmd/...
+	$(DOCKER_CMD) go fmt ./pkg/... ./cmd/...
 
 .PHONY: goimports
 goimports: ## Go fmt your code
-	hack/goimports.sh .
+	$(DOCKER_CMD) hack/goimports.sh .
 
 .PHONY: generate
 generate: gogen goimports
@@ -73,7 +87,7 @@ gogen:
 
 .PHONY: vet
 vet:
-	go vet -composites=false ./pkg/... ./cmd/...
+	$(DOCKER_CMD) go vet -composites=false ./pkg/... ./cmd/...
 
 .PHONY: verify-boilerplate
 verify-boilerplate:

@@ -107,12 +107,13 @@ stabilizes within the community.
 1. **Build and run azure actuator outside of the cluster**
 
    ```sh
-   $ go build -o bin/manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager
+   $ go build -o bin/machine-controller-manager sigs.k8s.io/cluster-api-provider-azure/cmd/manager
    ```
 
    ```sh
-   $ ./bin/manager --kubeconfig ~/.kube/config --logtostderr -v 5 -alsologtostderr
+   $ .bin/machine-controller-manager --kubeconfig ~/.kube/config --logtostderr -v 5 -alsologtostderr
    ```
+    If running in cointainer with podman and encountering permission issues, see [hacking-guide](https://github.com/openshift/machine-api-operator/blob/master/docs/dev/hacking-guide.md#troubleshooting-make-targets).
 
 1. **Deploy k8s apiserver through machine manifest**:
 
