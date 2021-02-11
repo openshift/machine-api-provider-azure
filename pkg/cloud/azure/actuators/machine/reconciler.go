@@ -671,8 +671,8 @@ func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMach
 		return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, nil
 	}
 	var billingProfile *compute.BillingProfile
-	if spotVMOptions.MaxPrice != nil && *spotVMOptions.MaxPrice != "" {
-		maxPrice, err := strconv.ParseFloat(*spotVMOptions.MaxPrice, 64)
+	if spotVMOptions.MaxPrice != nil && spotVMOptions.MaxPrice.AsDec().String() != "" {
+		maxPrice, err := strconv.ParseFloat(spotVMOptions.MaxPrice.AsDec().String(), 64)
 		if err != nil {
 			return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, err
 		}

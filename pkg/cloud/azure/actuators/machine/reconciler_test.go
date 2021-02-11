@@ -13,6 +13,7 @@ import (
 	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
@@ -128,12 +129,11 @@ func TestExists(t *testing.T) {
 }
 
 func TestGetSpotVMOptions(t *testing.T) {
-	maxPriceString := "100"
-	maxPriceFloat, err := strconv.ParseFloat(maxPriceString, 64)
+	maxPrice := resource.MustParse("0.001")
+	maxPriceFloat, err := strconv.ParseFloat(maxPrice.AsDec().String(), 64)
 	if err != nil {
 		t.Fatal(err)
 	}
-	maxPriceEmpty := ""
 
 	testCases := []struct {
 		name           string
@@ -145,7 +145,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 		{
 			name: "get spot vm option succefully",
 			spotVMOptions: &v1beta1.SpotVMOptions{
-				MaxPrice: &maxPriceString,
+				MaxPrice: &maxPrice,
 			},
 			priority:       compute.Spot,
 			evictionPolicy: compute.Deallocate,
@@ -161,10 +161,8 @@ func TestGetSpotVMOptions(t *testing.T) {
 			billingProfile: nil,
 		},
 		{
-			name: "not return an error if the max price is the empty string",
-			spotVMOptions: &v1beta1.SpotVMOptions{
-				MaxPrice: &maxPriceEmpty,
-			},
+			name:           "not return an error with empty spot vm options",
+			spotVMOptions:  &v1beta1.SpotVMOptions{},
 			priority:       compute.Spot,
 			evictionPolicy: compute.Deallocate,
 			billingProfile: &compute.BillingProfile{
@@ -224,7 +222,7 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 	testZone := "testZone"
 	testZones := []string{testZone}
 
-	maxPrice := "1"
+	maxPrice := resource.MustParse("1")
 	r := Reconciler{
 		scope: &actuators.MachineScope{
 			Machine: &machinev1.Machine{
