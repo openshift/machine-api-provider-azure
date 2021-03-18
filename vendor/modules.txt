@@ -705,6 +705,7 @@ k8s.io/kubectl/pkg/validation
 k8s.io/utils/buffer
 k8s.io/utils/exec
 k8s.io/utils/integer
+k8s.io/utils/net
 k8s.io/utils/pointer
 k8s.io/utils/trace
 # sigs.k8s.io/cluster-api-provider-aws v0.0.0-00010101000000-000000000000 => github.com/openshift/cluster-api-provider-aws v0.2.1-0.20210420175812-638f9f3fbb42

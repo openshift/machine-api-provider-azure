@@ -20,11 +20,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog/v2"
+	utilnet "k8s.io/utils/net"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
@@ -70,9 +70,6 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		return errors.New("invalid network interface specification")
 	}
 
-	nicProp := network.InterfacePropertiesFormat{}
-	nicConfig := &network.InterfaceIPConfigurationPropertiesFormat{}
-
 	subnetInterface, err := subnets.NewService(s.Scope).Get(ctx, &subnets.Spec{Name: nicSpec.SubnetName, VnetName: nicSpec.VnetName})
 	if err != nil {
 		return err
@@ -82,14 +79,36 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if !ok {
 		return errors.New("subnet get returned invalid network interface")
 	}
+	nicHasIPv6 := subnetHasIPv6(subnet)
+
+	nicProp := network.InterfacePropertiesFormat{}
+	nicConfig := &network.InterfaceIPConfigurationPropertiesFormat{}
+	nicConfigV6 := &network.InterfaceIPConfigurationPropertiesFormat{}
 
 	nicConfig.Subnet = &network.Subnet{ID: subnet.ID}
 	nicConfig.PrivateIPAllocationMethod = network.Dynamic
-	if nicSpec.StaticIPAddress != "" {
-		nicConfig.PrivateIPAllocationMethod = network.Static
-		nicConfig.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
+	nicConfig.LoadBalancerInboundNatRules = &[]network.InboundNatRule{}
+	if nicHasIPv6 {
+		klog.V(2).Infof("Found IPv6 address space. Adding IPv6 configuration to nic: %s", nicSpec.Name)
+		nicConfigV6.Subnet = &network.Subnet{ID: subnet.ID}
+		nicConfigV6.PrivateIPAllocationMethod = network.Dynamic
+		nicConfigV6.PrivateIPAddressVersion = network.IPv6
+		nicConfigV6.LoadBalancerInboundNatRules = &[]network.InboundNatRule{}
+		nicConfigV6.Primary = to.BoolPtr(false)
 	}
 
+	// IP address allocation
+	if nicSpec.StaticIPAddress != "" {
+		if utilnet.IsIPv6String(nicSpec.StaticIPAddress) {
+			nicConfigV6.PrivateIPAllocationMethod = network.Static
+			nicConfigV6.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
+		} else {
+			nicConfig.PrivateIPAllocationMethod = network.Static
+			nicConfig.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
+		}
+	}
+
+	// associated public IPs
 	if nicSpec.PublicIP != "" {
 		publicIPInterface, publicIPErr := publicips.NewService(s.Scope).Get(ctx, &publicips.Spec{Name: nicSpec.PublicIP})
 		if publicIPErr != nil {
@@ -100,10 +119,17 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		if !ok {
 			return errors.New("public ip get returned invalid network interface")
 		}
-		nicConfig.PublicIPAddress = &ip
+
+		if ip.PublicIPAddressPropertiesFormat.PublicIPAddressVersion == network.IPv6 {
+			nicConfigV6.PublicIPAddress = &ip
+		} else {
+			nicConfig.PublicIPAddress = &ip
+		}
 	}
 
+	// associated Load Balancers
 	backendAddressPools := []network.BackendAddressPool{}
+	backendAddressPoolsV6 := []network.BackendAddressPool{}
 	if nicSpec.PublicLoadBalancerName != "" {
 		lbInterface, lberr := publicloadbalancers.NewService(s.Scope).Get(ctx, &publicloadbalancers.Spec{Name: nicSpec.PublicLoadBalancerName})
 		if lberr != nil {
@@ -115,17 +141,42 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			return errors.New("public load balancer get returned invalid network interface")
 		}
 
-		backendAddressPools = append(backendAddressPools,
-			network.BackendAddressPool{
-				ID: (*lb.BackendAddressPools)[0].ID,
-			})
-		if nicSpec.NatRule != nil {
-			nicConfig.LoadBalancerInboundNatRules = &[]network.InboundNatRule{
-				{
-					ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID,
-				},
+		loadBalancerInboundNatRules := []network.InboundNatRule{}
+		loadBalancerInboundNatRulesV6 := []network.InboundNatRule{}
+		// loadbalancers can have multiple frontends and backends with different IP families
+		for i, ipConfig := range *lb.FrontendIPConfigurations {
+			// iterate only for the frontends that have backends configured
+			if i >= len(*lb.BackendAddressPools) {
+				break
+			}
+			if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+				backendAddressPoolsV6 = append(backendAddressPoolsV6,
+					network.BackendAddressPool{
+						ID: (*lb.BackendAddressPools)[i].ID,
+					})
+			} else {
+				backendAddressPools = append(backendAddressPools,
+					network.BackendAddressPool{
+						ID: (*lb.BackendAddressPools)[i].ID,
+					})
+			}
+
+			if nicSpec.NatRule != nil {
+				if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+					loadBalancerInboundNatRulesV6 = append(loadBalancerInboundNatRulesV6,
+						network.InboundNatRule{ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID})
+				} else {
+					loadBalancerInboundNatRules = append(loadBalancerInboundNatRules,
+						network.InboundNatRule{ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID})
+				}
 			}
 		}
+
+		if nicSpec.NatRule != nil {
+			nicConfig.LoadBalancerInboundNatRules = &loadBalancerInboundNatRules
+			nicConfigV6.LoadBalancerInboundNatRules = &loadBalancerInboundNatRulesV6
+		}
+
 	}
 	if nicSpec.InternalLoadBalancerName != "" {
 		internallbInterface, ilberr := internalloadbalancers.NewService(s.Scope).Get(ctx, &internalloadbalancers.Spec{Name: nicSpec.InternalLoadBalancerName})
@@ -137,13 +188,31 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		if !ok {
 			return errors.New("internal load balancer get returned invalid network interface")
 		}
-		backendAddressPools = append(backendAddressPools,
-			network.BackendAddressPool{
-				ID: (*internallb.BackendAddressPools)[0].ID,
-			})
+		// loadbalancers can have multiple frontends and backends with different IP families
+		for i, ipConfig := range *internallb.FrontendIPConfigurations {
+			// iterate only for the frontends that have backends configured
+			if i >= len(*internallb.BackendAddressPools) {
+				break
+			}
+			if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+				backendAddressPoolsV6 = append(backendAddressPoolsV6,
+					network.BackendAddressPool{
+						ID: (*internallb.BackendAddressPools)[i].ID,
+					})
+			} else {
+				backendAddressPools = append(backendAddressPools,
+					network.BackendAddressPool{
+						ID: (*internallb.BackendAddressPools)[i].ID,
+					})
+			}
+		}
 	}
 	nicConfig.LoadBalancerBackendAddressPools = &backendAddressPools
+	if nicHasIPv6 {
+		nicConfigV6.LoadBalancerBackendAddressPools = &backendAddressPoolsV6
+	}
 
+	// security groups
 	if nicSpec.SecurityGroupName != "" {
 		securityGroupInterface, sgerr := securitygroups.NewService(s.Scope).Get(ctx, &securitygroups.Spec{Name: nicSpec.SecurityGroupName})
 		if sgerr != nil {
@@ -177,6 +246,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		nicConfig.ApplicationSecurityGroups = &groups
 	}
 
+	// configure the nic with the corresponding IP configurations
 	nicProp.IPConfigurations = &[]network.InterfaceIPConfiguration{
 		{
 			Name:                                     to.StringPtr("pipConfig"),
@@ -184,18 +254,11 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		},
 	}
 
-	if subnetHasIPv6(subnet) {
-		klog.V(2).Infof("Found IPv6 address space. Adding IPv6 configuration to nic: %s", nicSpec.Name)
-		nicConfigIPv6 := &network.InterfaceIPConfigurationPropertiesFormat{}
-
-		nicConfigIPv6.Subnet = &network.Subnet{ID: subnet.ID}
-		nicConfigIPv6.PrivateIPAllocationMethod = network.Dynamic
-		nicConfigIPv6.PrivateIPAddressVersion = network.IPv6
-
+	if nicHasIPv6 {
 		ipConfigs := append(*nicProp.IPConfigurations,
 			network.InterfaceIPConfiguration{
 				Name:                                     to.StringPtr("pipConfig-v6"),
-				InterfaceIPConfigurationPropertiesFormat: nicConfigIPv6,
+				InterfaceIPConfigurationPropertiesFormat: nicConfigV6,
 			},
 		)
 
@@ -268,16 +331,9 @@ func subnetHasIPv6(subnet network.Subnet) bool {
 	}
 
 	for _, prefix := range prefixes {
-		ip, _, err := net.ParseCIDR(prefix)
-		if err != nil {
-			klog.Errorf("Error parsing subnet address prefix: %v", err)
-			continue
-		}
-
-		if ip != nil && ip.To4() == nil {
-			return true // Found an IPv6 subnet.
+		if utilnet.IsIPv6CIDRString(prefix) {
+			return true
 		}
 	}
-
 	return false
 }
