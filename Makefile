@@ -73,9 +73,7 @@ verify:
 
 .PHONY: vendor
 vendor:
-	go mod tidy
-	go mod vendor
-	go mod verify
+	$(DOCKER_CMD) hack/go-mod.sh
 
 .PHONY: fmt
 fmt:
