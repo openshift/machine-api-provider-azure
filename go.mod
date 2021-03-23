@@ -14,7 +14,7 @@ require (
 	github.com/onsi/ginkgo v1.14.1
 	github.com/onsi/gomega v1.10.2
 	github.com/openshift/api v0.0.0-20201216151826-78a19e96f9eb
-	github.com/openshift/machine-api-operator v0.2.1-0.20210310053650-d40398c49baf
+	github.com/openshift/machine-api-operator v0.2.1-0.20210322142500-9101e75223bf
 	github.com/spf13/cobra v1.1.1
 	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad
 
