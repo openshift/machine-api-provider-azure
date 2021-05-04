@@ -674,6 +674,8 @@ github.com/openshift/machine-api-operator v0.2.1-0.20201002104344-6abfb5440597/g
 github.com/openshift/machine-api-operator v0.2.1-0.20210322142500-9101e75223bf/go.mod h1:N3Q+UKEziycun6J3kyxQnRsBBebjwm9fnD6vSnUWqRU=
 github.com/openshift/machine-api-operator v0.2.1-0.20210420092411-384733bfd62e h1:4w69A/kY3LLep0io3Ap4bkfb/RT6jlowOTR0jj1qKPc=
 github.com/openshift/machine-api-operator v0.2.1-0.20210420092411-384733bfd62e/go.mod h1:DFZBMPtC2TYZH5NE9+2JQIpbZAnruqc9F26QmbOm9pw=
+github.com/openshift/machine-api-operator v0.2.1-0.20210504014029-a132ec00f7dd h1:8gwpgdXv0TPrvPRxms3CNqDwtktmOYxTWD4MrW1TVJk=
+github.com/openshift/machine-api-operator v0.2.1-0.20210504014029-a132ec00f7dd/go.mod h1:DFZBMPtC2TYZH5NE9+2JQIpbZAnruqc9F26QmbOm9pw=
 github.com/opentracing-contrib/go-observer v0.0.0-20170622124052-a52f23424492/go.mod h1:Ngi6UdF0k5OKD5t5wlmGhe/EDKPoUM3BXZSSfIuJbis=
 github.com/opentracing/basictracer-go v1.0.0/go.mod h1:QfBfYuafItcjQuMwinw9GhYKwFXS9KnPs5lxoYwgW74=
 github.com/opentracing/opentracing-go v1.0.2/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
