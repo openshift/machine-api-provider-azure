@@ -87,6 +87,7 @@ func main() {
 	flag.Parse()
 
 	cfg := config.GetConfigOrDie()
+	syncPeriod := 10 * time.Minute
 
 	opts := manager.Options{
 		HealthProbeBindAddress:  *healthAddr,
@@ -95,6 +96,7 @@ func main() {
 		LeaderElectionID:        "cluster-api-provider-azure-leader",
 		LeaseDuration:           leaderElectLeaseDuration,
 		MetricsBindAddress:      *metricsAddress,
+		SyncPeriod:              &syncPeriod,
 		// Slow the default retry and renew election rate to reduce etcd writes at idle: BZ 1858400
 		RetryPeriod:   &retryPeriod,
 		RenewDeadline: &renewDealine,
