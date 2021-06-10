@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
 	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -19,18 +22,23 @@ import (
 
 func TestExists(t *testing.T) {
 	testCases := []struct {
-		vmService *FakeVMService
-		expected  bool
+		name        string
+		vmService   azure.Service
+		expected    bool
+		errExpected bool
 	}{
 		{
+			name: "Succeded provisioning state",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
 				ProvisioningState: string(v1beta1.VMStateSucceeded),
 			},
-			expected: true,
+			expected:    true,
+			errExpected: false,
 		},
 		{
+			name: "Updating provisioning state",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -39,32 +47,82 @@ func TestExists(t *testing.T) {
 			expected: true,
 		},
 		{
+			name: "Creating provisioning state",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
 				ProvisioningState: string(v1beta1.VMStateCreating),
 			},
-			expected: true,
+			expected:    true,
+			errExpected: false,
 		},
 		{
+			name: "Creating provisioning state",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
-				ProvisioningState: "",
+				ProvisioningState: string(v1beta1.VMStateDeleting),
 			},
-			expected: false,
+			expected:    true,
+			errExpected: true,
+		},
+		{
+			name: "Arbitrary provisioning state",
+			vmService: &FakeVMService{
+				Name:              "machine-test",
+				ID:                "machine-test-ID",
+				ProvisioningState: "some random string",
+			},
+			expected:    true,
+			errExpected: false,
+		},
+		{
+			name: "Failed provisioning state",
+			vmService: &FakeVMService{
+				Name:              "machine-test",
+				ID:                "machine-test-ID",
+				ProvisioningState: "Failed",
+			},
+			expected:    true,
+			errExpected: true,
+		},
+		{
+			name: "Not found err",
+			vmService: &FakeBrokenVmService{
+				ErrorToReturn: autorest.DetailedError{
+					StatusCode: 404,
+					Message:    "Not found",
+				},
+			},
+			expected:    false,
+			errExpected: false,
+		},
+		{
+			name: "Internal service error",
+			vmService: &FakeBrokenVmService{
+				ErrorToReturn: autorest.DetailedError{
+					StatusCode: 500,
+					Message:    "boom",
+				},
+			},
+			expected:    false,
+			errExpected: true,
 		},
 	}
 	for _, tc := range testCases {
-		r := newFakeReconciler(t)
-		r.virtualMachinesSvc = tc.vmService
-		exists, err := r.Exists(context.TODO())
-		if err != nil {
-			t.Fatalf("Unexpected error: %v", err)
-		}
-		if exists != tc.expected {
-			t.Fatalf("Expected: %v, got: %v", tc.expected, exists)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			r := newFakeReconciler(t)
+			r.virtualMachinesSvc = tc.vmService
+			exists, err := r.Exists(context.TODO())
+
+			if exists != tc.expected {
+				t.Fatalf("Expected: %v, got: %v", tc.expected, exists)
+			}
+
+			if err != nil && !tc.errExpected {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+		})
 	}
 }
 

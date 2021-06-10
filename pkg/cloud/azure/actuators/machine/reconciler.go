@@ -284,6 +284,7 @@ func getVMState(vm compute.VirtualMachine) v1beta1.VMState {
 		return ""
 	}
 
+	// https://docs.microsoft.com/en-us/java/api/com.azure.resourcemanager.compute.models.powerstate
 	for _, status := range *vm.InstanceView.Statuses {
 		if status.Code == nil {
 			continue
@@ -354,7 +355,7 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	}
 	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
 
-	if err != nil && vmInterface == nil {
+	if err != nil && azure.ResourceNotFound(err) {
 		return false, nil
 	}
 
@@ -383,24 +384,14 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 		}
 	}
 
-	// VM States come from https://docs.microsoft.com/en-us/azure/virtual-machines/windows/states-lifecycle#provisioning-states
 	switch v1beta1.VMState(*vm.ProvisioningState) {
-	case v1beta1.VMStateSucceeded:
-		// VM was created or updated successfully
-		klog.Infof("Machine %v is running", to.String(vm.VMID))
-	case v1beta1.VMStateUpdating:
-		// Some update is being applied
-		klog.Infof("Machine %v is updating", to.String(vm.VMID))
-	case v1beta1.VMStateCreating:
-		// Creation request was accepted, VM is being created
-		klog.Infof("Machine %v is creating", to.String(vm.VMID))
-	default:
-		klog.Infof("Not found vm for machine %s", s.scope.Machine.GetName())
-		return false, nil
+	case v1beta1.VMStateDeleting:
+		return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
+	case v1beta1.VMStateFailed:
+		return true, fmt.Errorf("vm for machine %s exists, but has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
 	}
 
-	klog.Infof("Found vm for machine %s", s.scope.Machine.GetName())
-
+	klog.Infof("Provisioning state is '%s' for machine %s", *vm.ProvisioningState, s.scope.Machine.GetName())
 	return true, nil
 }
 

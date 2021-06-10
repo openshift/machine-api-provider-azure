@@ -177,6 +177,17 @@ func (s *FakeVMService) Delete(ctx context.Context, spec azure.Spec) error {
 	return nil
 }
 
+type FakeBrokenVmService struct {
+	FakeVMService
+	ErrorToReturn error
+}
+
+// Get returns fake error.
+func (s *FakeBrokenVmService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
+	s.GetCallCount++
+	return nil, s.ErrorToReturn
+}
+
 // FakeVMService generic vm service
 type FakeCountService struct {
 	GetCallCount            int
