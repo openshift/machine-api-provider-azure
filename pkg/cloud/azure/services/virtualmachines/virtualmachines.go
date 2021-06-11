@@ -88,7 +88,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceView)
 	if err != nil && azure.ResourceNotFound(err) {
-		klog.Warningf("vm %s not found: %w", vmSpec.Name, err)
+		klog.Warningf("vm %s not found: %w", vmSpec.Name, err.Error())
 		return nil, err
 	} else if err != nil {
 		return vm, err
