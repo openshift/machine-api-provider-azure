@@ -28,7 +28,7 @@ func TestExists(t *testing.T) {
 		errExpected bool
 	}{
 		{
-			name: "Succeded provisioning state",
+			name: "VM has 'Succeeded' ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -38,16 +38,17 @@ func TestExists(t *testing.T) {
 			errExpected: false,
 		},
 		{
-			name: "Updating provisioning state",
+			name: "VM has 'Updating' ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
 				ProvisioningState: string(v1beta1.VMStateUpdating),
 			},
-			expected: true,
+			expected:    true,
+			errExpected: false,
 		},
 		{
-			name: "Creating provisioning state",
+			name: "VM has 'Creating' ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -57,7 +58,7 @@ func TestExists(t *testing.T) {
 			errExpected: false,
 		},
 		{
-			name: "Creating provisioning state",
+			name: "VM has 'Deleting' ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -67,7 +68,7 @@ func TestExists(t *testing.T) {
 			errExpected: true,
 		},
 		{
-			name: "Arbitrary provisioning state",
+			name: "VM has some arbitrary ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -77,7 +78,7 @@ func TestExists(t *testing.T) {
 			errExpected: false,
 		},
 		{
-			name: "Failed provisioning state",
+			name: "VM has 'Failed' ProvisiongState",
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
@@ -87,7 +88,7 @@ func TestExists(t *testing.T) {
 			errExpected: true,
 		},
 		{
-			name: "Not found err",
+			name: "VM does not exists",
 			vmService: &FakeBrokenVmService{
 				ErrorToReturn: autorest.DetailedError{
 					StatusCode: 404,
