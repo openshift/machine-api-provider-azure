@@ -24,8 +24,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
@@ -86,7 +86,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	if !ok {
 		return compute.VirtualMachine{}, errors.New("invalid vm specification")
 	}
-	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceView)
+	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceViewTypesInstanceView)
 	if err != nil && azure.ResourceNotFound(err) {
 		klog.Warningf("vm %s not found: %w", vmSpec.Name, err.Error())
 		return nil, err
@@ -143,7 +143,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 	sshKeyData := vmSpec.SSHKeyData
-	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.Windows {
+	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.OperatingSystemTypesWindows {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
 			return nil, fmt.Errorf("Failed to generate private key: %w", perr)
@@ -167,7 +167,7 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 		AdminPassword: to.StringPtr(randomPassword),
 	}
 
-	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.Windows {
+	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.OperatingSystemTypesWindows {
 		osProfile.WindowsConfiguration = &compute.WindowsConfiguration{
 			EnableAutomaticUpdates: to.BoolPtr(false),
 			AdditionalUnattendContent: &[]compute.AdditionalUnattendContent{

@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -147,8 +147,8 @@ func TestGetSpotVMOptions(t *testing.T) {
 			spotVMOptions: &v1beta1.SpotVMOptions{
 				MaxPrice: &maxPrice,
 			},
-			priority:       compute.Spot,
-			evictionPolicy: compute.Deallocate,
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: &maxPriceFloat,
 			},
@@ -163,8 +163,8 @@ func TestGetSpotVMOptions(t *testing.T) {
 		{
 			name:           "not return an error with empty spot vm options",
 			spotVMOptions:  &v1beta1.SpotVMOptions{},
-			priority:       compute.Spot,
-			evictionPolicy: compute.Deallocate,
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: nil,
 			},
@@ -174,8 +174,8 @@ func TestGetSpotVMOptions(t *testing.T) {
 			spotVMOptions: &v1beta1.SpotVMOptions{
 				MaxPrice: nil,
 			},
-			priority:       compute.Spot,
-			evictionPolicy: compute.Deallocate,
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: nil,
 			},

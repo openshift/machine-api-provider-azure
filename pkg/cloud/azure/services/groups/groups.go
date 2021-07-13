@@ -26,6 +26,9 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 
+// MicroSoftComputeVirtualMachines constant because the library does not include one for this value.
+const MicroSoftComputeVirtualMachines = "Microsoft.Compute/virtualMachines"
+
 // Get provides information about a resource group.
 func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
 	return s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup)
@@ -42,7 +45,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 // Delete deletes the resource group with the provided name.
 func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("deleting resource group %s", s.Scope.MachineConfig.ResourceGroup)
-	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup)
+	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, MicroSoftComputeVirtualMachines)
 	if err != nil {
 		return fmt.Errorf("failed to delete resource group %s: %w", s.Scope.MachineConfig.ResourceGroup, err)
 	}

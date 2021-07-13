@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
@@ -67,8 +67,8 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			Name:     to.StringPtr(ipName),
 			Location: to.StringPtr(s.Scope.MachineConfig.Location),
 			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-				PublicIPAddressVersion:   network.IPv4,
-				PublicIPAllocationMethod: network.Static,
+				PublicIPAddressVersion:   network.IPVersionIPv4,
+				PublicIPAllocationMethod: network.IPAllocationMethodStatic,
 				DNSSettings: &network.PublicIPAddressDNSSettings{
 					DomainNameLabel: to.StringPtr(strings.ToLower(ipName)),
 				},

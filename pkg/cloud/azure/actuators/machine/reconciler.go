@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -38,6 +38,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
@@ -482,10 +483,15 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	if s.scope.MachineConfig.Vnet == "" {
 		return machinecontroller.InvalidMachineConfiguration("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
-
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     nicName,
 		VnetName: s.scope.MachineConfig.Vnet,
+	}
+	if s.scope.MachineConfig.AcceleratedNetworking {
+		if !machineset.InstanceTypes[s.scope.MachineConfig.VMSize].AcceleratedNetworking {
+			return machinecontroller.InvalidMachineConfiguration("accelerated networking not supported on instance type: %v", s.scope.MachineConfig.VMSize)
+		}
+		networkInterfaceSpec.AcceleratedNetworking = s.scope.MachineConfig.AcceleratedNetworking
 	}
 
 	if s.scope.MachineConfig.Subnet == "" {
@@ -683,5 +689,5 @@ func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMach
 
 	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
 	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
-	return compute.Spot, compute.Deallocate, billingProfile, nil
+	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
 }

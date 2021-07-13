@@ -59,7 +59,7 @@ ifeq ($(NO_DOCKER), 1)
   IMAGE_BUILD_CMD = imagebuilder
   export CGO_ENABLED
 else
-  DOCKER_CMD = $(ENGINE)  run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/sigs.k8s.io/cluster-api-provider-azure:Z -w /go/src/sigs.k8s.io/cluster-api-provider-azure openshift/origin-release:golang-1.15
+  DOCKER_CMD = $(ENGINE)  run --rm -e CGO_ENABLED=$(CGO_ENABLED) -e GOARCH=$(GOARCH) -e GOOS=$(GOOS) -v "$(PWD)":/go/src/sigs.k8s.io/cluster-api-provider-azure:Z -w /go/src/sigs.k8s.io/cluster-api-provider-azure openshift/origin-release:golang-1.16
   IMAGE_BUILD_CMD = $(ENGINE)  build
 endif
 

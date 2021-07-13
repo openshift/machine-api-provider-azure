@@ -21,7 +21,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
@@ -89,7 +89,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					{
 						Name: &frontEndIPConfigName,
 						FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
-							PrivateIPAllocationMethod: network.Static,
+							PrivateIPAllocationMethod: network.IPAllocationMethodStatic,
 							Subnet:                    &subnet,
 							PrivateIPAddress:          to.StringPtr(internalLBSpec.IPAddress),
 						},

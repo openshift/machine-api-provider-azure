@@ -21,11 +21,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
@@ -34,7 +35,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/subnets"
 )
 
-// Spec specification for routetable
+// Spec specification for networkinterface
 type Spec struct {
 	Name                          string
 	SubnetName                    string
@@ -46,6 +47,7 @@ type Spec struct {
 	PublicIP                      string
 	SecurityGroupName             string
 	ApplicationSecurityGroupNames []string
+	AcceleratedNetworking         bool
 }
 
 // Get provides information about a network interface.
@@ -82,17 +84,26 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	nicHasIPv6 := subnetHasIPv6(subnet)
 
 	nicProp := network.InterfacePropertiesFormat{}
+
+	// Enaled Accelerated networking
+	if s.Scope.MachineConfig.AcceleratedNetworking {
+		if !machineset.InstanceTypes[s.Scope.MachineConfig.VMSize].AcceleratedNetworking {
+			return errors.New("accelerated networking not supported on instance type " + s.Scope.MachineConfig.VMSize)
+		}
+		klog.V(4).Infof("setting EnableAcceleratedNetworking to %v", s.Scope.MachineConfig.AcceleratedNetworking)
+		nicProp.EnableAcceleratedNetworking = to.BoolPtr(s.Scope.MachineConfig.AcceleratedNetworking)
+	}
 	nicConfig := &network.InterfaceIPConfigurationPropertiesFormat{}
 	nicConfigV6 := &network.InterfaceIPConfigurationPropertiesFormat{}
 
 	nicConfig.Subnet = &network.Subnet{ID: subnet.ID}
-	nicConfig.PrivateIPAllocationMethod = network.Dynamic
+	nicConfig.PrivateIPAllocationMethod = network.IPAllocationMethodDynamic
 	nicConfig.LoadBalancerInboundNatRules = &[]network.InboundNatRule{}
 	if nicHasIPv6 {
 		klog.V(2).Infof("Found IPv6 address space. Adding IPv6 configuration to nic: %s", nicSpec.Name)
 		nicConfigV6.Subnet = &network.Subnet{ID: subnet.ID}
-		nicConfigV6.PrivateIPAllocationMethod = network.Dynamic
-		nicConfigV6.PrivateIPAddressVersion = network.IPv6
+		nicConfigV6.PrivateIPAllocationMethod = network.IPAllocationMethodDynamic
+		nicConfigV6.PrivateIPAddressVersion = network.IPVersionIPv6
 		nicConfigV6.LoadBalancerInboundNatRules = &[]network.InboundNatRule{}
 		nicConfigV6.Primary = to.BoolPtr(false)
 	}
@@ -100,10 +111,10 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	// IP address allocation
 	if nicSpec.StaticIPAddress != "" {
 		if utilnet.IsIPv6String(nicSpec.StaticIPAddress) {
-			nicConfigV6.PrivateIPAllocationMethod = network.Static
+			nicConfigV6.PrivateIPAllocationMethod = network.IPAllocationMethodStatic
 			nicConfigV6.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
 		} else {
-			nicConfig.PrivateIPAllocationMethod = network.Static
+			nicConfig.PrivateIPAllocationMethod = network.IPAllocationMethodStatic
 			nicConfig.PrivateIPAddress = to.StringPtr(nicSpec.StaticIPAddress)
 		}
 	}
@@ -120,7 +131,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			return errors.New("public ip get returned invalid network interface")
 		}
 
-		if ip.PublicIPAddressPropertiesFormat.PublicIPAddressVersion == network.IPv6 {
+		if ip.PublicIPAddressPropertiesFormat.PublicIPAddressVersion == network.IPVersionIPv6 {
 			nicConfigV6.PublicIPAddress = &ip
 		} else {
 			nicConfig.PublicIPAddress = &ip
@@ -149,7 +160,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			if i >= len(*lb.BackendAddressPools) {
 				break
 			}
-			if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+			if ipConfig.PrivateIPAddressVersion == network.IPVersionIPv6 {
 				backendAddressPoolsV6 = append(backendAddressPoolsV6,
 					network.BackendAddressPool{
 						ID: (*lb.BackendAddressPools)[i].ID,
@@ -162,7 +173,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			}
 
 			if nicSpec.NatRule != nil {
-				if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+				if ipConfig.PrivateIPAddressVersion == network.IPVersionIPv6 {
 					loadBalancerInboundNatRulesV6 = append(loadBalancerInboundNatRulesV6,
 						network.InboundNatRule{ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID})
 				} else {
@@ -194,7 +205,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			if i >= len(*internallb.BackendAddressPools) {
 				break
 			}
-			if ipConfig.PrivateIPAddressVersion == network.IPv6 {
+			if ipConfig.PrivateIPAddressVersion == network.IPVersionIPv6 {
 				backendAddressPoolsV6 = append(backendAddressPoolsV6,
 					network.BackendAddressPool{
 						ID: (*internallb.BackendAddressPools)[i].ID,

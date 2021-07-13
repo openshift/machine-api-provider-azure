@@ -7,8 +7,8 @@ import (
 
 	. "github.com/onsi/gomega"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2020-06-30/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2020-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 )
@@ -140,8 +140,8 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		CustomData:      "",
 		ManagedIdentity: "",
 		Tags:            map[string]string{},
-		Priority:        compute.Regular,
-		EvictionPolicy:  compute.Delete,
+		Priority:        compute.VirtualMachinePriorityTypesRegular,
+		EvictionPolicy:  compute.VirtualMachineEvictionPolicyTypesDelete,
 		BillingProfile:  nil,
 		SecurityProfile: nil,
 	}
