@@ -64,20 +64,21 @@ const (
 
 // Spec input specification for Get/CreateOrUpdate/Delete calls
 type Spec struct {
-	Name            string
-	NICName         string
-	SSHKeyData      string
-	Size            string
-	Zone            string
-	Image           v1beta1.Image
-	OSDisk          v1beta1.OSDisk
-	CustomData      string
-	ManagedIdentity string
-	Tags            map[string]string
-	Priority        compute.VirtualMachinePriorityTypes
-	EvictionPolicy  compute.VirtualMachineEvictionPolicyTypes
-	BillingProfile  *compute.BillingProfile
-	SecurityProfile *v1beta1.SecurityProfile
+	Name                string
+	NICName             string
+	SSHKeyData          string
+	Size                string
+	Zone                string
+	Image               v1beta1.Image
+	OSDisk              v1beta1.OSDisk
+	CustomData          string
+	ManagedIdentity     string
+	Tags                map[string]string
+	Priority            compute.VirtualMachinePriorityTypes
+	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
+	BillingProfile      *compute.BillingProfile
+	SecurityProfile     *v1beta1.SecurityProfile
+	AvailabilitySetName string
 }
 
 // Get provides information about a virtual network.
@@ -116,7 +117,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
-	virtualMachine, err := deriveVirtualMachineParameters(vmSpec, s.Scope.MachineConfig.Location, s.Scope.SubscriptionID, nic)
+	virtualMachine, err := deriveVirtualMachineParameters(vmSpec, s.Scope.MachineConfig.Location, s.Scope.SubscriptionID, s.Scope.MachineConfig.ResourceGroup, nic)
 	if err != nil {
 		return err
 	}
@@ -208,7 +209,7 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 // Derive virtual machine parameters for CreateOrUpdate API call based
 // on the provided virtual machine specification, resource location,
 // subscription ID, and the network interface.
-func deriveVirtualMachineParameters(vmSpec *Spec, location string, subscription string, nic network.Interface) (*compute.VirtualMachine, error) {
+func deriveVirtualMachineParameters(vmSpec *Spec, location, subscription, resourceGroup string, nic network.Interface) (*compute.VirtualMachine, error) {
 	osProfile, err := generateOSProfile(vmSpec)
 	if err != nil {
 		return nil, err
@@ -290,6 +291,12 @@ func deriveVirtualMachineParameters(vmSpec *Spec, location string, subscription 
 		virtualMachine.Zones = &zones
 	}
 
+	if vmSpec.AvailabilitySetName != "" {
+		virtualMachine.AvailabilitySet = &compute.SubResource{
+			ID: to.StringPtr(availabilitySetID(subscription, resourceGroup, vmSpec.AvailabilitySetName)),
+		}
+	}
+
 	return virtualMachine, nil
 }
 
@@ -345,4 +352,8 @@ func GenerateRandomString(n int) (string, error) {
 		return "", err
 	}
 	return base64.URLEncoding.EncodeToString(b), err
+}
+
+func availabilitySetID(subscriptionID, resourceGroup, availabilitySetName string) string {
+	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/availabilitySets/%s", subscriptionID, resourceGroup, availabilitySetName)
 }

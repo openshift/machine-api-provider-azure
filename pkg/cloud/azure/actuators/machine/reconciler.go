@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilitysets"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
@@ -64,6 +65,8 @@ const (
 
 	// MachineInstanceTypeLabelName as annotation name for a machine instance type
 	MachineInstanceTypeLabelName = "machine.openshift.io/instance-type"
+
+	MachineSetLabelName = "machine.openshift.io/cluster-api-machineset"
 )
 
 // Reconciler are list of services required by cluster actuator, easy to create a fake
@@ -75,6 +78,7 @@ type Reconciler struct {
 	virtualMachinesSvc    azure.Service
 	virtualMachinesExtSvc azure.Service
 	disksSvc              azure.Service
+	availabilitySetsSvc   azure.Service
 }
 
 // NewReconciler populates all the services based on input scope
@@ -87,6 +91,7 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope),
 		publicIPSvc:           publicips.NewService(scope),
 		disksSvc:              disks.NewService(scope),
+		availabilitySetsSvc:   availabilitysets.NewService(scope),
 	}
 }
 
@@ -118,7 +123,13 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 		return fmt.Errorf("failed to create nic %s for machine %s: %w", nicName, s.scope.Machine.Name, err)
 	}
 
-	if err := s.createVirtualMachine(ctx, nicName); err != nil {
+	// Availibility set will be created only if no zones were found for a machine
+	asName, err := s.createAvailabilitySet()
+	if err != nil {
+		return fmt.Errorf("failed to create availability set %s for machine %s: %w", asName, s.scope.Machine.Name, err)
+	}
+
+	if err := s.createVirtualMachine(ctx, nicName, asName); err != nil {
 		return fmt.Errorf("failed to create vm %s: %w", s.scope.Machine.Name, err)
 	}
 
@@ -472,6 +483,16 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		}
 	}
 
+	availabilitySetName := fmt.Sprintf("%s_%s-as",
+		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
+		s.scope.Machine.Labels[MachineSetLabelName])
+	// Delete the availability set with the given name if no virtual machines are attached to it.
+	if err := s.availabilitySetsSvc.Delete(ctx, availabilitysets.Spec{
+		Name: availabilitySetName,
+	}); err != nil {
+		return fmt.Errorf("failed to delete availability set: %w", err)
+	}
+
 	return nil
 }
 
@@ -548,7 +569,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	return err
 }
 
-func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) error {
+func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName string) error {
 	decoded, err := base64.StdEncoding.DecodeString(s.scope.MachineConfig.SSHPublicKey)
 	if err != nil {
 		return fmt.Errorf("failed to decode ssh public key: %w", err)
@@ -575,18 +596,19 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName string) e
 		}
 
 		vmSpec = &virtualmachines.Spec{
-			Name:            s.scope.Machine.Name,
-			NICName:         nicName,
-			SSHKeyData:      string(decoded),
-			Size:            s.scope.MachineConfig.VMSize,
-			OSDisk:          s.scope.MachineConfig.OSDisk,
-			Image:           s.scope.MachineConfig.Image,
-			Zone:            zone,
-			Tags:            s.scope.MachineConfig.Tags,
-			Priority:        priority,
-			EvictionPolicy:  evictionPolicy,
-			BillingProfile:  billingProfile,
-			SecurityProfile: s.scope.MachineConfig.SecurityProfile,
+			Name:                s.scope.Machine.Name,
+			NICName:             nicName,
+			SSHKeyData:          string(decoded),
+			Size:                s.scope.MachineConfig.VMSize,
+			OSDisk:              s.scope.MachineConfig.OSDisk,
+			Image:               s.scope.MachineConfig.Image,
+			Zone:                zone,
+			Tags:                s.scope.MachineConfig.Tags,
+			Priority:            priority,
+			EvictionPolicy:      evictionPolicy,
+			BillingProfile:      billingProfile,
+			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
+			AvailabilitySetName: asName,
 		}
 
 		if s.scope.MachineConfig.ManagedIdentity != "" {
@@ -690,4 +712,39 @@ func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMach
 	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
 	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
 	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
+}
+
+func (s *Reconciler) createAvailabilitySet() (string, error) {
+	// Try to find the zone for the machine location
+	availabilityZones, err := s.availabilityZonesSvc.Get(context.Background(), &availabilityzones.Spec{
+		VMSize: s.scope.MachineConfig.VMSize,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	availabilityZonesSlice, ok := availabilityZones.([]string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T", availabilityZones)
+	}
+
+	if len(availabilityZonesSlice) != 0 {
+		klog.V(4).Infof("No availability set needed for %s because availability zones were found", s.scope.Machine.Name)
+		return "", nil
+	}
+
+	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
+
+	// Create the availability set
+	availabilitySetName := fmt.Sprintf("%s_%s-as",
+		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
+		s.scope.Machine.Labels[MachineSetLabelName])
+
+	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), availabilitysets.Spec{
+		Name: availabilitySetName,
+	}); err != nil {
+		return "", err
+	}
+
+	return availabilitySetName, nil
 }

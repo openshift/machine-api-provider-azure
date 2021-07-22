@@ -101,7 +101,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			location := "eastus"
 			nic := getTestNic(vmSpec, subscription, resourcegroup, location)
 
-			vm, err := deriveVirtualMachineParameters(vmSpec, location, subscription, nic)
+			vm, err := deriveVirtualMachineParameters(vmSpec, location, subscription, resourcegroup, nic)
 
 			g.Expect(err).ToNot(HaveOccurred())
 			tc.validate(g, vm)
