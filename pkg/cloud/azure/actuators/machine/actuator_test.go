@@ -116,14 +116,21 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 		ID:                "machine-test-ID",
 		ProvisioningState: "Succeeded",
 	}
+	mockCtrl := gomock.NewController(t)
+	availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+	availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).AnyTimes()
+	availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+	availabilitySetsSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+
 	return &Reconciler{
 		scope:                 newFakeScope(t, providerspecv1.ControlPlane),
-		availabilityZonesSvc:  fakeSuccessSvc,
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
 		virtualMachinesExtSvc: fakeSuccessSvc,
 		disksSvc:              fakeSuccessSvc,
 		publicIPSvc:           fakeSuccessSvc,
+		availabilityZonesSvc:  availabilityZonesSvc,
+		availabilitySetsSvc:   availabilitySetsSvc,
 	}
 }
 
@@ -134,9 +141,12 @@ func newFakeReconcilerWithScope(t *testing.T, scope *actuators.MachineScope) *Re
 		ID:                "machine-test-ID",
 		ProvisioningState: "Succeeded",
 	}
+	mockCtrl := gomock.NewController(t)
+	availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+	availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).AnyTimes()
 	return &Reconciler{
 		scope:                 scope,
-		availabilityZonesSvc:  fakeSuccessSvc,
+		availabilityZonesSvc:  availabilityZonesSvc,
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
 		virtualMachinesExtSvc: fakeSuccessSvc,
@@ -656,12 +666,13 @@ func TestMachineEvents(t *testing.T) {
 			}
 
 			mockCtrl := gomock.NewController(t)
-			azSvc := mock_azure.NewMockService(mockCtrl)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
 			vmSvc := mock_azure.NewMockService(mockCtrl)
 			vmExtSvc := mock_azure.NewMockService(mockCtrl)
 			pipSvc := mock_azure.NewMockService(mockCtrl)
 			disksSvc := mock_azure.NewMockService(mockCtrl)
+			availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+			availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
 
 			eventsChannel := make(chan string, 1)
 
@@ -670,7 +681,8 @@ func TestMachineEvents(t *testing.T) {
 				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
 					return &Reconciler{
 						scope:                 scope,
-						availabilityZonesSvc:  azSvc,
+						availabilityZonesSvc:  availabilityZonesSvc,
+						availabilitySetsSvc:   availabilitySetsSvc,
 						networkInterfacesSvc:  networkSvc,
 						virtualMachinesSvc:    vmSvc,
 						virtualMachinesExtSvc: vmExtSvc,
@@ -702,6 +714,8 @@ func TestMachineEvents(t *testing.T) {
 			disksSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			networkSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			pipSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).AnyTimes()
+			availabilitySetsSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 			tc.operation(machineActuator, m)
 
@@ -773,6 +787,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
 			vmSvc := mock_azure.NewMockService(mockCtrl)
+			availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
 
 			eventsChannel := make(chan string, 1)
 
@@ -783,6 +798,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 						scope:                scope,
 						networkInterfacesSvc: networkSvc,
 						virtualMachinesSvc:   vmSvc,
+						availabilityZonesSvc: availabilityZonesSvc,
 					}
 				},
 				// use fake recorder and store an event into one item long buffer for subsequent check
@@ -797,6 +813,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			wrapErr := fmt.Errorf("failed to create or get machine: %w", azureErr)
 			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
 			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, autorest.NewError("compute.VirtualMachinesClient", "Get", "MOCK")).Times(1)
+			availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).Times(1)
 
 			_, ok := machineActuator.Create(context.TODO(), machine).(*machineapierrors.RequeueAfterError)
 			if ok && !tc.requeable {

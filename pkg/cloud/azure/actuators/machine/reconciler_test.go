@@ -2,11 +2,13 @@ package machine
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/golang/mock/gomock"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
@@ -19,6 +21,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
 )
 
 func TestExists(t *testing.T) {
@@ -404,6 +407,113 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			g.Expect(machine.Labels).To(Equal(tc.expectedLabels))
 			g.Expect(machine.Annotations).To(Equal(tc.expectedAnnotations))
 			g.Expect(machine.Spec.Labels).To(Equal(tc.expectedSpecLabels))
+		})
+	}
+}
+
+func TestCreateAvailabilitySet(t *testing.T) {
+	g := NewGomegaWithT(t)
+	mockCtrl := gomock.NewController(t)
+
+	testCases := []struct {
+		name                 string
+		expectedError        bool
+		expectedASName       string
+		availabilitySetsSvc  func() *mock_azure.MockService
+		availabilityZonesSvc func() *mock_azure.MockService
+	}{
+		{
+			name:          "Error when availability zones client fails",
+			expectedError: true,
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, errors.New("test error")).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				return nil
+			},
+		},
+		{
+			name:          "Error when availability zones client returns wrong type",
+			expectedError: true,
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				return nil
+			},
+		},
+		{
+			name:           "Return early when availability zones were found for the zone",
+			expectedASName: "",
+			expectedError:  false,
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"a", "b", "c"}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				return nil
+			},
+		},
+		{
+			name:          "Error when availability sets client fails",
+			expectedError: true,
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(errors.New("test error")).Times(1)
+				return availabilitySetsSvc
+			},
+		},
+		{
+			name:           "Succesfuly create an availability set",
+			expectedASName: "cluster_ms-as",
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				return availabilitySetsSvc
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := Reconciler{
+				availabilityZonesSvc: tc.availabilityZonesSvc(),
+				availabilitySetsSvc:  tc.availabilitySetsSvc(),
+				scope: &actuators.MachineScope{
+					Machine: &machinev1.Machine{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{MachineSetLabelName: "ms", machinev1.MachineClusterIDLabel: "cluster"},
+						},
+					},
+					MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+						VMSize: "Standard_D2_v2",
+					},
+				},
+			}
+
+			asName, err := r.createAvailabilitySet()
+			if tc.expectedError {
+				g.Expect(err).To(HaveOccurred())
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
+			}
+
+			g.Expect(asName).To(Equal(tc.expectedASName))
 		})
 	}
 }
