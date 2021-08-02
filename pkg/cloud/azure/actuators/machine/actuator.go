@@ -187,11 +187,18 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		}
 	}
 
+	previousResourceVersion := scope.Machine.ResourceVersion
+
 	if err := scope.Persist(); err != nil {
 		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
-	a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
+	currentResourceVersion := scope.Machine.ResourceVersion
+
+	// Create event only if machine object was modified
+	if previousResourceVersion != currentResourceVersion {
+		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
+	}
 
 	return nil
 }
