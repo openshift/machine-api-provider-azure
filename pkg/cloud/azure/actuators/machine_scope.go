@@ -139,6 +139,18 @@ func (m *MachineScope) Location() string {
 	return m.MachineConfig.Location
 }
 
+func (m *MachineScope) setMachineSpec() error {
+	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
+	if err != nil {
+		return err
+	}
+
+	klog.V(4).Infof("Storing machine spec for %q, resourceVersion: %v, generation: %v", m.Machine.Name, m.Machine.ResourceVersion, m.Machine.Generation)
+	m.Machine.Spec.ProviderSpec.Value = ext
+
+	return nil
+}
+
 func (m *MachineScope) setMachineStatus() error {
 	if equality.Semantic.DeepEqual(m.MachineStatus, m.origMachineStatus) && equality.Semantic.DeepEqual(m.Machine.Status.Addresses, m.origMachine.Status.Addresses) {
 		klog.Infof("%s: status unchanged", m.Machine.Name)
@@ -196,8 +208,8 @@ func (m *MachineScope) Persist() error {
 		return fmt.Errorf("[machinescope] failed to set provider status for machine %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
-	if err := m.setMachineStatus(); err != nil {
-		return fmt.Errorf("[machinescope] failed to set machine status %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
+	if err := m.setMachineSpec(); err != nil {
+		return fmt.Errorf("[machinescope] failed to set machine spec %q in namespace %q: %v", m.Machine.Name, m.Machine.Namespace, err)
 	}
 
 	if err := m.PatchMachine(); err != nil {

@@ -302,6 +302,7 @@ func TestPersistMachineScope(t *testing.T) {
 	scope.Machine.Annotations["test"] = "testValue"
 	scope.MachineStatus.VMID = pointer.StringPtr("vmid")
 	scope.Machine.Status.Addresses = make([]corev1.NodeAddress, len(nodeAddresses))
+	scope.MachineConfig.InternalLoadBalancer = "test"
 	copy(nodeAddresses, scope.Machine.Status.Addresses)
 
 	if err := params.CoreClient.Create(scope.Context, scope.Machine); err != nil {
@@ -318,6 +319,15 @@ func TestPersistMachineScope(t *testing.T) {
 
 	if scope.Machine.Annotations["test"] != "testValue" {
 		t.Errorf("Expected annotation 'test' to equal 'testValue', got %q instead", scope.Machine.Annotations["test"])
+	}
+
+	machineSpec, err := MachineConfigFromProviderSpec(scope.Machine.Spec.ProviderSpec)
+	if err != nil {
+		t.Errorf("failed to get machine provider status: %v", err)
+	}
+
+	if machineSpec.InternalLoadBalancer != "test" {
+		t.Errorf("Expected InternalLoadBalancer to be 'test', got %q instead", machineSpec.InternalLoadBalancer)
 	}
 
 	machineStatus, err := providerspecv1.MachineStatusFromProviderStatus(scope.Machine.Status.ProviderStatus)
