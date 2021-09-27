@@ -483,12 +483,9 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		}
 	}
 
-	availabilitySetName := fmt.Sprintf("%s_%s-as",
-		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
-		s.scope.Machine.Labels[MachineSetLabelName])
 	// Delete the availability set with the given name if no virtual machines are attached to it.
-	if err := s.availabilitySetsSvc.Delete(ctx, availabilitysets.Spec{
-		Name: availabilitySetName,
+	if err := s.availabilitySetsSvc.Delete(ctx, &availabilitysets.Spec{
+		Name: s.getAvailibilitySetName(),
 	}); err != nil {
 		return fmt.Errorf("failed to delete availability set: %w", err)
 	}
@@ -735,16 +732,19 @@ func (s *Reconciler) createAvailabilitySet() (string, error) {
 
 	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
 
-	// Create the availability set
-	availabilitySetName := fmt.Sprintf("%s_%s-as",
-		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
-		s.scope.Machine.Labels[MachineSetLabelName])
-
 	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), availabilitysets.Spec{
-		Name: availabilitySetName,
+		Name: s.getAvailibilitySetName(),
 	}); err != nil {
 		return "", err
 	}
 
-	return availabilitySetName, nil
+	return s.getAvailibilitySetName(), nil
+}
+
+// getAvailibilitySetName use MachineSet or Machine name + cluster name to
+// generate availability set name
+func (s *Reconciler) getAvailibilitySetName() string {
+	return fmt.Sprintf("%s_%s-as",
+		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
+		s.scope.Machine.Labels[MachineSetLabelName])
 }
