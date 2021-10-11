@@ -419,6 +419,7 @@ func TestCreateAvailabilitySet(t *testing.T) {
 		name                 string
 		expectedError        bool
 		expectedASName       string
+		labels               map[string]string
 		availabilitySetsSvc  func() *mock_azure.MockService
 		availabilityZonesSvc func() *mock_azure.MockService
 	}{
@@ -487,17 +488,37 @@ func TestCreateAvailabilitySet(t *testing.T) {
 				return availabilitySetsSvc
 			},
 		},
+		{
+			name:   "Skip availability set creation when MachineSet label name is missing",
+			labels: map[string]string{},
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				// Set call counter to 0 here
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(0)
+				return availabilitySetsSvc
+			},
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			labels := map[string]string{MachineSetLabelName: "ms", machinev1.MachineClusterIDLabel: "cluster"}
+			if tc.labels != nil {
+				labels = tc.labels
+			}
+
 			r := Reconciler{
 				availabilityZonesSvc: tc.availabilityZonesSvc(),
 				availabilitySetsSvc:  tc.availabilitySetsSvc(),
 				scope: &actuators.MachineScope{
 					Machine: &machinev1.Machine{
 						ObjectMeta: metav1.ObjectMeta{
-							Labels: map[string]string{MachineSetLabelName: "ms", machinev1.MachineClusterIDLabel: "cluster"},
+							Labels: labels,
 						},
 					},
 					MachineConfig: &providerspecv1.AzureMachineProviderSpec{

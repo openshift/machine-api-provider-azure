@@ -730,6 +730,11 @@ func (s *Reconciler) createAvailabilitySet() (string, error) {
 		return "", nil
 	}
 
+	if _, ok := s.scope.Machine.Labels[MachineSetLabelName]; !ok {
+		klog.V(4).Infof("MachineSet label name was not found for %s, skipping availability set creation", s.scope.Machine.Name)
+		return "", nil
+	}
+
 	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
 
 	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), availabilitysets.Spec{
