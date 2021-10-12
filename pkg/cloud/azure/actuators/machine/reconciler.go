@@ -737,7 +737,7 @@ func (s *Reconciler) createAvailabilitySet() (string, error) {
 
 	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
 
-	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), availabilitysets.Spec{
+	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), &availabilitysets.Spec{
 		Name: s.getAvailibilitySetName(),
 	}); err != nil {
 		return "", err
