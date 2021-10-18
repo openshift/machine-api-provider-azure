@@ -19,6 +19,7 @@ package actuators
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
@@ -75,6 +76,11 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
 
+	cloudEnv, armEndpoint, err := getCloudEnvironment(params.CoreClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed azure environment: %w", err)
+	}
+
 	machineScope := &MachineScope{
 		Context:      context.Background(),
 		AzureClients: params.AzureClients,
@@ -90,6 +96,8 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		origMachine:        params.Machine.DeepCopy(),
 		origMachineStatus:  machineStatus.DeepCopy(),
 		machineToBePatched: controllerclient.MergeFrom(params.Machine.DeepCopy()),
+		cloudEnv:           cloudEnv,
+		armEndpoint:        armEndpoint,
 	}
 
 	if err = updateFromSecret(params.CoreClient, machineScope); err != nil {
@@ -108,6 +116,12 @@ type MachineScope struct {
 	CoreClient    controllerclient.Client
 	MachineConfig *v1beta1.AzureMachineProviderSpec
 	MachineStatus *v1beta1.AzureMachineProviderStatus
+
+	// cloudEnv azure environment: AzurePublic, AzureStackCloud, etc.
+	cloudEnv string
+
+	// armEndpoint azure resource manager endpoint
+	armEndpoint string
 
 	// origMachine captures original value of machine before it is updated (to
 	// skip object updated if nothing is changed)
@@ -219,6 +233,31 @@ func (m *MachineScope) Persist() error {
 	return nil
 }
 
+func (m *MachineScope) IsStackHub() bool {
+	return strings.EqualFold(m.cloudEnv, string(configv1.AzureStackCloud))
+}
+
+func getCloudEnvironment(client controllerclient.Client) (string, string, error) {
+	infra := &configv1.Infrastructure{}
+	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
+
+	if err := client.Get(context.Background(), infraName, infra); err != nil {
+		return "", "", err
+	}
+
+	// When cloud environment is missing default to Azure Public Cloud
+	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.Azure == nil || infra.Status.PlatformStatus.Azure.CloudName == "" {
+		return string(configv1.AzurePublicCloud), "", nil
+	}
+
+	armEndpoint := ""
+	if infra.Status.PlatformStatus != nil || infra.Status.PlatformStatus.Azure != nil || infra.Status.PlatformStatus.Azure.ARMEndpoint != "" {
+		armEndpoint = infra.Status.PlatformStatus.Azure.ARMEndpoint
+	}
+
+	return string(infra.Status.PlatformStatus.Azure.CloudName), armEndpoint, nil
+}
+
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.
 func MachineConfigFromProviderSpec(providerConfig machinev1.ProviderSpec) (*v1beta1.AzureMachineProviderSpec, error) {
 	var config v1beta1.AzureMachineProviderSpec
@@ -294,12 +333,7 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 			secretType.String(), AzureResourcePrefix)
 	}
 
-	cloudEnv, err := scope.getCloudEnvironment()
-	if err != nil {
-		return err
-	}
-
-	env, err := azure.EnvironmentFromName(cloudEnv)
+	env, err := getEnvironment(scope)
 	if err != nil {
 		return err
 	}
@@ -311,7 +345,7 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 	}
 
 	token, err := adal.NewServicePrincipalToken(
-		*oauthConfig, string(clientID), string(clientSecret), env.ResourceManagerEndpoint)
+		*oauthConfig, string(clientID), string(clientSecret), env.TokenAudience)
 	if err != nil {
 		return err
 	}
@@ -341,18 +375,20 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 	return nil
 }
 
-func (scope *MachineScope) getCloudEnvironment() (string, error) {
-	infra := &configv1.Infrastructure{}
-	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
+func getEnvironment(m *MachineScope) (*azure.Environment, error) {
+	if m.IsStackHub() {
+		env, err := azure.EnvironmentFromURL(m.armEndpoint)
+		if err != nil {
+			return nil, err
+		}
 
-	if err := scope.CoreClient.Get(context.Background(), infraName, infra); err != nil {
-		return "", err
+		return &env, nil
 	}
 
-	// When cloud environment is missing default to Azure Public Cloud
-	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.Azure == nil || infra.Status.PlatformStatus.Azure.CloudName == "" {
-		return string(configv1.AzurePublicCloud), nil
+	env, err := azure.EnvironmentFromName(m.cloudEnv)
+	if err != nil {
+		return nil, err
 	}
 
-	return string(infra.Status.PlatformStatus.Azure.CloudName), nil
+	return &env, nil
 }

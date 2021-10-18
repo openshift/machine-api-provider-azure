@@ -69,19 +69,6 @@ func newMachine(t *testing.T) *machinev1.Machine {
 	}
 }
 
-func TestNilClusterScope(t *testing.T) {
-	m := newMachine(t)
-	params := MachineScopeParams{
-		AzureClients: AzureClients{},
-		CoreClient:   nil,
-		Machine:      m,
-	}
-	_, err := NewMachineScope(params)
-	if err != nil {
-		t.Errorf("Expected New machine scope to succeed with nil cluster: %v", err)
-	}
-}
-
 func TestCredentialsSecretSuccess(t *testing.T) {
 	credentialsSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -98,26 +85,15 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 			AzureResourcePrefix:         []byte("dummyClusterName"),
 		},
 	}
-	infra := &configv1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: globalInfrastuctureName,
-		},
-		Status: configv1.InfrastructureStatus{
-			PlatformStatus: &configv1.PlatformStatus{
-				Azure: &configv1.AzurePlatformStatus{
-					CloudName: configv1.AzurePublicCloud,
-				},
-			},
-		},
-	}
 
-	fakeclient := controllerfake.NewFakeClient(credentialsSecret, infra)
+	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
 
 	scope := &MachineScope{
 		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
 			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		},
 		CoreClient: fakeclient,
+		cloudEnv:   string(configv1.AzurePublicCloud),
 	}
 	err := updateFromSecret(
 		fakeclient,
@@ -144,26 +120,14 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 }
 
 func testCredentialFields(credentialsSecret *corev1.Secret) error {
-	infra := &configv1.Infrastructure{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: globalInfrastuctureName,
-		},
-		Status: configv1.InfrastructureStatus{
-			PlatformStatus: &configv1.PlatformStatus{
-				Azure: &configv1.AzurePlatformStatus{
-					CloudName: configv1.AzurePublicCloud,
-				},
-			},
-		},
-	}
-
-	fakeclient := controllerfake.NewFakeClient(credentialsSecret, infra)
+	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
 
 	scope := &MachineScope{
 		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
 			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		},
 		CoreClient: fakeclient,
+		cloudEnv:   string(configv1.AzurePublicCloud),
 	}
 	return updateFromSecret(
 		fakeclient,
@@ -404,6 +368,7 @@ func TestGetCloudEnvironment(t *testing.T) {
 		client              client.Client
 		expectedError       bool
 		expectedEnvironment string
+		expectedARMEndpoint string
 	}{
 		{
 			name:          "fail when infrastructure is missing",
@@ -436,15 +401,29 @@ func TestGetCloudEnvironment(t *testing.T) {
 			}),
 			expectedEnvironment: string(configv1.AzureUSGovernmentCloud),
 		},
+		{
+			name: "when cloud environment is present return it",
+			client: controllerfake.NewFakeClient(&configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: globalInfrastuctureName,
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Azure: &configv1.AzurePlatformStatus{
+							CloudName:   configv1.AzureStackCloud,
+							ARMEndpoint: "test",
+						},
+					},
+				},
+			}),
+			expectedEnvironment: string(configv1.AzureStackCloud),
+			expectedARMEndpoint: "test",
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			scope := MachineScope{
-				CoreClient: tc.client,
-			}
-
-			env, err := scope.getCloudEnvironment()
+			env, armEndpoint, err := getCloudEnvironment(tc.client)
 
 			if tc.expectedError {
 				if err == nil {
@@ -458,6 +437,10 @@ func TestGetCloudEnvironment(t *testing.T) {
 
 			if env != tc.expectedEnvironment {
 				t.Fatalf("expected environment %s, got: %s", tc.expectedEnvironment, env)
+			}
+
+			if armEndpoint != tc.expectedARMEndpoint {
+				t.Fatalf("expected arm endpoint %s, got: %s", tc.expectedARMEndpoint, armEndpoint)
 			}
 		})
 	}
