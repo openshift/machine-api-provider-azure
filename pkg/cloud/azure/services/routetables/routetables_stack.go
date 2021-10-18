@@ -21,24 +21,18 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 
-// Spec specification for routetable
-type Spec struct {
-	Name string
-}
-
 // Get provides information about a route table.
-func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
+func (s *StackHubService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
 	routeTableSpec, ok := spec.(*Spec)
 	if !ok {
 		return network.RouteTable{}, errors.New("Invalid Route Table Specification")
 	}
-
 	routeTable, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, routeTableSpec.Name, "")
 	if err != nil && azure.ResourceNotFound(err) {
 		return nil, fmt.Errorf("route table %s not found: %w", routeTableSpec.Name, err)
@@ -49,7 +43,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 }
 
 // CreateOrUpdate creates or updates a route table.
-func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
+func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	routeTableSpec, ok := spec.(*Spec)
 	if !ok {
 		return errors.New("Invalid Route Table Specification")
@@ -82,7 +76,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 }
 
 // Delete deletes the route table with the provided name.
-func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
+func (s *StackHubService) Delete(ctx context.Context, spec azure.Spec) error {
 	routeTableSpec, ok := spec.(*Spec)
 	if !ok {
 		return errors.New("Invalid Route Table Specification")

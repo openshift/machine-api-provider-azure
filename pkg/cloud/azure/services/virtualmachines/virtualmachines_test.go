@@ -3,14 +3,17 @@ package virtualmachines
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"testing"
 
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
 func TestGetTagListFromSpec(t *testing.T) {
@@ -101,7 +104,19 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			location := "eastus"
 			nic := getTestNic(vmSpec, subscription, resourcegroup, location)
 
-			vm, err := deriveVirtualMachineParameters(vmSpec, location, subscription, resourcegroup, nic)
+			s := Service{
+				Scope: &actuators.MachineScope{
+					AzureClients: actuators.AzureClients{
+						SubscriptionID: subscription,
+					},
+					MachineConfig: &v1beta1.AzureMachineProviderSpec{
+						Location:      location,
+						ResourceGroup: resourcegroup,
+					},
+				},
+			}
+
+			vm, err := s.deriveVirtualMachineParameters(vmSpec, nic)
 
 			g.Expect(err).ToNot(HaveOccurred())
 			tc.validate(g, vm)
@@ -151,4 +166,91 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 	}
 
 	return spec
+}
+
+func TestGetSpotVMOptions(t *testing.T) {
+	maxPrice := resource.MustParse("0.001")
+	maxPriceFloat, err := strconv.ParseFloat(maxPrice.AsDec().String(), 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name           string
+		spotVMOptions  *v1beta1.SpotVMOptions
+		priority       compute.VirtualMachinePriorityTypes
+		evictionPolicy compute.VirtualMachineEvictionPolicyTypes
+		billingProfile *compute.BillingProfile
+	}{
+		{
+			name: "get spot vm option succefully",
+			spotVMOptions: &v1beta1.SpotVMOptions{
+				MaxPrice: &maxPrice,
+			},
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			billingProfile: &compute.BillingProfile{
+				MaxPrice: &maxPriceFloat,
+			},
+		},
+		{
+			name:           "return empty values on missing options",
+			spotVMOptions:  nil,
+			priority:       "",
+			evictionPolicy: "",
+			billingProfile: nil,
+		},
+		{
+			name:           "not return an error with empty spot vm options",
+			spotVMOptions:  &v1beta1.SpotVMOptions{},
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			billingProfile: &compute.BillingProfile{
+				MaxPrice: nil,
+			},
+		},
+		{
+			name: "not return an error if the max price is nil",
+			spotVMOptions: &v1beta1.SpotVMOptions{
+				MaxPrice: nil,
+			},
+			priority:       compute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			billingProfile: &compute.BillingProfile{
+				MaxPrice: nil,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			priority, evictionPolicy, billingProfile, err := getSpotVMOptions(tc.spotVMOptions)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if priority != tc.priority {
+				t.Fatalf("Expected priority %s, got: %s", priority, tc.priority)
+			}
+
+			if evictionPolicy != tc.evictionPolicy {
+				t.Fatalf("Expected eviction policy %s, got: %s", evictionPolicy, tc.evictionPolicy)
+			}
+
+			// only check billing profile when spotVMOptions object is not nil
+			if tc.spotVMOptions != nil {
+				if tc.billingProfile.MaxPrice != nil {
+					if billingProfile == nil {
+						t.Fatal("Expected billing profile to not be nil")
+					} else if *billingProfile.MaxPrice != *tc.billingProfile.MaxPrice {
+						t.Fatalf("Expected billing profile max price %d, got: %d", billingProfile, tc.billingProfile)
+					}
+				}
+			} else {
+				if billingProfile != nil {
+					t.Fatal("Expected billing profile to be nil")
+				}
+			}
+		})
+	}
 }

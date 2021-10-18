@@ -17,20 +17,20 @@ limitations under the License.
 package applicationsecuritygroups
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHubService provides operations on resource groups
+type StackHubService struct {
 	Client network.ApplicationSecurityGroupsClient
 	Scope  *actuators.MachineScope
 }
 
-// getGroupsClient creates a new groups client from subscriptionid.
-func getApplicationSecurityGroupsClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.ApplicationSecurityGroupsClient {
+// getApplicationSecurityGroupsClientStackHub creates a new groups client from subscriptionid.
+func getApplicationSecurityGroupsClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.ApplicationSecurityGroupsClient {
 	applicationSecurityGroupsClient := network.NewApplicationSecurityGroupsClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	applicationSecurityGroupsClient.Authorizer = authorizer
 	applicationSecurityGroupsClient.AddToUserAgent(azure.UserAgent)
@@ -38,13 +38,9 @@ func getApplicationSecurityGroupsClient(resourceManagerEndpoint, subscriptionID 
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getApplicationSecurityGroupsClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getApplicationSecurityGroupsClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

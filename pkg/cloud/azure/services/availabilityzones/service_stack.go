@@ -17,20 +17,20 @@ limitations under the License.
 package availabilityzones
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on availability zones
-type Service struct {
+// StackHubService provides operations on availability zones
+type StackHubService struct {
 	Client compute.ResourceSkusClient
 	Scope  *actuators.MachineScope
 }
 
 // getResourceSkusClient creates a new availability zones client from subscriptionid.
-func getResourceSkusClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.ResourceSkusClient {
+func getResourceSkusClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.ResourceSkusClient {
 	skusClient := compute.NewResourceSkusClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	skusClient.Authorizer = authorizer
 	skusClient.AddToUserAgent(azure.UserAgent)
@@ -38,13 +38,9 @@ func getResourceSkusClient(resourceManagerEndpoint, subscriptionID string, autho
 }
 
 // NewService creates a new availability zones service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getResourceSkusClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getResourceSkusClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

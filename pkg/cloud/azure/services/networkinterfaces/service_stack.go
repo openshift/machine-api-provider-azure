@@ -17,34 +17,30 @@ limitations under the License.
 package networkinterfaces
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHubService provides operations on resource groups
+type StackHubService struct {
 	Client network.InterfacesClient
 	Scope  *actuators.MachineScope
 }
 
-// getGroupsClient creates a new groups client from subscriptionid.
-func getNetworkInterfacesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.InterfacesClient {
+// getNetworkInterfacesClientStackHub creates a new groups client from subscriptionid.
+func getNetworkInterfacesClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.InterfacesClient {
 	nicClient := network.NewInterfacesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	nicClient.Authorizer = authorizer
 	nicClient.AddToUserAgent(azure.UserAgent)
 	return nicClient
 }
 
-// NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getNetworkInterfacesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+// NewStackHubService creates a new groups service.
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getNetworkInterfacesClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

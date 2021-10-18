@@ -17,34 +17,30 @@ limitations under the License.
 package routetables
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHub provides operations on resource groups
+type StackHubService struct {
 	Client network.RouteTablesClient
 	Scope  *actuators.MachineScope
 }
 
-// getGroupsClient creates a new groups client from subscriptionid.
-func getRouteTablesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.RouteTablesClient {
+// getRouteTablesClientStackHub creates a new groups client from subscriptionid.
+func getRouteTablesClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.RouteTablesClient {
 	routeTablesClient := network.NewRouteTablesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	routeTablesClient.Authorizer = authorizer
 	routeTablesClient.AddToUserAgent(azure.UserAgent)
 	return routeTablesClient
 }
 
-// NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getRouteTablesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+// NewStackHubService creates a new groups service.
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getRouteTablesClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

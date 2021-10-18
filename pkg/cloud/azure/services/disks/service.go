@@ -40,7 +40,11 @@ func getDisksClient(resourceManagerEndpoint, subscriptionID string, authorizer a
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) *Service {
+func NewService(scope *actuators.MachineScope) azure.Service {
+	if scope.IsStackHub() {
+		return NewStackHubService(scope)
+	}
+
 	return &Service{
 		Client: getDisksClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,

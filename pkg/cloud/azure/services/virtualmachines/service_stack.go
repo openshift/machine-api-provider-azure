@@ -17,20 +17,20 @@ limitations under the License.
 package virtualmachines
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHubService provides operations on resource groups
+type StackHubService struct {
 	Client compute.VirtualMachinesClient
 	Scope  *actuators.MachineScope
 }
 
-// getVirtualNetworksClient creates a new groups client from subscriptionid.
-func getVirtualMachinesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachinesClient {
+// getVirtualNetworksClientStackHub creates a new groups client from subscriptionid.
+func getVirtualMachinesClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachinesClient {
 	vmClient := compute.NewVirtualMachinesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	vmClient.Authorizer = authorizer
 	vmClient.AddToUserAgent(azure.UserAgent)
@@ -38,13 +38,9 @@ func getVirtualMachinesClient(resourceManagerEndpoint, subscriptionID string, au
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewServiceStackHub(scope)
-	}
-
-	return &Service{
-		Client: getVirtualMachinesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+func NewServiceStackHub(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getVirtualMachinesClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

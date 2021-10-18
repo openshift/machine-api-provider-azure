@@ -17,34 +17,30 @@ limitations under the License.
 package virtualmachineextensions
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHubService provides operations on resource groups
+type StackHubService struct {
 	Client compute.VirtualMachineExtensionsClient
 	Scope  *actuators.MachineScope
 }
 
 // getVirtualNetworksClient creates a new groups client from subscriptionid.
-func getVirtualMachineExtensionsClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachineExtensionsClient {
+func getVirtualMachineExtensionsClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachineExtensionsClient {
 	vmExtClient := compute.NewVirtualMachineExtensionsClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	vmExtClient.Authorizer = authorizer
 	vmExtClient.AddToUserAgent(azure.UserAgent)
 	return vmExtClient
 }
 
-// NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getVirtualMachineExtensionsClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+// NewStackHubService creates a new groups service.
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getVirtualMachineExtensionsClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

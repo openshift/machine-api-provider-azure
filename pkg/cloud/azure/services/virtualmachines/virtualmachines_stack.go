@@ -20,75 +20,25 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"encoding/base64"
 	"errors"
 	"fmt"
-	"strconv"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 )
 
-const (
-	// winAutoLogonFormatString is the format string used to create the AutoLogon
-	// AdditionalUnattendContent configuration for Windows machines.
-	winAutoLogonFormatString = `<AutoLogon>
-			<Username>%s</Username>
-			<Password>
-				<Value>%s</Value>
-			</Password>
-			<Enabled>true</Enabled>
-			<LogonCount>1</LogonCount>
-		</AutoLogon>`
-
-	// winFirstLogonCommandsString is the string used to create the FirstLogonCommands
-	// AdditionalUnattendContent configuration for Windows machines.
-	winFirstLogonCommandsString = `<FirstLogonCommands>
-			<SynchronousCommand>
-				<Description>Copy user data secret contents to init script</Description>
-				<CommandLine>cmd /c "copy C:\AzureData\CustomData.bin C:\init.ps1"</CommandLine>
-				<Order>11</Order>
-			</SynchronousCommand>
-			<SynchronousCommand>
-				<Description>Launch init script</Description>
-				<CommandLine>powershell.exe -NonInteractive -ExecutionPolicy Bypass -File C:\init.ps1</CommandLine>
-				<Order>12</Order>
-			</SynchronousCommand>
-		</FirstLogonCommands>`
-)
-
-// Spec input specification for Get/CreateOrUpdate/Delete calls
-type Spec struct {
-	Name                string
-	NICName             string
-	SSHKeyData          string
-	Size                string
-	Zone                string
-	Image               v1beta1.Image
-	OSDisk              v1beta1.OSDisk
-	CustomData          string
-	ManagedIdentity     string
-	Tags                map[string]string
-	Priority            compute.VirtualMachinePriorityTypes
-	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
-	BillingProfile      *compute.BillingProfile
-	SecurityProfile     *v1beta1.SecurityProfile
-	AvailabilitySetName string
-}
-
 // Get provides information about a virtual network.
-func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
+func (s *StackHubService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
 	vmSpec, ok := spec.(*Spec)
 	if !ok {
 		return compute.VirtualMachine{}, errors.New("invalid vm specification")
 	}
-	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceViewTypesInstanceView)
+	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceView)
 	if err != nil && azure.ResourceNotFound(err) {
 		klog.Warningf("vm %s not found: %w", vmSpec.Name, err.Error())
 		return nil, err
@@ -99,7 +49,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 }
 
 // CreateOrUpdate creates or updates a virtual network.
-func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
+func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	vmSpec, ok := spec.(*Spec)
 	if !ok {
 		return errors.New("invalid vm specification")
@@ -110,16 +60,15 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if err != nil {
 		return err
 	}
-
 	nic, ok := nicInterface.(network.Interface)
 	if !ok {
-		return errors.New("error getting network security group")
+		return errors.New("error getting network security group3")
 	}
 	klog.V(2).Infof("got nic %s", vmSpec.NICName)
 
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
-	virtualMachine, err := s.deriveVirtualMachineParameters(vmSpec, nic)
+	virtualMachine, err := s.deriveVirtualMachineParametersStackHub(vmSpec, nic)
 	if err != nil {
 		return err
 	}
@@ -144,9 +93,9 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	return err
 }
 
-func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
+func generateOSProfileStackHub(vmSpec *Spec) (*compute.OSProfile, error) {
 	sshKeyData := vmSpec.SSHKeyData
-	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.OperatingSystemTypesWindows {
+	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.Windows {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
 			return nil, fmt.Errorf("Failed to generate private key: %w", perr)
@@ -170,7 +119,7 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 		AdminPassword: to.StringPtr(randomPassword),
 	}
 
-	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.OperatingSystemTypesWindows {
+	if compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) == compute.Windows {
 		osProfile.WindowsConfiguration = &compute.WindowsConfiguration{
 			EnableAutomaticUpdates: to.BoolPtr(false),
 			AdditionalUnattendContent: &[]compute.AdditionalUnattendContent{
@@ -211,8 +160,8 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 // Derive virtual machine parameters for CreateOrUpdate API call based
 // on the provided virtual machine specification, resource location,
 // subscription ID, and the network interface.
-func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Interface) (*compute.VirtualMachine, error) {
-	osProfile, err := generateOSProfile(vmSpec)
+func (s *StackHubService) deriveVirtualMachineParametersStackHub(vmSpec *Spec, nic network.Interface) (*compute.VirtualMachine, error) {
+	osProfile, err := generateOSProfileStackHub(vmSpec)
 	if err != nil {
 		return nil, err
 	}
@@ -229,26 +178,9 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 		}
 	}
 
-	var diskEncryptionSet *compute.DiskEncryptionSetParameters
-	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
-		diskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
-	}
-
-	var securityProfile *compute.SecurityProfile
-	if vmSpec.SecurityProfile != nil {
-		securityProfile = &compute.SecurityProfile{
-			EncryptionAtHost: vmSpec.SecurityProfile.EncryptionAtHost,
-		}
-	}
-
-	priority, evictionPolicy, billingProfile, err := getSpotVMOptions(s.Scope.MachineConfig.SpotVMOptions)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get Spot VM options %w", err)
-	}
-
 	virtualMachine := &compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.MachineConfig.Location),
-		Tags:     getTagListFromSpec(vmSpec),
+		Tags:     getTagListFromSpecStackHub(vmSpec),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypes(vmSpec.Size),
@@ -262,12 +194,10 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 					DiskSizeGB:   to.Int32Ptr(vmSpec.OSDisk.DiskSizeGB),
 					ManagedDisk: &compute.ManagedDiskParameters{
 						StorageAccountType: compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType),
-						DiskEncryptionSet:  diskEncryptionSet,
 					},
 				},
 			},
-			SecurityProfile: securityProfile,
-			OsProfile:       osProfile,
+			OsProfile: osProfile,
 			NetworkProfile: &compute.NetworkProfile{
 				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
 					{
@@ -278,19 +208,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 					},
 				},
 			},
-			Priority:       priority,
-			EvictionPolicy: evictionPolicy,
-			BillingProfile: billingProfile,
 		},
-	}
-
-	if vmSpec.ManagedIdentity != "" {
-		virtualMachine.Identity = &compute.VirtualMachineIdentity{
-			Type: compute.ResourceIdentityTypeUserAssigned,
-			UserAssignedIdentities: map[string]*compute.VirtualMachineIdentityUserAssignedIdentitiesValue{
-				vmSpec.ManagedIdentity: &compute.VirtualMachineIdentityUserAssignedIdentitiesValue{},
-			},
-		}
 	}
 
 	if vmSpec.Zone != "" {
@@ -307,26 +225,14 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 	return virtualMachine, nil
 }
 
-func getTagListFromSpec(spec *Spec) map[string]*string {
-	if len(spec.Tags) < 1 {
-		return nil
-	}
-
-	tagList := map[string]*string{}
-	for key, element := range spec.Tags {
-		tagList[key] = to.StringPtr(element)
-	}
-	return tagList
-}
-
 // Delete deletes the virtual network with the provided name.
-func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
+func (s *StackHubService) Delete(ctx context.Context, spec azure.Spec) error {
 	vmSpec, ok := spec.(*Spec)
 	if !ok {
 		return errors.New("invalid vm Specification")
 	}
 	klog.V(2).Infof("deleting vm %s ", vmSpec.Name)
-	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, nil)
+	future, err := s.Client.Delete(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name)
 	if err != nil && azure.ResourceNotFound(err) {
 		// already deleted
 		return nil
@@ -346,42 +252,14 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	return err
 }
 
-// GenerateRandomString returns a URL-safe, base64 encoded
-// securely generated random string.
-// It will return an error if the system's secure random
-// number generator fails to function correctly, in which
-// case the caller should not continue.
-func GenerateRandomString(n int) (string, error) {
-	b := make([]byte, n)
-	_, err := rand.Read(b)
-	// Note that err == nil only if we read len(b) bytes.
-	if err != nil {
-		return "", err
-	}
-	return base64.URLEncoding.EncodeToString(b), err
-}
-
-func availabilitySetID(subscriptionID, resourceGroup, availabilitySetName string) string {
-	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/availabilitySets/%s", subscriptionID, resourceGroup, availabilitySetName)
-}
-
-func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMachinePriorityTypes, compute.VirtualMachineEvictionPolicyTypes, *compute.BillingProfile, error) {
-	// Spot VM not requested, return zero values to apply defaults
-	if spotVMOptions == nil {
-		return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, nil
-	}
-	var billingProfile *compute.BillingProfile
-	if spotVMOptions.MaxPrice != nil && spotVMOptions.MaxPrice.AsDec().String() != "" {
-		maxPrice, err := strconv.ParseFloat(spotVMOptions.MaxPrice.AsDec().String(), 64)
-		if err != nil {
-			return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, err
-		}
-		billingProfile = &compute.BillingProfile{
-			MaxPrice: &maxPrice,
-		}
+func getTagListFromSpecStackHub(spec *Spec) map[string]*string {
+	if len(spec.Tags) < 1 {
+		return nil
 	}
 
-	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
-	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
-	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
+	tagList := map[string]*string{}
+	for key, element := range spec.Tags {
+		tagList[key] = to.StringPtr(element)
+	}
+	return tagList
 }

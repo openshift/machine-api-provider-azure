@@ -17,34 +17,30 @@ limitations under the License.
 package publicips
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
+	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
-// Service provides operations on resource groups
-type Service struct {
+// StackHub provides operations on resource groups
+type StackHubService struct {
 	Client network.PublicIPAddressesClient
 	Scope  *actuators.MachineScope
 }
 
 // getPublicIPsClient creates a new groups client from subscriptionid.
-func getPublicIPAddressesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.PublicIPAddressesClient {
+func getPublicIPAddressesClientStackHub(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.PublicIPAddressesClient {
 	publicIPsClient := network.NewPublicIPAddressesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
 	publicIPsClient.Authorizer = authorizer
 	publicIPsClient.AddToUserAgent(azure.UserAgent)
 	return publicIPsClient
 }
 
-// NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
-	if scope.IsStackHub() {
-		return NewStackHubService(scope)
-	}
-
-	return &Service{
-		Client: getPublicIPAddressesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+// NewStackHubService creates a new groups service.
+func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+	return &StackHubService{
+		Client: getPublicIPAddressesClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
 	}
 }

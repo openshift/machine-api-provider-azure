@@ -39,6 +39,10 @@ func getSecurityGroupsClient(resourceManagerEndpoint, subscriptionID string, aut
 
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
+	if scope.IsStackHub() {
+		return NewStackHubService(scope)
+	}
+
 	return &Service{
 		Client: getSecurityGroupsClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
