@@ -3,7 +3,6 @@ package machine
 import (
 	"context"
 	"errors"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -21,6 +20,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/decode"
 	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
 )
 
@@ -131,96 +131,9 @@ func TestExists(t *testing.T) {
 	}
 }
 
-func TestGetSpotVMOptions(t *testing.T) {
-	maxPrice := resource.MustParse("0.001")
-	maxPriceFloat, err := strconv.ParseFloat(maxPrice.AsDec().String(), 64)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	testCases := []struct {
-		name           string
-		spotVMOptions  *v1beta1.SpotVMOptions
-		priority       compute.VirtualMachinePriorityTypes
-		evictionPolicy compute.VirtualMachineEvictionPolicyTypes
-		billingProfile *compute.BillingProfile
-	}{
-		{
-			name: "get spot vm option succefully",
-			spotVMOptions: &v1beta1.SpotVMOptions{
-				MaxPrice: &maxPrice,
-			},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
-			billingProfile: &compute.BillingProfile{
-				MaxPrice: &maxPriceFloat,
-			},
-		},
-		{
-			name:           "return empty values on missing options",
-			spotVMOptions:  nil,
-			priority:       "",
-			evictionPolicy: "",
-			billingProfile: nil,
-		},
-		{
-			name:           "not return an error with empty spot vm options",
-			spotVMOptions:  &v1beta1.SpotVMOptions{},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
-			billingProfile: &compute.BillingProfile{
-				MaxPrice: nil,
-			},
-		},
-		{
-			name: "not return an error if the max price is nil",
-			spotVMOptions: &v1beta1.SpotVMOptions{
-				MaxPrice: nil,
-			},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
-			billingProfile: &compute.BillingProfile{
-				MaxPrice: nil,
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			priority, evictionPolicy, billingProfile, err := getSpotVMOptions(tc.spotVMOptions)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if priority != tc.priority {
-				t.Fatalf("Expected priority %s, got: %s", priority, tc.priority)
-			}
-
-			if evictionPolicy != tc.evictionPolicy {
-				t.Fatalf("Expected eviction policy %s, got: %s", evictionPolicy, tc.evictionPolicy)
-			}
-
-			// only check billing profile when spotVMOptions object is not nil
-			if tc.spotVMOptions != nil {
-				if tc.billingProfile.MaxPrice != nil {
-					if billingProfile == nil {
-						t.Fatal("Expected billing profile to not be nil")
-					} else if *billingProfile.MaxPrice != *tc.billingProfile.MaxPrice {
-						t.Fatalf("Expected billing profile max price %d, got: %d", billingProfile, tc.billingProfile)
-					}
-				}
-			} else {
-				if billingProfile != nil {
-					t.Fatal("Expected billing profile to be nil")
-				}
-			}
-		})
-	}
-}
-
 func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 	testStatus := "testState"
-	testSize := compute.VirtualMachineSizeTypesBasicA4
+	testSize := string(compute.VirtualMachineSizeTypesBasicA4)
 	testRegion := "testRegion"
 	testZone := "testZone"
 	testZones := []string{testZone}
@@ -242,10 +155,10 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 		},
 	}
 
-	vm := compute.VirtualMachine{
-		VirtualMachineProperties: &compute.VirtualMachineProperties{
+	vm := &decode.VirtualMachine{
+		VirtualMachineProperties: &decode.VirtualMachineProperties{
 			ProvisioningState: &testStatus,
-			HardwareProfile: &compute.HardwareProfile{
+			HardwareProfile: &decode.HardwareProfile{
 				VMSize: testSize,
 			},
 		},
@@ -287,7 +200,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 	testCases := []struct {
 		name                string
 		scope               func(t *testing.T) *actuators.MachineScope
-		vm                  compute.VirtualMachine
+		vm                  decode.VirtualMachine
 		expectedLabels      map[string]string
 		expectedAnnotations map[string]string
 		expectedSpecLabels  map[string]string
@@ -295,7 +208,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a blank vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") },
-			vm:    compute.VirtualMachine{},
+			vm:    decode.VirtualMachine{},
 			expectedLabels: map[string]string{
 				providerspecv1.MachineRoleLabel: "worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
@@ -308,8 +221,8 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a running vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "good-worker") },
-			vm: compute.VirtualMachine{
-				VirtualMachineProperties: &compute.VirtualMachineProperties{
+			vm: decode.VirtualMachine{
+				VirtualMachineProperties: &decode.VirtualMachineProperties{
 					ProvisioningState: pointer.StringPtr("Running"),
 				},
 			},
@@ -325,9 +238,9 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a VMSize set vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "sized-worker") },
-			vm: compute.VirtualMachine{
-				VirtualMachineProperties: &compute.VirtualMachineProperties{
-					HardwareProfile: &compute.HardwareProfile{
+			vm: decode.VirtualMachine{
+				VirtualMachineProperties: &decode.VirtualMachineProperties{
+					HardwareProfile: &decode.HardwareProfile{
 						VMSize: "big",
 					},
 				},
@@ -345,7 +258,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a vm location",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "located-worker") },
-			vm: compute.VirtualMachine{
+			vm: decode.VirtualMachine{
 				Location: pointer.StringPtr("nowhere"),
 			},
 			expectedLabels: map[string]string{
@@ -361,7 +274,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a vm with zones",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "zoned-worker") },
-			vm: compute.VirtualMachine{
+			vm: decode.VirtualMachine{
 				Zones: &abcZones,
 			},
 			expectedLabels: map[string]string{
@@ -381,7 +294,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				scope.MachineConfig.SpotVMOptions = &v1beta1.SpotVMOptions{}
 				return scope
 			},
-			vm: compute.VirtualMachine{},
+			vm: decode.VirtualMachine{},
 			expectedLabels: map[string]string{
 				providerspecv1.MachineRoleLabel:                         "spot-worker",
 				machinev1.MachineClusterIDLabel:                         "clusterID",
@@ -401,7 +314,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			g := NewWithT(t)
 
 			r := newFakeReconcilerWithScope(t, tc.scope(t))
-			r.setMachineCloudProviderSpecifics(tc.vm)
+			r.setMachineCloudProviderSpecifics(&tc.vm)
 
 			machine := r.scope.Machine
 			g.Expect(machine.Labels).To(Equal(tc.expectedLabels))
@@ -422,6 +335,7 @@ func TestCreateAvailabilitySet(t *testing.T) {
 		labels               map[string]string
 		availabilitySetsSvc  func() *mock_azure.MockService
 		availabilityZonesSvc func() *mock_azure.MockService
+		inputASName          string
 	}{
 		{
 			name:          "Error when availability zones client fails",
@@ -503,6 +417,24 @@ func TestCreateAvailabilitySet(t *testing.T) {
 				return availabilitySetsSvc
 			},
 		},
+		{
+			name:           "Skip availability set creation when name was specified in provider spec",
+			labels:         map[string]string{},
+			inputASName:    "test-as",
+			expectedASName: "test-as",
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				// Set call counter to 0 here
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(0)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				// Set call counter to 0 here
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(0)
+				return availabilitySetsSvc
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -522,12 +454,13 @@ func TestCreateAvailabilitySet(t *testing.T) {
 						},
 					},
 					MachineConfig: &providerspecv1.AzureMachineProviderSpec{
-						VMSize: "Standard_D2_v2",
+						VMSize:          "Standard_D2_v2",
+						AvailabilitySet: tc.inputASName,
 					},
 				},
 			}
 
-			asName, err := r.createAvailabilitySet()
+			asName, err := r.getOrCreateAvailabilitySet()
 			if tc.expectedError {
 				g.Expect(err).To(HaveOccurred())
 			} else {

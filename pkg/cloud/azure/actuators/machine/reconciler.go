@@ -22,12 +22,9 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
@@ -39,6 +36,7 @@ import (
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/decode"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilitysets"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/disks"
@@ -123,8 +121,9 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 		return fmt.Errorf("failed to create nic %s for machine %s: %w", nicName, s.scope.Machine.Name, err)
 	}
 
-	// Availibility set will be created only if no zones were found for a machine
-	asName, err := s.createAvailabilitySet()
+	// Availability set will be created only if no zones were found for a machine or
+	// if availability set name was not specified in provider spec
+	asName, err := s.getOrCreateAvailabilitySet()
 	if err != nil {
 		return fmt.Errorf("failed to create availability set %s for machine %s: %w", asName, s.scope.Machine.Name, err)
 	}
@@ -146,8 +145,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		return fmt.Errorf("failed to get vm: %+v", err)
 	}
 
-	vm, ok := vmInterface.(compute.VirtualMachine)
-	if !ok {
+	vm, err := decode.GetVirtualMachine(vmInterface)
+	if err != nil {
 		return errors.New("returned incorrect vm interface")
 	}
 
@@ -195,8 +194,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 				continue
 			}
 
-			niface, ok := networkIface.(network.Interface)
-			if !ok {
+			niface, err := decode.GetNetworkInterface(networkIface)
+			if err != nil {
 				klog.Errorf("Network interfaces get returned invalid network interface, getting %T instead", networkIface)
 				continue
 			}
@@ -228,8 +227,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 						continue
 					}
 
-					ip, ok := publicIPInterface.(network.PublicIPAddress)
-					if !ok {
+					ip, err := decode.GetPublicIPAdress(publicIPInterface)
+					if err != nil {
 						klog.Errorf("Public ip get returned invalid network interface, getting %T instead", publicIPInterface)
 						continue
 					}
@@ -283,7 +282,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	return nil
 }
 
-func getVMState(vm compute.VirtualMachine) v1beta1.VMState {
+func getVMState(vm *decode.VirtualMachine) v1beta1.VMState {
 	if vm.VirtualMachineProperties == nil || vm.ProvisioningState == nil {
 		return ""
 	}
@@ -324,7 +323,7 @@ func getVMState(vm compute.VirtualMachine) v1beta1.VMState {
 	return ""
 }
 
-func (s *Reconciler) setMachineCloudProviderSpecifics(vm compute.VirtualMachine) {
+func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine) {
 	if s.scope.Machine.Labels == nil {
 		s.scope.Machine.Labels = make(map[string]string)
 	}
@@ -372,12 +371,12 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	}
 
 	if err != nil {
-		return false, fmt.Errorf("Failed to get vm: %w", err)
+		return false, fmt.Errorf("failed to get vm: %w", err)
 	}
 
-	vm, ok := vmInterface.(compute.VirtualMachine)
-	if !ok {
-		return false, fmt.Errorf("returned incorrect vm interface: %T", vmInterface)
+	vm, err := decode.GetVirtualMachine(vmInterface)
+	if err != nil {
+		return false, fmt.Errorf("returned incorrect vm interface: %v", err)
 	}
 
 	if s.scope.MachineConfig.UserDataSecret == nil {
@@ -572,11 +571,6 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 		return fmt.Errorf("failed to decode ssh public key: %w", err)
 	}
 
-	priority, evictionPolicy, billingProfile, err := getSpotVMOptions(s.scope.MachineConfig.SpotVMOptions)
-	if err != nil {
-		return fmt.Errorf("failed to get Spot VM options %w", err)
-	}
-
 	vmSpec := &virtualmachines.Spec{
 		Name: s.scope.Machine.Name,
 	}
@@ -601,9 +595,6 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			Image:               s.scope.MachineConfig.Image,
 			Zone:                zone,
 			Tags:                s.scope.MachineConfig.Tags,
-			Priority:            priority,
-			EvictionPolicy:      evictionPolicy,
-			BillingProfile:      billingProfile,
 			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
 			AvailabilitySetName: asName,
 		}
@@ -644,9 +635,9 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 	} else if err != nil {
 		return fmt.Errorf("failed to get vm: %w", err)
 	} else {
-		vm, ok := vmInterface.(compute.VirtualMachine)
-		if !ok {
-			return errors.New("returned incorrect vm interface")
+		vm, err := decode.GetVirtualMachine(vmInterface)
+		if err != nil {
+			return fmt.Errorf("returned incorrect vm interface: %v", err)
 		}
 		if vm.ProvisioningState == nil {
 			return fmt.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
@@ -690,28 +681,11 @@ func (s *Reconciler) getCustomUserData() (string, error) {
 	return base64.StdEncoding.EncodeToString(data), nil
 }
 
-func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMachinePriorityTypes, compute.VirtualMachineEvictionPolicyTypes, *compute.BillingProfile, error) {
-	// Spot VM not requested, return zero values to apply defaults
-	if spotVMOptions == nil {
-		return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, nil
-	}
-	var billingProfile *compute.BillingProfile
-	if spotVMOptions.MaxPrice != nil && spotVMOptions.MaxPrice.AsDec().String() != "" {
-		maxPrice, err := strconv.ParseFloat(spotVMOptions.MaxPrice.AsDec().String(), 64)
-		if err != nil {
-			return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, err
-		}
-		billingProfile = &compute.BillingProfile{
-			MaxPrice: &maxPrice,
-		}
+func (s *Reconciler) getOrCreateAvailabilitySet() (string, error) {
+	if s.scope.MachineConfig.AvailabilitySet != "" {
+		return s.scope.MachineConfig.AvailabilitySet, nil
 	}
 
-	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
-	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
-	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
-}
-
-func (s *Reconciler) createAvailabilitySet() (string, error) {
 	// Try to find the zone for the machine location
 	availabilityZones, err := s.availabilityZonesSvc.Get(context.Background(), &availabilityzones.Spec{
 		VMSize: s.scope.MachineConfig.VMSize,
