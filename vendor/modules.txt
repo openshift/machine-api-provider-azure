@@ -1,7 +1,13 @@
 # github.com/Azure/azure-sdk-for-go v55.2.0+incompatible
 ## explicit
+github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute
+github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network
+github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources
+github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2017-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute
+github.com/Azure/azure-sdk-for-go/services/network/mgmt/2017-10-01/network
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network
+github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2018-05-01/resources
 github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2020-06-01/resources
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1
@@ -127,6 +133,9 @@ github.com/mattn/go-isatty
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/mitchellh/go-wordwrap v1.0.0
 github.com/mitchellh/go-wordwrap
+# github.com/mitchellh/mapstructure v1.4.1
+## explicit
+github.com/mitchellh/mapstructure
 # github.com/moby/spdystream v0.2.0
 github.com/moby/spdystream
 github.com/moby/spdystream/spdy
