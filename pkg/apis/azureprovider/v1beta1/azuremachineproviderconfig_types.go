@@ -101,6 +101,11 @@ type AzureMachineProviderSpec struct {
 	// Set to false by default. If true, then this will depend on whether the requested
 	// VMSize is supported. If set to true with an unsupported VMSize, Azure will return an error.
 	AcceleratedNetworking bool `json:"acceleratedNetworking,omitempty"`
+
+	// AvailabilitySet specifies the availability set to use for this instance.
+	// Availability set should be precreated, before using this field.
+	// +optional
+	AvailabilitySet string `json:"availabilitySet,omitempty"`
 }
 
 // SpotVMOptions defines the options relevant to running the Machine on Spot VMs
