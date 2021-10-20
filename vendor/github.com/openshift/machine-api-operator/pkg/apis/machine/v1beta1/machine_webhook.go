@@ -604,13 +604,27 @@ func validateAWS(m *Machine, config *admissionConfig) (bool, []string, utilerror
 		return false, warnings, utilerrors.NewAggregate(errs)
 	}
 
-	if providerSpec.AMI.ARN == nil && providerSpec.AMI.Filters == nil && providerSpec.AMI.ID == nil {
+	if providerSpec.AMI.ID == nil {
 		errs = append(
 			errs,
 			field.Required(
 				field.NewPath("providerSpec", "ami"),
-				"expected either providerSpec.ami.arn or providerSpec.ami.filters or providerSpec.ami.id to be populated",
+				"expected providerSpec.ami.id to be populated",
 			),
+		)
+	}
+
+	if providerSpec.AMI.ARN != nil {
+		warnings = append(
+			warnings,
+			"can't use providerSpec.ami.arn, only providerSpec.ami.id can be used to reference AMI",
+		)
+	}
+
+	if providerSpec.AMI.Filters != nil {
+		warnings = append(
+			warnings,
+			"can't use providerSpec.ami.filters, only providerSpec.ami.id can be used to reference AMI",
 		)
 	}
 
@@ -684,11 +698,35 @@ func validateAWS(m *Machine, config *admissionConfig) (bool, []string, utilerror
 		)
 	}
 
+	duplicatedTags := getDuplicatedTags(providerSpec.Tags)
+	if len(duplicatedTags) > 0 {
+		warnings = append(warnings, fmt.Sprintf("providerSpec.tags: duplicated tag names (%s): only the first value will be used.", strings.Join(duplicatedTags, ",")))
+	}
+
 	if len(errs) > 0 {
 		return false, warnings, utilerrors.NewAggregate(errs)
 	}
 
 	return true, warnings, nil
+}
+
+// getDuplicatedTags iterates through the AWS TagSpecifications
+// to determine if any tag Name is duplicated within the list.
+// A list of duplicated names will be returned.
+func getDuplicatedTags(tagSpecs []aws.TagSpecification) []string {
+	tagNames := map[string]int{}
+	for _, spec := range tagSpecs {
+		tagNames[spec.Name] += 1
+	}
+
+	duplicatedTags := []string{}
+	for name, count := range tagNames {
+		if count > 1 {
+			duplicatedTags = append(duplicatedTags, name)
+		}
+	}
+
+	return duplicatedTags
 }
 
 func defaultAzure(m *Machine, config *admissionConfig) (bool, []string, utilerrors.Aggregate) {
