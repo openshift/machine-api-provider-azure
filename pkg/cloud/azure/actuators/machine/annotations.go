@@ -19,14 +19,14 @@ package machine
 import (
 	"encoding/json"
 
-	machine "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 )
 
 // updateMachineAnnotationJSON updates the `annotation` on `machine` with
 // `content`. `content` in this case should be a `map[string]interface{}`
 // suitable for turning into JSON. This `content` map will be marshalled into a
 // JSON string before being set as the given `annotation`.
-func (a *Actuator) updateMachineAnnotationJSON(machine *machine.Machine, annotation string, content map[string]interface{}) error {
+func (a *Actuator) updateMachineAnnotationJSON(machine *machinev1.Machine, annotation string, content map[string]interface{}) error {
 	b, err := json.Marshal(content)
 	if err != nil {
 		return err
@@ -38,21 +38,20 @@ func (a *Actuator) updateMachineAnnotationJSON(machine *machine.Machine, annotat
 
 // updateMachineAnnotation updates the `annotation` on the given `machine` with
 // `content`.
-func (a *Actuator) updateMachineAnnotation(machine *machine.Machine, annotation string, content string) {
+func (a *Actuator) updateMachineAnnotation(machine *machinev1.Machine, annotation string, content string) {
 	// Get the annotations
-	annotations := machine.GetAnnotations()
-
+	annotations := machine.Annotations
+	if annotations == nil {
+		machine.Annotations = map[string]string{}
+	}
 	// Set our annotation to the given content.
-	annotations[annotation] = content
-
-	// Update the machine object with these annotations
-	machine.SetAnnotations(annotations)
+	machine.Annotations[annotation] = content
 }
 
 // Returns a map[string]interface from a JSON annotation.
 // This method gets the given `annotation` from the `machine` and unmarshalls it
 // from a JSON string into a `map[string]interface{}`.
-func (a *Actuator) machineAnnotationJSON(machine *machine.Machine, annotation string) (map[string]interface{}, error) {
+func (a *Actuator) machineAnnotationJSON(machine *machinev1.Machine, annotation string) (map[string]interface{}, error) {
 	out := map[string]interface{}{}
 
 	jsonAnnotation := a.machineAnnotation(machine, annotation)
@@ -69,6 +68,9 @@ func (a *Actuator) machineAnnotationJSON(machine *machine.Machine, annotation st
 }
 
 // Fetches the specific machine annotation.
-func (a *Actuator) machineAnnotation(machine *machine.Machine, annotation string) string {
-	return machine.GetAnnotations()[annotation]
+func (a *Actuator) machineAnnotation(machine *machinev1.Machine, annotation string) string {
+	if machine.Annotations == nil {
+		return ""
+	}
+	return machine.Annotations[annotation]
 }

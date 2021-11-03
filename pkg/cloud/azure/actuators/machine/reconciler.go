@@ -27,12 +27,11 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
@@ -96,8 +95,8 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 // Create creates machine if and only if machine exists, handled by cluster-api
 func (s *Reconciler) Create(ctx context.Context) error {
 	if err := s.CreateMachine(ctx); err != nil {
-		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1beta1.AzureMachineProviderCondition{
-			Type:    v1beta1.MachineCreated,
+		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, machinev1.AzureMachineProviderCondition{
+			Type:    machinev1.MachineCreated,
 			Status:  apicorev1.ConditionTrue,
 			Reason:  machineCreationFailedReason,
 			Message: err.Error(),
@@ -266,8 +265,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	}
 
 	// Set instance conditions
-	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, v1beta1.AzureMachineProviderCondition{
-		Type:    v1beta1.MachineCreated,
+	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, machinev1.AzureMachineProviderCondition{
+		Type:    machinev1.MachineCreated,
 		Status:  apicorev1.ConditionTrue,
 		Reason:  machineCreationSucceedReason,
 		Message: machineCreationSucceedMessage,
@@ -282,13 +281,13 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	return nil
 }
 
-func getVMState(vm *decode.VirtualMachine) v1beta1.VMState {
+func getVMState(vm *decode.VirtualMachine) machinev1.AzureVMState {
 	if vm.VirtualMachineProperties == nil || vm.ProvisioningState == nil {
 		return ""
 	}
 
 	if *vm.ProvisioningState != "Succeeded" {
-		return v1beta1.VMState(*vm.ProvisioningState)
+		return machinev1.AzureVMState(*vm.ProvisioningState)
 	}
 
 	if vm.InstanceView == nil || vm.InstanceView.Statuses == nil {
@@ -304,19 +303,19 @@ func getVMState(vm *decode.VirtualMachine) v1beta1.VMState {
 		case "ProvisioningState/succeeded":
 			continue
 		case "PowerState/starting":
-			return v1beta1.VMStateStarting
+			return machinev1.VMStateStarting
 		case "PowerState/running":
-			return v1beta1.VMStateRunning
+			return machinev1.VMStateRunning
 		case "PowerState/stopping":
-			return v1beta1.VMStateStopping
+			return machinev1.VMStateStopping
 		case "PowerState/stopped":
-			return v1beta1.VMStateStopped
+			return machinev1.VMStateStopped
 		case "PowerState/deallocating":
-			return v1beta1.VMStateDeallocating
+			return machinev1.VMStateDeallocating
 		case "PowerState/deallocated":
-			return v1beta1.VMStateDeallocated
+			return machinev1.VMStateDeallocated
 		default:
-			return v1beta1.VMStateUnknown
+			return machinev1.VMStateUnknown
 		}
 	}
 
@@ -395,10 +394,10 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 		}
 	}
 
-	switch v1beta1.VMState(*vm.ProvisioningState) {
-	case v1beta1.VMStateDeleting:
+	switch machinev1.AzureVMState(*vm.ProvisioningState) {
+	case machinev1.VMStateDeleting:
 		return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
-	case v1beta1.VMStateFailed:
+	case machinev1.VMStateFailed:
 		return true, fmt.Errorf("vm for machine %s exists, but has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
 	}
 
@@ -417,8 +416,9 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	if s.scope.Machine.Annotations == nil {
 		s.scope.Machine.Annotations = make(map[string]string)
 	}
-	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(v1beta1.VMStateDeleting)
-	s.scope.MachineStatus.VMState = &v1beta1.VMStateDeleting
+	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(machinev1.VMStateDeleting)
+	vmStateDeleting := machinev1.VMStateDeleting
+	s.scope.MachineStatus.VMState = &vmStateDeleting
 
 	err := s.virtualMachinesSvc.Delete(ctx, vmSpec)
 	if err != nil {

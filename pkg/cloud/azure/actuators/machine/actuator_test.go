@@ -31,7 +31,7 @@ import (
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
 	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
@@ -41,7 +41,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
-	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
@@ -63,7 +62,7 @@ func init() {
 	configv1.AddToScheme(scheme.Scheme)
 }
 
-func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machinev1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := yaml.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -73,7 +72,7 @@ func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*mach
 	}, nil
 }
 
-func newMachine(t *testing.T, machineConfig providerspecv1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
+func newMachine(t *testing.T, machineConfig machinev1.AzureMachineProviderSpec, labels map[string]string) *machinev1.Machine {
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -91,21 +90,21 @@ func newMachine(t *testing.T, machineConfig providerspecv1.AzureMachineProviderS
 
 func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 	labels := make(map[string]string)
-	labels[providerspecv1.MachineRoleLabel] = label
+	labels[actuators.MachineRoleLabel] = label
 	labels[machinev1.MachineClusterIDLabel] = "clusterID"
-	machineConfig := providerspecv1.AzureMachineProviderSpec{}
+	machineConfig := machinev1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
 	return &actuators.MachineScope{
 		Context: context.Background(),
 		Machine: m,
-		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+		MachineConfig: &machinev1.AzureMachineProviderSpec{
 			ResourceGroup:   "dummyResourceGroup",
 			Location:        "dummyLocation",
 			Subnet:          "dummySubnet",
 			Vnet:            "dummyVnet",
 			ManagedIdentity: "dummyIdentity",
 		},
-		MachineStatus: &providerspecv1.AzureMachineProviderStatus{},
+		MachineStatus: &machinev1.AzureMachineProviderStatus{},
 	}
 }
 
@@ -123,7 +122,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 	availabilitySetsSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	return &Reconciler{
-		scope:                 newFakeScope(t, providerspecv1.ControlPlane),
+		scope:                 newFakeScope(t, actuators.ControlPlane),
 		networkInterfacesSvc:  fakeSuccessSvc,
 		virtualMachinesSvc:    fakeVMSuccessSvc,
 		virtualMachinesExtSvc: fakeSuccessSvc,
@@ -412,7 +411,7 @@ func (s *FakeAvailabilityZonesService) Delete(ctx context.Context, spec azure.Sp
 }
 
 func TestAvailabilityZones(t *testing.T) {
-	fakeScope := newFakeScope(t, providerspecv1.ControlPlane)
+	fakeScope := newFakeScope(t, actuators.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
@@ -456,7 +455,7 @@ func TestGetZone(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeScope := newFakeScope(t, providerspecv1.ControlPlane)
+		fakeScope := newFakeScope(t, actuators.ControlPlane)
 		fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 		fakeReconciler.scope.MachineConfig.Zone = tc.inputZone
 
@@ -477,7 +476,7 @@ func TestGetZone(t *testing.T) {
 }
 
 func TestCustomUserData(t *testing.T) {
-	fakeScope := newFakeScope(t, providerspecv1.Node)
+	fakeScope := newFakeScope(t, actuators.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
@@ -506,7 +505,7 @@ func TestCustomUserData(t *testing.T) {
 }
 
 func TestCustomDataFailures(t *testing.T) {
-	fakeScope := newFakeScope(t, providerspecv1.Node)
+	fakeScope := newFakeScope(t, actuators.Node)
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
@@ -562,7 +561,7 @@ func TestMachineEvents(t *testing.T) {
 	machinePc.Subnet = ""
 	machinePc.Vnet = ""
 	machinePc.VMSize = ""
-	providerSpec, err := providerspecv1.EncodeMachineSpec(machinePc)
+	providerSpec, err := actuators.RawExtensionFromProviderSpec(machinePc)
 	if err != nil {
 		t.Fatalf("EncodeMachineSpec failed: %v", err)
 	}
@@ -852,7 +851,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 	cases := []struct {
 		name          string
 		mutateMachine func(*machinev1.Machine)
-		mutatePC      func(*providerspecv1.AzureMachineProviderSpec)
+		mutatePC      func(*machinev1.AzureMachineProviderSpec)
 		expectedErr   error
 	}{
 		{
@@ -860,21 +859,21 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 			mutateMachine: func(m *machinev1.Machine) {
 				m.Name = "MachineNameOverSixtyChars" + "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 			},
-			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+			mutatePC: func(s *machinev1.AzureMachineProviderSpec) {
 				s.PublicIP = true
 			},
 			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\": failed to create nic MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-nic for machine MachineNameOverSixtyCharsabcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ: unable to create Public IP: machine public IP name is longer than 63 characters"),
 		},
 		{
 			name: "Machine Config missing vnet",
-			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+			mutatePC: func(s *machinev1.AzureMachineProviderSpec) {
 				s.Vnet = ""
 			},
 			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"azure-actuator-testing-machine\": failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig vnet is missing on machine azure-actuator-testing-machine"),
 		},
 		{
 			name: "Machine Config missing subnet",
-			mutatePC: func(s *providerspecv1.AzureMachineProviderSpec) {
+			mutatePC: func(s *machinev1.AzureMachineProviderSpec) {
 				s.Subnet = ""
 			},
 			expectedErr: machineapierrors.InvalidMachineConfiguration("failed to reconcile machine \"azure-actuator-testing-machine\": failed to create nic azure-actuator-testing-machine-nic for machine azure-actuator-testing-machine: MachineConfig subnet is missing on machine azure-actuator-testing-machine, skipping machine creation"),
@@ -928,7 +927,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 				machinePC := stubProviderConfig()
 				tc.mutatePC(machinePC)
 
-				providerSpec, err := providerspecv1.EncodeMachineSpec(machinePC)
+				providerSpec, err := actuators.RawExtensionFromProviderSpec(machinePC)
 				if err != nil {
 					t.Fatalf("unexpected error encoding providerspec: %v", err)
 				}

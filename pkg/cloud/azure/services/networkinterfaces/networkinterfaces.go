@@ -43,7 +43,7 @@ type Spec struct {
 	StaticIPAddress               string
 	PublicLoadBalancerName        string
 	InternalLoadBalancerName      string
-	NatRule                       *int
+	NatRule                       *int64
 	PublicIP                      string
 	SecurityGroupName             string
 	ApplicationSecurityGroupNames []string

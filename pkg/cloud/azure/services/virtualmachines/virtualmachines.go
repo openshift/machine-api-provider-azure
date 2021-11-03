@@ -28,9 +28,9 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 )
@@ -70,15 +70,15 @@ type Spec struct {
 	SSHKeyData          string
 	Size                string
 	Zone                string
-	Image               v1beta1.Image
-	OSDisk              v1beta1.OSDisk
+	Image               machinev1.Image
+	OSDisk              machinev1.OSDisk
 	CustomData          string
 	ManagedIdentity     string
 	Tags                map[string]string
 	Priority            compute.VirtualMachinePriorityTypes
 	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile      *compute.BillingProfile
-	SecurityProfile     *v1beta1.SecurityProfile
+	SecurityProfile     *machinev1.SecurityProfile
 	AvailabilitySetName string
 }
 
@@ -365,7 +365,7 @@ func availabilitySetID(subscriptionID, resourceGroup, availabilitySetName string
 	return fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Compute/availabilitySets/%s", subscriptionID, resourceGroup, availabilitySetName)
 }
 
-func getSpotVMOptions(spotVMOptions *v1beta1.SpotVMOptions) (compute.VirtualMachinePriorityTypes, compute.VirtualMachineEvictionPolicyTypes, *compute.BillingProfile, error) {
+func getSpotVMOptions(spotVMOptions *machinev1.SpotVMOptions) (compute.VirtualMachinePriorityTypes, compute.VirtualMachineEvictionPolicyTypes, *compute.BillingProfile, error) {
 	// Spot VM not requested, return zero values to apply defaults
 	if spotVMOptions == nil {
 		return compute.VirtualMachinePriorityTypes(""), compute.VirtualMachineEvictionPolicyTypes(""), nil, nil

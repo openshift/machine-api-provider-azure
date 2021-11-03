@@ -3,11 +3,11 @@ package machine
 import (
 	"fmt"
 
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
 const (
@@ -31,15 +31,15 @@ runcmd:
 - [ cat, /root/node_bootstrap/node_settings.yaml]
 `
 
-func stubProviderConfig() *providerspecv1.AzureMachineProviderSpec {
-	var natRule int
-	return &providerspecv1.AzureMachineProviderSpec{
+func stubProviderConfig() *machinev1.AzureMachineProviderSpec {
+	var natRule int64
+	return &machinev1.AzureMachineProviderSpec{
 		UserDataSecret:       &corev1.SecretReference{Name: userDataSecretName, Namespace: defaultNamespace},
 		CredentialsSecret:    &corev1.SecretReference{Name: azureCredentialsSecretName, Namespace: defaultNamespace},
 		Location:             "eastus2",
 		VMSize:               "Standard_B2ms",
-		Image:                providerspecv1.Image{ResourceID: "/resourceGroups/os4-common/providers/Microsoft.Compute/images/test1-controlplane-0-image-20190529150403"},
-		OSDisk:               providerspecv1.OSDisk{OSType: "Linux", ManagedDisk: providerspecv1.ManagedDiskParameters{StorageAccountType: "Premium_LRS"}, DiskSizeGB: 60},
+		Image:                machinev1.Image{ResourceID: "/resourceGroups/os4-common/providers/Microsoft.Compute/images/test1-controlplane-0-image-20190529150403"},
+		OSDisk:               machinev1.OSDisk{OSType: "Linux", ManagedDisk: machinev1.ManagedDiskParameters{StorageAccountType: "Premium_LRS"}, DiskSizeGB: 60},
 		SSHPublicKey:         "c3NoLXJzYSBBQUFBQjNOemFDMXljMkVBQUFBREFRQUJBQUFCQVFDNEd4SGQ1L0pLZVJYMGZOMCt4YzM1eXhLdmtvb0Qwb0l2RnNCdDNHNTNaSXZlTWxwNUppQTRWT0Y3YjJ4cHZmL1FHbVpmWWl4d1JYMHdUKzRWUzYxV1ZNeUdZRUhPcE9QYy85MWZTcTg4bTJZbitBYVhTUUxTbFpaVkZJTDZsK296bjlRQ3NaSXhqSlpkTW5BTlRQdlhWMWpjSVNJeDhmU0pKeWVEdlhFU2FEQ2N1VjdPZTdvd01lVVpseCtUUEhkcU85eEV1OXFuREVYUXo1SUVQQUMwTElSQnVicmJVaTRQZUJFUlFieVBQd1p0Um9NN2pFZ3RuRFhDcmxYbXo2T0N3NXNiaE1FNEJCUVliVjBOV0J3Unl2bHJReDJtYzZHNnJjODJ6OWxJMkRKQ3ZJcnNkRW43NytQZThiWm1MVU83V0sxRUFyd2xXY0FiZU1kYUFkbzcgamNoYWxvdXBAZGhjcC0yNC0xNzAuYnJxLnJlZGhhdC5jb20K",
 		PublicIP:             false,
 		Subnet:               "stub-machine-subnet",
@@ -53,7 +53,7 @@ func stubProviderConfig() *providerspecv1.AzureMachineProviderSpec {
 
 func stubMachine() (*machinev1.Machine, error) {
 	machinePc := stubProviderConfig()
-	providerSpec, err := providerspecv1.EncodeMachineSpec(machinePc)
+	providerSpec, err := actuators.RawExtensionFromProviderSpec(machinePc)
 	if err != nil {
 		return nil, fmt.Errorf("EncodeMachineSpec failed: %v", err)
 	}
@@ -63,7 +63,7 @@ func stubMachine() (*machinev1.Machine, error) {
 			Name:      "azure-actuator-testing-machine",
 			Namespace: defaultNamespace,
 			Labels: map[string]string{
-				providerspecv1.ClusterIDLabel: clusterID,
+				machinev1.MachineClusterIDLabel: clusterID,
 			},
 			Annotations: map[string]string{
 				// skip node draining since it's not mocked

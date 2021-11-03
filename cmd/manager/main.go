@@ -22,12 +22,11 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis"
 	actuator "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	machinesetcontroller "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/record"
@@ -123,11 +122,7 @@ func main() {
 		EventRecorder:     mgr.GetEventRecorderFor("azure-controller"),
 	})
 
-	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		klog.Fatal(err)
-	}
-
-	if err := v1beta1.AddToScheme(mgr.GetScheme()); err != nil {
+	if err := machinev1.AddToScheme(mgr.GetScheme()); err != nil {
 		klog.Fatal(err)
 	}
 

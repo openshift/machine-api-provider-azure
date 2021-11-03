@@ -21,17 +21,15 @@ import (
 	"testing"
 
 	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/pointer"
-	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -43,7 +41,7 @@ func init() {
 	configv1.AddToScheme(scheme.Scheme)
 }
 
-func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machinev1.AzureMachineProviderSpec) (*machinev1.ProviderSpec, error) {
 	bytes, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
@@ -54,7 +52,7 @@ func providerSpecFromMachine(in *providerspecv1.AzureMachineProviderSpec) (*mach
 }
 
 func newMachine(t *testing.T) *machinev1.Machine {
-	machineConfig := providerspecv1.AzureMachineProviderSpec{}
+	machineConfig := machinev1.AzureMachineProviderSpec{}
 	providerSpec, err := providerSpecFromMachine(&machineConfig)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -89,7 +87,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
 
 	scope := &MachineScope{
-		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+		MachineConfig: &machinev1.AzureMachineProviderSpec{
 			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		},
 		CoreClient: fakeclient,
@@ -123,7 +121,7 @@ func testCredentialFields(credentialsSecret *corev1.Secret) error {
 	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
 
 	scope := &MachineScope{
-		MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+		MachineConfig: &machinev1.AzureMachineProviderSpec{
 			CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 		},
 		CoreClient: fakeclient,
@@ -201,15 +199,15 @@ func testCredentialSecret() *corev1.Secret {
 	}
 }
 
-func testProviderSpec() *providerspecv1.AzureMachineProviderSpec {
-	return &providerspecv1.AzureMachineProviderSpec{
+func testProviderSpec() *machinev1.AzureMachineProviderSpec {
+	return &machinev1.AzureMachineProviderSpec{
 		Location:          "test",
 		ResourceGroup:     "test",
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 }
 
-func testMachineWithProviderSpec(t *testing.T, providerSpec *providerspecv1.AzureMachineProviderSpec) *machinev1.Machine {
+func testMachineWithProviderSpec(t *testing.T, providerSpec *machinev1.AzureMachineProviderSpec) *machinev1.Machine {
 	providerSpecWithValues, err := providerSpecFromMachine(providerSpec)
 	if err != nil {
 		t.Fatalf("error encoding provider config: %v", err)
@@ -294,7 +292,7 @@ func TestPersistMachineScope(t *testing.T) {
 		t.Errorf("Expected InternalLoadBalancer to be 'test', got %q instead", machineSpec.InternalLoadBalancer)
 	}
 
-	machineStatus, err := providerspecv1.MachineStatusFromProviderStatus(scope.Machine.Status.ProviderStatus)
+	machineStatus, err := ProviderStatusFromRawExtension(scope.Machine.Status.ProviderStatus)
 	if err != nil {
 		t.Errorf("failed to get machine provider status: %v", err)
 	}
@@ -307,7 +305,7 @@ func TestPersistMachineScope(t *testing.T) {
 }
 
 func TestNewMachineScope(t *testing.T) {
-	machineConfigNoValues := &providerspecv1.AzureMachineProviderSpec{
+	machineConfigNoValues := &machinev1.AzureMachineProviderSpec{
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 

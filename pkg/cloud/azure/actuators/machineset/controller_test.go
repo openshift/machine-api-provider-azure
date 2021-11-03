@@ -24,12 +24,11 @@ import (
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
-	machineproviderv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -285,7 +284,7 @@ func newTestMachineSet(namespace string, vmSize string, existingAnnotations map[
 		annotations[k] = v
 	}
 
-	machineProviderSpec := &machineproviderv1.AzureMachineProviderSpec{
+	machineProviderSpec := &machinev1.AzureMachineProviderSpec{
 		VMSize: vmSize,
 	}
 	providerSpec, err := providerSpecFromMachine(machineProviderSpec)
@@ -309,7 +308,7 @@ func newTestMachineSet(namespace string, vmSize string, existingAnnotations map[
 	}, nil
 }
 
-func providerSpecFromMachine(in *machineproviderv1.AzureMachineProviderSpec) (machinev1.ProviderSpec, error) {
+func providerSpecFromMachine(in *machinev1.AzureMachineProviderSpec) (machinev1.ProviderSpec, error) {
 	bytes, err := json.Marshal(in)
 	if err != nil {
 		return machinev1.ProviderSpec{}, err

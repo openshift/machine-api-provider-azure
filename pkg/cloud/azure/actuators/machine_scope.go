@@ -25,14 +25,13 @@ import (
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	configv1 "github.com/openshift/api/config/v1"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	apicorev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
 )
@@ -54,6 +53,13 @@ const (
 	AzureResourcePrefix = "azure_resource_prefix"
 
 	globalInfrastuctureName = "cluster"
+
+	// ControlPlane machine label
+	ControlPlane string = "master"
+	// Node machine label
+	Node string = "worker"
+	// MachineRoleLabel machine label to determine the role
+	MachineRoleLabel = "machine.openshift.io/cluster-api-machine-role"
 )
 
 // MachineScopeParams defines the input parameters used to create a new MachineScope.
@@ -71,7 +77,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, apierrors.InvalidMachineConfiguration(err.Error(), "failed to get machine config")
 	}
 
-	machineStatus, err := v1beta1.MachineStatusFromProviderStatus(params.Machine.Status.ProviderStatus)
+	machineStatus, err := ProviderStatusFromRawExtension(params.Machine.Status.ProviderStatus)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
@@ -114,8 +120,8 @@ type MachineScope struct {
 
 	Machine       *machinev1.Machine
 	CoreClient    controllerclient.Client
-	MachineConfig *v1beta1.AzureMachineProviderSpec
-	MachineStatus *v1beta1.AzureMachineProviderStatus
+	MachineConfig *machinev1.AzureMachineProviderSpec
+	MachineStatus *machinev1.AzureMachineProviderStatus
 
 	// cloudEnv azure environment: AzurePublic, AzureStackCloud, etc.
 	cloudEnv string
@@ -128,7 +134,7 @@ type MachineScope struct {
 	origMachine *machinev1.Machine
 	// origMachineStatus captures original value of machine provider status
 	// before it is updated (to skip object updated if nothing is changed)
-	origMachineStatus *v1beta1.AzureMachineProviderStatus
+	origMachineStatus *machinev1.AzureMachineProviderStatus
 
 	machineToBePatched controllerclient.Patch
 }
@@ -145,7 +151,7 @@ func (m *MachineScope) Namespace() string {
 
 // Role returns the machine role from the labels.
 func (m *MachineScope) Role() string {
-	return m.Machine.Labels[v1beta1.MachineRoleLabel]
+	return m.Machine.Labels[MachineRoleLabel]
 }
 
 // Location returns the machine location.
@@ -154,7 +160,7 @@ func (m *MachineScope) Location() string {
 }
 
 func (m *MachineScope) setMachineSpec() error {
-	ext, err := v1beta1.EncodeMachineSpec(m.MachineConfig)
+	ext, err := RawExtensionFromProviderSpec(m.MachineConfig)
 	if err != nil {
 		return err
 	}
@@ -172,7 +178,7 @@ func (m *MachineScope) setMachineStatus() error {
 	}
 
 	klog.V(4).Infof("Storing machine status for %q, resourceVersion: %v, generation: %v", m.Machine.Name, m.Machine.ResourceVersion, m.Machine.Generation)
-	ext, err := v1beta1.EncodeMachineStatus(m.MachineStatus)
+	ext, err := RawExtensionFromProviderStatus(m.MachineStatus)
 	if err != nil {
 		return err
 	}
@@ -259,8 +265,8 @@ func getCloudEnvironment(client controllerclient.Client) (string, string, error)
 }
 
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.
-func MachineConfigFromProviderSpec(providerConfig machinev1.ProviderSpec) (*v1beta1.AzureMachineProviderSpec, error) {
-	var config v1beta1.AzureMachineProviderSpec
+func MachineConfigFromProviderSpec(providerConfig machinev1.ProviderSpec) (*machinev1.AzureMachineProviderSpec, error) {
+	var config machinev1.AzureMachineProviderSpec
 	if providerConfig.Value != nil {
 		klog.V(4).Info("Decoding ProviderConfig from Value")
 		return unmarshalProviderSpec(providerConfig.Value)
@@ -269,8 +275,8 @@ func MachineConfigFromProviderSpec(providerConfig machinev1.ProviderSpec) (*v1be
 	return &config, nil
 }
 
-func unmarshalProviderSpec(spec *runtime.RawExtension) (*v1beta1.AzureMachineProviderSpec, error) {
-	var config v1beta1.AzureMachineProviderSpec
+func unmarshalProviderSpec(spec *runtime.RawExtension) (*machinev1.AzureMachineProviderSpec, error) {
+	var config machinev1.AzureMachineProviderSpec
 	if spec != nil {
 		if err := yaml.Unmarshal(spec.Raw, &config); err != nil {
 			return nil, err

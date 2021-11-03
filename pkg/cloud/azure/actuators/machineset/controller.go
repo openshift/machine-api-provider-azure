@@ -19,14 +19,13 @@ import (
 	"strconv"
 
 	"github.com/go-logr/logr"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	mapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	providerconfigv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -147,6 +146,6 @@ func (r *Reconciler) reconcile(machineSet *machinev1.MachineSet) (ctrl.Result, e
 	return ctrl.Result{}, nil
 }
 
-func getproviderConfig(machineSet *machinev1.MachineSet) (*providerconfigv1.AzureMachineProviderSpec, error) {
+func getproviderConfig(machineSet *machinev1.MachineSet) (*machinev1.AzureMachineProviderSpec, error) {
 	return actuators.MachineConfigFromProviderSpec(machineSet.Spec.Template.Spec.ProviderSpec)
 }

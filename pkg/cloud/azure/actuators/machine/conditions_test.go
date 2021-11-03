@@ -3,23 +3,23 @@ package machine
 import (
 	"testing"
 
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
 )
 
 func TestShouldUpdateCondition(t *testing.T) {
 	testCases := []struct {
-		oldCondition v1beta1.AzureMachineProviderCondition
-		newCondition v1beta1.AzureMachineProviderCondition
+		oldCondition machinev1.AzureMachineProviderCondition
+		newCondition machinev1.AzureMachineProviderCondition
 		expected     bool
 	}{
 		{
-			oldCondition: v1beta1.AzureMachineProviderCondition{
+			oldCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
 			},
-			newCondition: v1beta1.AzureMachineProviderCondition{
+			newCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
@@ -27,12 +27,12 @@ func TestShouldUpdateCondition(t *testing.T) {
 			expected: false,
 		},
 		{
-			oldCondition: v1beta1.AzureMachineProviderCondition{
+			oldCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
 			},
-			newCondition: v1beta1.AzureMachineProviderCondition{
+			newCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "different reason",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
@@ -40,12 +40,12 @@ func TestShouldUpdateCondition(t *testing.T) {
 			expected: true,
 		},
 		{
-			oldCondition: v1beta1.AzureMachineProviderCondition{
+			oldCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "different message",
 				Status:  corev1.ConditionTrue,
 			},
-			newCondition: v1beta1.AzureMachineProviderCondition{
+			newCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
@@ -53,12 +53,12 @@ func TestShouldUpdateCondition(t *testing.T) {
 			expected: true,
 		},
 		{
-			oldCondition: v1beta1.AzureMachineProviderCondition{
+			oldCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionTrue,
 			},
-			newCondition: v1beta1.AzureMachineProviderCondition{
+			newCondition: machinev1.AzureMachineProviderCondition{
 				Reason:  "foo",
 				Message: "bar",
 				Status:  corev1.ConditionFalse,

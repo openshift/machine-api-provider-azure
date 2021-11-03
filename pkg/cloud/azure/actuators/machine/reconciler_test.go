@@ -6,19 +6,16 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/mock/gomock"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	. "github.com/onsi/gomega"
-	machinev1 "github.com/openshift/machine-api-operator/pkg/apis/machine/v1beta1"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
-	providerspecv1 "sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/decode"
 	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
@@ -36,7 +33,7 @@ func TestExists(t *testing.T) {
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
-				ProvisioningState: string(v1beta1.VMStateSucceeded),
+				ProvisioningState: string(machinev1.VMStateSucceeded),
 			},
 			expected:    true,
 			errExpected: false,
@@ -46,7 +43,7 @@ func TestExists(t *testing.T) {
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
-				ProvisioningState: string(v1beta1.VMStateUpdating),
+				ProvisioningState: string(machinev1.VMStateUpdating),
 			},
 			expected:    true,
 			errExpected: false,
@@ -56,7 +53,7 @@ func TestExists(t *testing.T) {
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
-				ProvisioningState: string(v1beta1.VMStateCreating),
+				ProvisioningState: string(machinev1.VMStateCreating),
 			},
 			expected:    true,
 			errExpected: false,
@@ -66,7 +63,7 @@ func TestExists(t *testing.T) {
 			vmService: &FakeVMService{
 				Name:              "machine-test",
 				ID:                "machine-test-ID",
-				ProvisioningState: string(v1beta1.VMStateDeleting),
+				ProvisioningState: string(machinev1.VMStateDeleting),
 			},
 			expected:    true,
 			errExpected: true,
@@ -147,8 +144,8 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 					Namespace: "",
 				},
 			},
-			MachineConfig: &v1beta1.AzureMachineProviderSpec{
-				SpotVMOptions: &v1beta1.SpotVMOptions{
+			MachineConfig: &machinev1.AzureMachineProviderSpec{
+				SpotVMOptions: &machinev1.SpotVMOptions{
 					MaxPrice: &maxPrice,
 				},
 			},
@@ -210,7 +207,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") },
 			vm:    decode.VirtualMachine{},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "worker",
+				actuators.MachineRoleLabel:      "worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
 			},
 			expectedAnnotations: map[string]string{
@@ -227,7 +224,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "good-worker",
+				actuators.MachineRoleLabel:      "good-worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
 			},
 			expectedAnnotations: map[string]string{
@@ -246,7 +243,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				},
 			},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "sized-worker",
+				actuators.MachineRoleLabel:      "sized-worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
 				MachineInstanceTypeLabelName:    "big",
 			},
@@ -262,7 +259,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				Location: pointer.StringPtr("nowhere"),
 			},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "located-worker",
+				actuators.MachineRoleLabel:      "located-worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
 				MachineRegionLabelName:          "nowhere",
 			},
@@ -278,7 +275,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				Zones: &abcZones,
 			},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel: "zoned-worker",
+				actuators.MachineRoleLabel:      "zoned-worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
 				MachineAZLabelName:              "a,b,c",
 			},
@@ -291,12 +288,12 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			name: "with a vm on spot",
 			scope: func(t *testing.T) *actuators.MachineScope {
 				scope := newFakeScope(t, "spot-worker")
-				scope.MachineConfig.SpotVMOptions = &v1beta1.SpotVMOptions{}
+				scope.MachineConfig.SpotVMOptions = &machinev1.SpotVMOptions{}
 				return scope
 			},
 			vm: decode.VirtualMachine{},
 			expectedLabels: map[string]string{
-				providerspecv1.MachineRoleLabel:                         "spot-worker",
+				actuators.MachineRoleLabel:                              "spot-worker",
 				machinev1.MachineClusterIDLabel:                         "clusterID",
 				machinecontroller.MachineInterruptibleInstanceLabelName: "",
 			},
@@ -453,7 +450,7 @@ func TestCreateAvailabilitySet(t *testing.T) {
 							Labels: labels,
 						},
 					},
-					MachineConfig: &providerspecv1.AzureMachineProviderSpec{
+					MachineConfig: &machinev1.AzureMachineProviderSpec{
 						VMSize:          "Standard_D2_v2",
 						AvailabilitySet: tc.inputASName,
 					},

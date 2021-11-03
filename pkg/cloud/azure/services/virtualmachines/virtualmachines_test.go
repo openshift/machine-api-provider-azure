@@ -6,13 +6,12 @@ import (
 	"strconv"
 	"testing"
 
-	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
-
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/apis/azureprovider/v1beta1"
+	. "github.com/onsi/gomega"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
@@ -64,7 +63,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 		{
 			name: "Security profile with EncryptionAtHost set to true",
 			updateSpec: func(vmSpec *Spec) {
-				vmSpec.SecurityProfile = &v1beta1.SecurityProfile{EncryptionAtHost: to.BoolPtr(true)}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: to.BoolPtr(true)}
 			},
 			validate: func(g *WithT, vm *compute.VirtualMachine) {
 				g.Expect(vm.SecurityProfile).ToNot(BeNil())
@@ -75,7 +74,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 		{
 			name: "Security profile with EncryptionAtHost set to false",
 			updateSpec: func(vmSpec *Spec) {
-				vmSpec.SecurityProfile = &v1beta1.SecurityProfile{EncryptionAtHost: to.BoolPtr(false)}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: to.BoolPtr(false)}
 			},
 			validate: func(g *WithT, vm *compute.VirtualMachine) {
 				g.Expect(vm.SecurityProfile).ToNot(BeNil())
@@ -86,7 +85,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 		{
 			name: "Security profile with EncryptionAtHost unset",
 			updateSpec: func(vmSpec *Spec) {
-				vmSpec.SecurityProfile = &v1beta1.SecurityProfile{EncryptionAtHost: nil}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: nil}
 			},
 			validate: func(g *WithT, vm *compute.VirtualMachine) {
 				g.Expect(vm.SecurityProfile).ToNot(BeNil())
@@ -109,7 +108,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					AzureClients: actuators.AzureClients{
 						SubscriptionID: subscription,
 					},
-					MachineConfig: &v1beta1.AzureMachineProviderSpec{
+					MachineConfig: &machinev1.AzureMachineProviderSpec{
 						Location:      location,
 						ResourceGroup: resourcegroup,
 					},
@@ -142,13 +141,13 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		SSHKeyData: "",
 		Size:       "Standard_D4s_v3",
 		Zone:       "",
-		Image: v1beta1.Image{
+		Image: machinev1.Image{
 			Publisher: "Red Hat Inc",
 			Offer:     "ubi",
 			SKU:       "ubi7",
 			Version:   "latest",
 		},
-		OSDisk: v1beta1.OSDisk{
+		OSDisk: machinev1.OSDisk{
 			OSType:     "Linux",
 			DiskSizeGB: 256,
 		},
@@ -177,14 +176,14 @@ func TestGetSpotVMOptions(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		spotVMOptions  *v1beta1.SpotVMOptions
+		spotVMOptions  *machinev1.SpotVMOptions
 		priority       compute.VirtualMachinePriorityTypes
 		evictionPolicy compute.VirtualMachineEvictionPolicyTypes
 		billingProfile *compute.BillingProfile
 	}{
 		{
 			name: "get spot vm option succefully",
-			spotVMOptions: &v1beta1.SpotVMOptions{
+			spotVMOptions: &machinev1.SpotVMOptions{
 				MaxPrice: &maxPrice,
 			},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
@@ -202,7 +201,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 		},
 		{
 			name:           "not return an error with empty spot vm options",
-			spotVMOptions:  &v1beta1.SpotVMOptions{},
+			spotVMOptions:  &machinev1.SpotVMOptions{},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
 			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
 			billingProfile: &compute.BillingProfile{
@@ -211,7 +210,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 		},
 		{
 			name: "not return an error if the max price is nil",
-			spotVMOptions: &v1beta1.SpotVMOptions{
+			spotVMOptions: &machinev1.SpotVMOptions{
 				MaxPrice: nil,
 			},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
