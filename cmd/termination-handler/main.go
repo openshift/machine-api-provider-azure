@@ -17,9 +17,9 @@ import (
 	"flag"
 	"time"
 
+	"github.com/openshift/machine-api-provider-azure/pkg/termination"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/termination"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )

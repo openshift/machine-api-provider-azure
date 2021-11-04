@@ -23,10 +23,10 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/routetables"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/securitygroups"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/routetables"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/securitygroups"
 )
 
 // Get provides information about a route table.

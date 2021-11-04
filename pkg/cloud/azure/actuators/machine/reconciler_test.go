@@ -12,13 +12,13 @@ import (
 	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/decode"
+	mock_azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/mock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/pointer"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/decode"
-	mock_azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/mock"
 )
 
 func TestExists(t *testing.T) {

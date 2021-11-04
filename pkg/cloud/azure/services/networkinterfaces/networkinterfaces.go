@@ -23,16 +23,16 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicips"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicloadbalancers"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/securitygroups"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/subnets"
 	"k8s.io/klog/v2"
 	utilnet "k8s.io/utils/net"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators/machineset"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicips"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/publicloadbalancers"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/securitygroups"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/subnets"
 )
 
 // Spec specification for networkinterface

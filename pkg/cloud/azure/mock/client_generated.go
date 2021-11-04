@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	azure "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+	azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 )
 
 // MockSpec is a mock of Spec interface
