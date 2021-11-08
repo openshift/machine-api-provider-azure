@@ -1,0 +1,39 @@
+{
+  "additionalProperties": {},
+  "assignableScopes": [
+    "/subscriptions/6648228a-736c-4a4e-9a14-92a7e5190f4a"
+  ],
+  "description": "Azure actuator role to manage Azure virtual instance through an azure actuator",
+  "id": "/subscriptions/6648228a-736c-4a4e-9a14-92a7e5190f4a/providers/Microsoft.Authorization/roleDefinitions/80262652-a4ff-43ab-89ae-add4c86fe207",
+  "name": "Azure Actuator",
+  "permissions": [
+    {
+      "actions": [
+        "Microsoft.Compute/disks/delete",
+        "Microsoft.Compute/virtualMachines/read",
+        "Microsoft.Network/virtualNetworks/subnets/read",
+        "Microsoft.Network/networkInterfaces/write",
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+        "Microsoft.Network/networkInterfaces/read",
+        "Microsoft.Compute/virtualMachines/write",
+        "Microsoft.Network/networkInterfaces/join/action",
+        "Microsoft.ManagedIdentity/userAssignedIdentities/assign/action",
+        "Microsoft.Compute/images/read",
+        "Microsoft.Network/publicIPAddresses/read",
+        "Microsoft.Network/publicIPAddresses/join/action",
+        "Microsoft.Network/publicIPAddresses/write",
+
+        "Microsoft.Compute/virtualMachines/delete",
+        "Microsoft.Network/networkInterfaces/delete",
+        "Microsoft.Network/publicIPAddresses/delete",
+      ],
+      "additionalProperties": {},
+      "dataActions": [],
+      "notActions": [],
+      "notDataActions": []
+    }
+  ],
+  "roleName": "AzureActuator",
+  "roleType": "CustomRole",
+  "type": "Microsoft.Authorization/roleDefinitions"
+}
