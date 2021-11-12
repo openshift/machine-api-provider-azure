@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.16 as builder
+FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
 WORKDIR /go/src/github.com/openshift/machine-api-provider-azure
 COPY . .
 # VERSION env gets set in the openshift/release image and refers to the golang version, which interferes with our own
 RUN unset VERSION \
   && GOPROXY=off NO_DOCKER=1 make build
 
-FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
+FROM registry.ci.openshift.org/openshift/origin-v4.0:base
 COPY --from=builder /go/src/github.com/openshift/machine-api-provider-azure/bin/machine-controller-manager /
 COPY --from=builder /go/src/github.com/openshift/machine-api-provider-azure/bin/termination-handler /
+
