@@ -249,6 +249,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 	virtualMachine := &compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.MachineConfig.Location),
 		Tags:     getTagListFromSpec(vmSpec),
+		Plan:     generateImagePlan(vmSpec.Image),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypes(vmSpec.Size),
@@ -384,4 +385,21 @@ func getSpotVMOptions(spotVMOptions *machinev1.SpotVMOptions) (compute.VirtualMa
 	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
 	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
 	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
+}
+
+func generateImagePlan(image machinev1.Image) *compute.Plan {
+	// We only need a purchase plan for third-party marketplace images.
+	if image.Type == "" || image.Type == machinev1.AzureImageTypeMarketplaceNoPlan {
+		return nil
+	}
+
+	if image.Publisher == "" || image.SKU == "" || image.Offer == "" {
+		return nil
+	}
+
+	return &compute.Plan{
+		Publisher: to.StringPtr(image.Publisher),
+		Name:      to.StringPtr(image.SKU),
+		Product:   to.StringPtr(image.Offer),
+	}
 }

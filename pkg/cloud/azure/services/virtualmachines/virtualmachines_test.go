@@ -92,6 +92,23 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				g.Expect(vm.SecurityProfile.EncryptionAtHost).To(BeNil())
 			},
 		},
+		{
+			name:       "Non-ThirdParty Marketplace Image",
+			updateSpec: nil,
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.Plan).To(BeNil())
+			},
+		},
+		{
+			name: "ThirdParty Marketplace Image",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Image.Type = machinev1.AzureImageTypeMarketplaceWithPlan
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.Plan).ToNot(BeNil())
+
+			},
+		},
 	}
 
 	for _, tc := range testCases {
