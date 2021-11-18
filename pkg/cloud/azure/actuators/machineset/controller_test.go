@@ -77,6 +77,8 @@ var _ = Describe("Reconciler", func() {
 		machineSet, err := newTestMachineSet(namespace.Name, rtc.vmSize, rtc.existingAnnotations)
 		Expect(err).ToNot(HaveOccurred())
 
+		replicas := int32(1)
+		machineSet.Spec.Replicas = &replicas
 		Expect(c.Create(ctx, machineSet)).To(Succeed())
 
 		Eventually(func() map[string]string {
