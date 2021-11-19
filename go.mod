@@ -14,7 +14,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.14.0
-	github.com/openshift/api v0.0.0-20211028135425-c4970133b5ba
+	github.com/openshift/api v0.0.0-20211119153416-313e51eab8c8
 	github.com/openshift/machine-api-operator v0.2.1-0.20211029132328-128c5c90918c
 	github.com/spf13/cobra v1.2.1
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
