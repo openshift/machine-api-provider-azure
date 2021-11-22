@@ -1,4 +1,4 @@
-module sigs.k8s.io/cluster-api-provider-azure
+module github.com/openshift/machine-api-provider-azure
 
 go 1.16
 

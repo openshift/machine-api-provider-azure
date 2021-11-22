@@ -1,6 +1,6 @@
 package v1beta1
 
-import "sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+import "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 
 var (
 	// MachineStatusFromProviderStatus unmarshals a raw extension into an AzureMachineProviderStatus type.

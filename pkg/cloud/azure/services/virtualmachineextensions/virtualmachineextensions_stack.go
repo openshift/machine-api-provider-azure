@@ -23,8 +23,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 
 // Get provides information about a virtual network.

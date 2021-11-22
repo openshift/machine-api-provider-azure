@@ -19,8 +19,8 @@ package groups
 import (
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/resources/mgmt/resources"
 	"github.com/Azure/go-autorest/autorest"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/actuators"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
 // StackHubService provides operations on resource groups

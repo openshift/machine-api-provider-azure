@@ -26,10 +26,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 )
 
 // Get provides information about a virtual network.

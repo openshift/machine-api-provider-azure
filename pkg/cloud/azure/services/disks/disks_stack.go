@@ -22,8 +22,8 @@ import (
 	"fmt"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"k8s.io/klog/v2"
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
 )
 
 // Get on disk is currently no-op. OS disks should only be deleted and will create with the VM automatically.

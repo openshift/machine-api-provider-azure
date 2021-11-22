@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"strings"
 
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 )
 
 // Spec input specification for Get/CreateOrUpdate/Delete calls

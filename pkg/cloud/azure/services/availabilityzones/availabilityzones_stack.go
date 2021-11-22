@@ -21,7 +21,7 @@ import (
 	"errors"
 	"strings"
 
-	"sigs.k8s.io/cluster-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 )
 
 // Get provides information about a availability zones.
