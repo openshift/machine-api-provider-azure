@@ -285,6 +285,16 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 		},
 	}
 
+	// Ephemeral storage related options
+	if vmSpec.OSDisk.CachingType != "" {
+		virtualMachine.VirtualMachineProperties.StorageProfile.OsDisk.Caching = compute.CachingTypes(vmSpec.OSDisk.CachingType)
+	}
+	if vmSpec.OSDisk.DiskSettings.EphemeralStorageLocation == "Local" {
+		virtualMachine.VirtualMachineProperties.StorageProfile.OsDisk.DiffDiskSettings = &compute.DiffDiskSettings{
+			Option: compute.DiffDiskOptions(vmSpec.OSDisk.DiskSettings.EphemeralStorageLocation),
+		}
+	}
+
 	if vmSpec.ManagedIdentity != "" {
 		virtualMachine.Identity = &compute.VirtualMachineIdentity{
 			Type: compute.ResourceIdentityTypeUserAssigned,
