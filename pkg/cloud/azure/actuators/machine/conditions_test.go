@@ -3,65 +3,64 @@ package machine
 import (
 	"testing"
 
-	machinev1 "github.com/openshift/api/machine/v1beta1"
-	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestShouldUpdateCondition(t *testing.T) {
 	testCases := []struct {
-		oldCondition machinev1.AzureMachineProviderCondition
-		newCondition machinev1.AzureMachineProviderCondition
+		oldCondition metav1.Condition
+		newCondition metav1.Condition
 		expected     bool
 	}{
 		{
-			oldCondition: machinev1.AzureMachineProviderCondition{
+			oldCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
-			newCondition: machinev1.AzureMachineProviderCondition{
+			newCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
 			expected: false,
 		},
 		{
-			oldCondition: machinev1.AzureMachineProviderCondition{
+			oldCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
-			newCondition: machinev1.AzureMachineProviderCondition{
+			newCondition: metav1.Condition{
 				Reason:  "different reason",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
 			expected: true,
 		},
 		{
-			oldCondition: machinev1.AzureMachineProviderCondition{
+			oldCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "different message",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
-			newCondition: machinev1.AzureMachineProviderCondition{
+			newCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
 			expected: true,
 		},
 		{
-			oldCondition: machinev1.AzureMachineProviderCondition{
+			oldCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 			},
-			newCondition: machinev1.AzureMachineProviderCondition{
+			newCondition: metav1.Condition{
 				Reason:  "foo",
 				Message: "bar",
-				Status:  corev1.ConditionFalse,
+				Status:  metav1.ConditionFalse,
 			},
 			expected: true,
 		},
