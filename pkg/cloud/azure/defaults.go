@@ -124,6 +124,11 @@ func GenerateOSDiskName(machineName string) string {
 	return fmt.Sprintf("%s_OSDisk", machineName)
 }
 
+// GenerateDataDiskName generates Data disks names used by VM
+func GenerateDataDiskName(machineName, suffix string) string {
+	return fmt.Sprintf("%s_%s", machineName, suffix)
+}
+
 // GenerateNetworkInterfaceName generates network interface name used by VM
 func GenerateNetworkInterfaceName(machineName string) string {
 	return fmt.Sprintf("%s-nic", machineName)
