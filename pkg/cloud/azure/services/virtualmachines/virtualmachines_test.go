@@ -11,6 +11,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/gomega"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
@@ -49,9 +50,10 @@ func TestGetTagListFromSpec(t *testing.T) {
 
 func TestDeriveVirtualMachineParameters(t *testing.T) {
 	testCases := []struct {
-		name       string
-		updateSpec func(*Spec)
-		validate   func(*WithT, *compute.VirtualMachine)
+		name          string
+		updateSpec    func(*Spec)
+		validate      func(*WithT, *compute.VirtualMachine)
+		expectedError error
 	}{
 		{
 			name:       "Unspecified security profile",
@@ -109,6 +111,280 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 
 			},
 		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to true with an Ultra Disk Data Disk",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "ultradisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			},
+		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to true with Ultra Disk and UltraSSDCapability enabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			},
+		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to true with no Ultra Disks but UltraSSDCapability enabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.UltraSSDCapability = machinev1.AzureUltraSSDCapabilityEnabled
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			},
+		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to false with UltraSSDCapability disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.UltraSSDCapability = machinev1.AzureUltraSSDCapabilityDisabled
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse())
+			},
+		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to false with Ultra Disks but UltraSSDCapability disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.UltraSSDCapability = machinev1.AzureUltraSSDCapabilityDisabled
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse())
+			},
+		},
+		{
+			name: "AdditionalCapabilities.UltraSSDEnabled to nil with a non Ultra Disk Data Disk",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "premiumdisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				if vm.AdditionalCapabilities != nil {
+					g.Expect(vm.AdditionalCapabilities.UltraSSDEnabled).To(BeNil())
+				} else {
+					g.Expect(vm.AdditionalCapabilities).To(BeNil())
+				}
+			},
+		},
+		{
+			name: "Error when Data Disk lun is too high",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        100,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w", apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"Invalid value `lun`: %d. `lun` cannot be lower than 0 or higher than 63.",
+				"testvm"+"_"+"datadisk-test", "testvm", 100)),
+		},
+		{
+			name: "Error when Data Disk lun is too low",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        -1,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w", apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"Invalid value `lun`: %d. `lun` cannot be lower than 0 or higher than 63.",
+				"testvm"+"_"+"datadisk-test", "testvm", -1)),
+		},
+		{
+			name: "Error when Data Disks luns are not unique",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+					{
+						NameSuffix: "datadisk-test-2",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"A Data Disk with `lun`: %d, already exists. `lun` must be unique.",
+					"testvm"+"_"+"datadisk-test-2", "testvm", 0)),
+		},
+		{
+			name: "Error when Data Disks nameSuffixes are not unique",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        1,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"A Data Disk with `nameSuffix`: %s, already exists. `nameSuffix` must be unique.",
+					"testvm"+"_"+"datadisk-test", "testvm", "datadisk-test")),
+		},
+		{
+			name: "Error when Data Disk nameSuffix is invalid",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "inv$alid",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"The nameSuffix can only contain letters, numbers, "+
+					"underscores, periods or hyphens. Check your `nameSuffix`.",
+					"testvm"+"_"+"inv$alid", "testvm")),
+		},
+		{
+			name: "Error when Data Disk nameSuffix is too long",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "qwkuid031j3x3fxktj9saez28zoo2843jkl35w3ner90i9wvwkqphau1l5y7j7k3750960btqljnlthoq",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountPremiumLRS,
+						},
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"The overall disk name name must not exceed 80 chars in length. Check your `nameSuffix`.",
+					"testvm"+"_"+"qwkuid031j3x3fxktj9saez28zoo2843jkl35w3ner90i9wvwkqphau1l5y7j7k3750960btqljnlthoq", "testvm")),
+		},
+		{
+			name: "Error when Data Disk is Ultra Disk and cachingType not None",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						CachingType: machinev1.CachingTypeReadOnly,
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"`cachingType`: %s, is not supported for Data Disk of `storageAccountType`: \"%s\". "+
+					"Use `storageAccountType`: \"%s\" instead.",
+					"testvm"+"_"+"datadisk-test", "testvm",
+					machinev1.CachingTypeReadOnly, machinev1.StorageAccountUltraSSDLRS, machinev1.CachingTypeNone)),
+		},
+		{
+			name: "Error when Data Disk is smaller than 4GB",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 3,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						CachingType: machinev1.CachingTypeReadOnly,
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"`diskSizeGB`: %d, is invalid, disk size must be greater or equal than 4.",
+					"testvm"+"_"+"datadisk-test", "testvm", 3)),
+		},
 	}
 
 	for _, tc := range testCases {
@@ -134,8 +410,12 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 
 			vm, err := s.deriveVirtualMachineParameters(vmSpec, nic)
 
-			g.Expect(err).ToNot(HaveOccurred())
-			tc.validate(g, vm)
+			if tc.expectedError != nil {
+				g.Expect(err).To(MatchError(tc.expectedError))
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
+				tc.validate(g, vm)
+			}
 		})
 	}
 }
@@ -167,6 +447,13 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		OSDisk: machinev1.OSDisk{
 			OSType:     "Linux",
 			DiskSizeGB: 256,
+		},
+		DataDisks: []machinev1.DataDisk{
+			{
+				DiskSizeGB: 4,
+				NameSuffix: "testdata",
+				Lun:        0,
+			},
 		},
 		CustomData:      "",
 		ManagedIdentity: "",
