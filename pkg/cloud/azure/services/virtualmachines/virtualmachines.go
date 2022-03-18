@@ -72,6 +72,7 @@ type Spec struct {
 	Zone                string
 	Image               machinev1.Image
 	OSDisk              machinev1.OSDisk
+	DataDisks           []machinev1.DataDisk
 	CustomData          string
 	ManagedIdentity     string
 	Tags                map[string]string
@@ -79,6 +80,7 @@ type Spec struct {
 	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile      *compute.BillingProfile
 	SecurityProfile     *machinev1.SecurityProfile
+	UltraSSDCapability  machinev1.AzureUltraSSDCapabilityState
 	AvailabilitySetName string
 }
 
