@@ -122,6 +122,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -140,6 +141,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -177,6 +179,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -195,6 +198,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -204,6 +208,48 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				} else {
 					g.Expect(vm.AdditionalCapabilities).To(BeNil())
 				}
+			},
+		},
+		{
+			name: "When Data Disk deletionPolicy is Detach",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDetach,
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.StorageProfile.DataDisks).ToNot(BeNil())
+				g.Expect((*vm.StorageProfile.DataDisks)[0].DeleteOption).To(BeIdenticalTo(compute.DiskDeleteOptionTypesDetach))
+			},
+		},
+		{
+			name: "When Data Disk deletionPolicy is Delete",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.StorageProfile.DataDisks).ToNot(BeNil())
+				g.Expect((*vm.StorageProfile.DataDisks)[0].DeleteOption).To(BeIdenticalTo(compute.DiskDeleteOptionTypesDelete))
 			},
 		},
 		{
@@ -218,6 +264,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -237,6 +284,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -256,6 +304,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 					{
 						NameSuffix: "datadisk-test-2",
@@ -264,6 +313,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -284,6 +334,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 					{
 						NameSuffix: "datadisk-test",
@@ -292,6 +343,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -312,6 +364,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -333,6 +386,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountPremiumLRS,
 						},
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -353,7 +407,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
 						},
-						CachingType: machinev1.CachingTypeReadOnly,
+						CachingType:    machinev1.CachingTypeReadOnly,
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -376,7 +431,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
 							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
 						},
-						CachingType: machinev1.CachingTypeReadOnly,
+						CachingType:    machinev1.CachingTypeReadOnly,
+						DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 					},
 				}
 			},
@@ -384,6 +440,50 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
 					"`diskSizeGB`: %d, is invalid, disk size must be greater or equal than 4.",
 					"testvm"+"_"+"datadisk-test", "testvm", 3)),
+		},
+		{
+			name: "Error when Data Disk deletionPolicy is invalid",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						DeletionPolicy: "bla",
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"Invalid value `deletionPolicy`: \"%s\". Valid values are \"%s\",\"%s\".",
+					"testvm"+"_"+"datadisk-test", "testvm",
+					"bla", machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)),
+		},
+		{
+			name: "Error when Data Disk deletionPolicy is empty",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.DataDisks = []machinev1.DataDisk{
+					{
+						NameSuffix: "datadisk-test",
+						DiskSizeGB: 4,
+						Lun:        0,
+						ManagedDisk: machinev1.DataDiskManagedDiskParameters{
+							StorageAccountType: machinev1.StorageAccountUltraSSDLRS,
+						},
+						DeletionPolicy: "",
+					},
+				}
+			},
+			expectedError: fmt.Errorf("failed to generate data disk spec: %w",
+				apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+					"Invalid value `deletionPolicy`: \"%s\". Valid values are \"%s\",\"%s\".",
+					"testvm"+"_"+"datadisk-test", "testvm",
+					"", machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)),
 		},
 	}
 
@@ -450,9 +550,10 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		},
 		DataDisks: []machinev1.DataDisk{
 			{
-				DiskSizeGB: 4,
-				NameSuffix: "testdata",
-				Lun:        0,
+				DiskSizeGB:     4,
+				NameSuffix:     "testdata",
+				Lun:            0,
+				DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
 			},
 		},
 		CustomData:      "",
