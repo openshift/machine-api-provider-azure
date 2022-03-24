@@ -592,10 +592,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			SSHKeyData:          string(decoded),
 			Size:                s.scope.MachineConfig.VMSize,
 			OSDisk:              s.scope.MachineConfig.OSDisk,
+			DataDisks:           s.scope.MachineConfig.DataDisks,
 			Image:               s.scope.MachineConfig.Image,
 			Zone:                zone,
 			Tags:                s.scope.MachineConfig.Tags,
 			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
+			UltraSSDCapability:  s.scope.MachineConfig.UltraSSDCapability,
 			AvailabilitySetName: asName,
 		}
 
