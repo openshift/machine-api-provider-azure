@@ -502,6 +502,15 @@ func generateDataDisks(vmSpec *Spec) ([]compute.DataDisk, error) {
 				dataDiskName, vmSpec.Name, disk.Lun)
 		}
 
+		switch disk.DeletionPolicy {
+		case machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach:
+			// valid
+		default:
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"Invalid value `deletionPolicy`: \"%s\". Valid values are \"%s\",\"%s\".",
+				dataDiskName, vmSpec.Name, disk.DeletionPolicy, machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)
+		}
+
 		seenDataDiskNames[disk.NameSuffix] = struct{}{}
 		seenDataDiskLuns[disk.Lun] = struct{}{}
 
@@ -511,6 +520,7 @@ func generateDataDisks(vmSpec *Spec) ([]compute.DataDisk, error) {
 			Lun:          to.Int32Ptr(disk.Lun),
 			Name:         to.StringPtr(dataDiskName),
 			Caching:      compute.CachingTypes(disk.CachingType),
+			DeleteOption: compute.DiskDeleteOptionTypes(disk.DeletionPolicy),
 		}
 
 		dataDisks[i].ManagedDisk = &compute.ManagedDiskParameters{
