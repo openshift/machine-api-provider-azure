@@ -14,7 +14,7 @@ require (
 	github.com/onsi/ginkgo v1.16.5
 	github.com/onsi/gomega v1.17.0
 	github.com/openshift/api v0.0.0-20220324135351-3d6a78ae0721
-	github.com/openshift/machine-api-operator v0.2.1-0.20220307175710-ece28bb67518
+	github.com/openshift/machine-api-operator v0.2.1-0.20220327131531-58ba8507d869
 	github.com/spf13/cobra v1.2.1
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 
@@ -84,7 +84,7 @@ require (
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/prometheus/client_golang v1.11.0 // indirect
+	github.com/prometheus/client_golang v1.11.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.28.0 // indirect
 	github.com/prometheus/procfs v0.6.0 // indirect
