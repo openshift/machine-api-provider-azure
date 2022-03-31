@@ -42,6 +42,7 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachineextensions"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 	apicorev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -95,9 +96,9 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 // Create creates machine if and only if machine exists, handled by cluster-api
 func (s *Reconciler) Create(ctx context.Context) error {
 	if err := s.CreateMachine(ctx); err != nil {
-		s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, machinev1.AzureMachineProviderCondition{
-			Type:    machinev1.MachineCreated,
-			Status:  apicorev1.ConditionTrue,
+		s.scope.MachineStatus.Conditions = setCondition(s.scope.MachineStatus.Conditions, metav1.Condition{
+			Type:    string(machinev1.MachineCreated),
+			Status:  metav1.ConditionTrue,
 			Reason:  machineCreationFailedReason,
 			Message: err.Error(),
 		})
@@ -265,9 +266,9 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	}
 
 	// Set instance conditions
-	s.scope.MachineStatus.Conditions = setMachineProviderCondition(s.scope.MachineStatus.Conditions, machinev1.AzureMachineProviderCondition{
-		Type:    machinev1.MachineCreated,
-		Status:  apicorev1.ConditionTrue,
+	s.scope.MachineStatus.Conditions = setCondition(s.scope.MachineStatus.Conditions, metav1.Condition{
+		Type:    string(machinev1.MachineCreated),
+		Status:  metav1.ConditionTrue,
 		Reason:  machineCreationSucceedReason,
 		Message: machineCreationSucceedMessage,
 	})
