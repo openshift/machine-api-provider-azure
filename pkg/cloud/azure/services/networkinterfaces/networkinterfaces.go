@@ -87,8 +87,13 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	// Enaled Accelerated networking
 	if s.Scope.MachineConfig.AcceleratedNetworking {
-		if !machineset.InstanceTypes[s.Scope.MachineConfig.VMSize].AcceleratedNetworking {
-			return errors.New("accelerated networking not supported on instance type " + s.Scope.MachineConfig.VMSize)
+		nicProperties, ok := machineset.InstanceTypes[s.Scope.MachineConfig.VMSize]
+		if ok {
+			if !nicProperties.AcceleratedNetworking {
+				return fmt.Errorf("accelerated networking not supported on instance type %s", s.Scope.MachineConfig.VMSize)
+			}
+		} else {
+			klog.V(4).Infof("could not determine nic properties for instance type %s", s.Scope.MachineConfig.VMSize)
 		}
 		klog.V(4).Infof("setting EnableAcceleratedNetworking to %v", s.Scope.MachineConfig.AcceleratedNetworking)
 		nicProp.EnableAcceleratedNetworking = to.BoolPtr(s.Scope.MachineConfig.AcceleratedNetworking)
