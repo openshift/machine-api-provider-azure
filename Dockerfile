@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.ci.openshift.org/openshift/release:golang-1.17 AS builder
+FROM registry.ci.openshift.org/openshift/release:golang-1.18 AS builder
 WORKDIR /go/src/github.com/openshift/machine-api-provider-azure
 COPY . .
 # VERSION env gets set in the openshift/release image and refers to the golang version, which interferes with our own
