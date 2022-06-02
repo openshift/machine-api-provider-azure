@@ -732,12 +732,19 @@ func (s *Reconciler) getOrCreateAvailabilitySet() (string, error) {
 // will be `<MachineSet Name>-as`.
 // see https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftcompute
 func (s *Reconciler) getAvailabilitySetName() string {
+	asname := ""
 	if strings.HasPrefix(s.scope.Machine.Labels[MachineSetLabelName], s.scope.Machine.Labels[machinev1.MachineClusterIDLabel]) {
-		return fmt.Sprintf("%s-as",
-			s.scope.Machine.Labels[MachineSetLabelName])
+		asname = s.scope.Machine.Labels[MachineSetLabelName]
 	} else {
-		return fmt.Sprintf("%s_%s-as",
+		asname = fmt.Sprintf("%s_%s",
 			s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
 			s.scope.Machine.Labels[MachineSetLabelName])
 	}
+	// due to the 80 character name limit, if the proposed name will be 77 or more
+	// characters, we truncate the name before adding `-as`
+	if len(asname) >= 77 { // 80 char minus room for adding `-as`
+		asname = asname[:77]
+	}
+	asname = fmt.Sprintf("%s-as", asname)
+	return asname
 }
