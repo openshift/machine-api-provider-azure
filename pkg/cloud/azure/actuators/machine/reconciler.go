@@ -484,7 +484,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 
 	// Delete the availability set with the given name if no virtual machines are attached to it.
 	if err := s.availabilitySetsSvc.Delete(ctx, &availabilitysets.Spec{
-		Name: s.getAvailibilitySetName(),
+		Name: s.getAvailabilitySetName(),
 	}); err != nil {
 		return fmt.Errorf("failed to delete availability set: %w", err)
 	}
@@ -712,18 +712,28 @@ func (s *Reconciler) getOrCreateAvailabilitySet() (string, error) {
 	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
 
 	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), &availabilitysets.Spec{
-		Name: s.getAvailibilitySetName(),
+		Name: s.getAvailabilitySetName(),
 	}); err != nil {
 		return "", err
 	}
 
-	return s.getAvailibilitySetName(), nil
+	return s.getAvailabilitySetName(), nil
 }
 
-// getAvailibilitySetName use MachineSet or Machine name + cluster name to
-// generate availability set name
-func (s *Reconciler) getAvailibilitySetName() string {
-	return fmt.Sprintf("%s_%s-as",
-		s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
-		s.scope.Machine.Labels[MachineSetLabelName])
+// getAvailabilitySetName uses the MachineSet name and the cluster name to
+// generate an availability set name with the format
+// `<Cluster Name>_<MachineSet Name>-as`. Due to an 80 character restriction
+// on availability set names, if the MachineSet name starts with the cluster
+// name, then it will not be added a second time and the availability set name
+// will be `<MachineSet Name>-as`.
+// see https://docs.microsoft.com/en-us/azure/azure-resource-manager/management/resource-name-rules#microsoftcompute
+func (s *Reconciler) getAvailabilitySetName() string {
+	if strings.HasPrefix(s.scope.Machine.Labels[MachineSetLabelName], s.scope.Machine.Labels[machinev1.MachineClusterIDLabel]) {
+		return fmt.Sprintf("%s-as",
+			s.scope.Machine.Labels[MachineSetLabelName])
+	} else {
+		return fmt.Sprintf("%s_%s-as",
+			s.scope.Machine.Labels[machinev1.MachineClusterIDLabel],
+			s.scope.Machine.Labels[MachineSetLabelName])
+	}
 }

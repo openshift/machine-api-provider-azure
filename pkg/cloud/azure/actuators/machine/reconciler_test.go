@@ -432,6 +432,21 @@ func TestCreateAvailabilitySet(t *testing.T) {
 				return availabilitySetsSvc
 			},
 		},
+		{
+			name:           "Availability set does not contain double cluster name when it is present in MachineSet name",
+			labels:         map[string]string{MachineSetLabelName: "clustername-msname", machinev1.MachineClusterIDLabel: "clustername"},
+			expectedASName: "clustername-msname-as",
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+				return availabilitySetsSvc
+			},
+		},
 	}
 
 	for _, tc := range testCases {
