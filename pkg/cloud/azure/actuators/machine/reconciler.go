@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -44,6 +45,7 @@ import (
 	apicorev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -584,6 +586,11 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			return fmt.Errorf("failed to get zone: %w", err)
 		}
 
+		diagnosticsProfile, err := createDiagnosticsConfig(s.scope.MachineConfig)
+		if err != nil {
+			return fmt.Errorf("failed to configure diagnostics profile: %w", err)
+		}
+
 		if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
 			return fmt.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
 		}
@@ -601,6 +608,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
 			UltraSSDCapability:  s.scope.MachineConfig.UltraSSDCapability,
 			AvailabilitySetName: asName,
+			DiagnosticsProfile:  diagnosticsProfile,
 		}
 
 		if s.scope.MachineConfig.ManagedIdentity != "" {
@@ -747,4 +755,39 @@ func (s *Reconciler) getAvailabilitySetName() string {
 	}
 	asname = fmt.Sprintf("%s-as", asname)
 	return asname
+}
+
+// createDiagnosticsConfig sets up the diagnostics configuration for the virtual machine.
+func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compute.DiagnosticsProfile, error) {
+	boot := config.Diagnostics.Boot
+	if boot == nil {
+		return nil, nil
+	}
+
+	switch boot.StorageAccountType {
+	case machinev1.AzureManagedAzureDiagnosticsStorage:
+		return &compute.DiagnosticsProfile{
+			BootDiagnostics: &compute.BootDiagnostics{
+				Enabled: pointer.Bool(true),
+			},
+		}, nil
+	case machinev1.CustomerManagedAzureDiagnosticsStorage:
+		if boot.CustomerManaged == nil || boot.CustomerManaged.StorageAccountURI == "" {
+			return nil, machinecontroller.InvalidMachineConfiguration("missing configuration for customer managed storage account URI")
+		}
+
+		return &compute.DiagnosticsProfile{
+			BootDiagnostics: &compute.BootDiagnostics{
+				Enabled:    pointer.Bool(true),
+				StorageURI: pointer.String(boot.CustomerManaged.StorageAccountURI),
+			},
+		}, nil
+	default:
+		return nil, machinecontroller.InvalidMachineConfiguration(
+			"unknown storage account type for boot diagnostics: %q, supported types are %s & %s",
+			boot.StorageAccountType,
+			machinev1.AzureManagedAzureDiagnosticsStorage,
+			machinev1.CustomerManagedAzureDiagnosticsStorage,
+		)
+	}
 }

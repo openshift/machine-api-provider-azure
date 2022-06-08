@@ -83,6 +83,7 @@ type Spec struct {
 	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile      *compute.BillingProfile
 	SecurityProfile     *machinev1.SecurityProfile
+	DiagnosticsProfile  *compute.DiagnosticsProfile
 	UltraSSDCapability  machinev1.AzureUltraSSDCapabilityState
 	AvailabilitySetName string
 }
@@ -290,9 +291,10 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 					},
 				},
 			},
-			Priority:       priority,
-			EvictionPolicy: evictionPolicy,
-			BillingProfile: billingProfile,
+			Priority:           priority,
+			EvictionPolicy:     evictionPolicy,
+			BillingProfile:     billingProfile,
+			DiagnosticsProfile: vmSpec.DiagnosticsProfile,
 		},
 	}
 
