@@ -6,18 +6,18 @@ var pluralRules = []rule{}
 func AddPlural(suffix string, repl string) {
 	pluralMoot.Lock()
 	defer pluralMoot.Unlock()
-	pluralRules = append([]rule{{
+	pluralRules = append(pluralRules, rule{
 		suffix: suffix,
 		fn: func(s string) string {
 			s = s[:len(s)-len(suffix)]
 			return s + repl
 		},
-	}}, pluralRules...)
+	})
 
-	pluralRules = append([]rule{{
+	pluralRules = append(pluralRules, rule{
 		suffix: repl,
 		fn:     noop,
-	}}, pluralRules...)
+	})
 }
 
 var singleToPlural = map[string]string{
@@ -224,6 +224,7 @@ var singularToPluralSuffixList = []singularToPluralSuffix{
 	{"oci", "ocus"},
 	{"ode", "odes"},
 	{"ofe", "oves"},
+	{"oot", "eet"},
 	{"pfe", "pves"},
 	{"pse", "psis"},
 	{"qfe", "qves"},
@@ -280,8 +281,8 @@ var singularToPluralSuffixList = []singularToPluralSuffix{
 }
 
 func init() {
-	for i := len(singularToPluralSuffixList) - 1; i >= 0; i-- {
-		AddPlural(singularToPluralSuffixList[i].singular, singularToPluralSuffixList[i].plural)
-		AddSingular(singularToPluralSuffixList[i].plural, singularToPluralSuffixList[i].singular)
+	for _, suffix := range singularToPluralSuffixList {
+		AddPlural(suffix.singular, suffix.plural)
+		AddSingular(suffix.plural, suffix.singular)
 	}
 }

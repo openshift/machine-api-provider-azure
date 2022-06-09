@@ -33,8 +33,8 @@ const (
 	daemonSetWarning    = "ignoring DaemonSet-managed Pods"
 	localStorageFatal   = "Pods with local storage (use --delete-emptydir-data to override)"
 	localStorageWarning = "deleting Pods with local storage"
-	unmanagedFatal      = "Pods declare no controller (use --force to override)"
-	unmanagedWarning    = "deleting Pods that declare no controller"
+	unmanagedFatal      = "Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet (use --force to override)"
+	unmanagedWarning    = "deleting Pods not managed by ReplicationController, ReplicaSet, Job, DaemonSet or StatefulSet"
 )
 
 // PodDelete informs filtering logic whether a pod should be deleted or not

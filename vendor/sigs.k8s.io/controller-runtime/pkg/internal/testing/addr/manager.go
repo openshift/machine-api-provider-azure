@@ -43,17 +43,11 @@ var (
 
 func init() {
 	baseDir, err := os.UserCacheDir()
-	if err == nil {
-		cacheDir = filepath.Join(baseDir, "kubebuilder-envtest")
-		err = os.MkdirAll(cacheDir, 0o750)
-	}
 	if err != nil {
-		// Either we didn't get a cache directory, or we can't use it
 		baseDir = os.TempDir()
-		cacheDir = filepath.Join(baseDir, "kubebuilder-envtest")
-		err = os.MkdirAll(cacheDir, 0o750)
 	}
-	if err != nil {
+	cacheDir = filepath.Join(baseDir, "kubebuilder-envtest")
+	if err := os.MkdirAll(cacheDir, 0750); err != nil {
 		panic(err)
 	}
 }

@@ -41,11 +41,6 @@ const defaultVersion = v1
 
 // Generator generates CustomResourceDefinition objects.
 type Generator struct {
-	// IgnoreUnexportedFields indicates that we should skip unexported fields.
-	//
-	// Left unspecified, the default is false.
-	IgnoreUnexportedFields *bool `marker:",optional"`
-
 	// AllowDangerousTypes allows types which are usually omitted from CRD generation
 	// because they are not recommended.
 	//
@@ -85,20 +80,12 @@ func (Generator) CheckFilter() loader.NodeFilter {
 func (Generator) RegisterMarkers(into *markers.Registry) error {
 	return crdmarkers.Register(into)
 }
-
-// transformRemoveCRDStatus ensures we do not write the CRD status field.
-func transformRemoveCRDStatus(obj map[string]interface{}) error {
-	delete(obj, "status")
-	return nil
-}
-
 func (g Generator) Generate(ctx *genall.GenerationContext) error {
 	parser := &Parser{
 		Collector: ctx.Collector,
 		Checker:   ctx.Checker,
 		// Perform defaulting here to avoid ambiguity later
-		IgnoreUnexportedFields: g.IgnoreUnexportedFields != nil && *g.IgnoreUnexportedFields == true,
-		AllowDangerousTypes:    g.AllowDangerousTypes != nil && *g.AllowDangerousTypes == true,
+		AllowDangerousTypes: g.AllowDangerousTypes != nil && *g.AllowDangerousTypes == true,
 		// Indicates the parser on whether to register the ObjectMeta type or not
 		GenerateEmbeddedObjectMeta: g.GenerateEmbeddedObjectMeta != nil && *g.GenerateEmbeddedObjectMeta == true,
 	}
@@ -152,7 +139,7 @@ func (g Generator) Generate(ctx *genall.GenerationContext) error {
 			} else {
 				fileName = fmt.Sprintf("%s_%s.%s.yaml", crdRaw.Spec.Group, crdRaw.Spec.Names.Plural, crdVersions[i])
 			}
-			if err := ctx.WriteYAML(fileName, []interface{}{crd}, genall.WithTransform(transformRemoveCRDStatus)); err != nil {
+			if err := ctx.WriteYAML(fileName, crd); err != nil {
 				return err
 			}
 		}
