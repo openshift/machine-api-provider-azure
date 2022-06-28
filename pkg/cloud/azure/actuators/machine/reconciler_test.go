@@ -501,3 +501,104 @@ func TestCreateAvailabilitySet(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateDiagnosticsConfig(t *testing.T) {
+	testCases := []struct {
+		name           string
+		config         *machinev1.AzureMachineProviderSpec
+		expectedConfig *compute.DiagnosticsProfile
+		expectedError  error
+	}{
+		{
+			name:           "with no boot configuration",
+			config:         &machinev1.AzureMachineProviderSpec{},
+			expectedConfig: nil,
+			expectedError:  nil,
+		},
+		{
+			name: "with no storage account type",
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{},
+				},
+			},
+			expectedConfig: nil,
+			expectedError:  machinecontroller.InvalidMachineConfiguration("unknown storage account type for boot diagnostics: \"\", supported types are AzureManaged & CustomerManaged"),
+		},
+		{
+			name: "with an invalid storage account type",
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.AzureBootDiagnosticsStorageAccountType("foo"),
+					},
+				},
+			},
+			expectedConfig: nil,
+			expectedError:  machinecontroller.InvalidMachineConfiguration("unknown storage account type for boot diagnostics: \"foo\", supported types are AzureManaged & CustomerManaged"),
+		},
+		{
+			name: "with an Azure managed storage account",
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.AzureManagedAzureDiagnosticsStorage,
+					},
+				},
+			},
+			expectedConfig: &compute.DiagnosticsProfile{
+				BootDiagnostics: &compute.BootDiagnostics{
+					Enabled: pointer.BoolPtr(true),
+				},
+			},
+			expectedError: nil,
+		},
+		{
+			name: "with an Customer managed storage account with no account URI",
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.CustomerManagedAzureDiagnosticsStorage,
+					},
+				},
+			},
+			expectedConfig: nil,
+			expectedError:  machinecontroller.InvalidMachineConfiguration("missing configuration for customer managed storage account URI"),
+		},
+		{
+			name: "with an Customer managed storage account with a valid account URI",
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.CustomerManagedAzureDiagnosticsStorage,
+						CustomerManaged: &machinev1.AzureCustomerManagedBootDiagnostics{
+							StorageAccountURI: "https://myaccount.blob.windows.net/",
+						},
+					},
+				},
+			},
+			expectedConfig: &compute.DiagnosticsProfile{
+				BootDiagnostics: &compute.BootDiagnostics{
+					Enabled:    pointer.BoolPtr(true),
+					StorageURI: pointer.String("https://myaccount.blob.windows.net/"),
+				},
+			},
+			expectedError: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			config, err := createDiagnosticsConfig(tc.config)
+			if tc.expectedError != nil {
+				g.Expect(err).To(MatchError(tc.expectedError))
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
+			}
+
+			g.Expect(config).To(Equal(tc.expectedConfig))
+		})
+	}
+}
