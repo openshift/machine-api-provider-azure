@@ -230,6 +230,28 @@ func TestReconcile(t *testing.T) {
 			expectErr: false,
 		},
 		{
+			name:                "with a case insensitive Standard_NC24 #1",
+			vmSize:              "standard_nc24",
+			existingAnnotations: make(map[string]string),
+			expectedAnnotations: map[string]string{
+				cpuKey:    "24",
+				memoryKey: "229376",
+				gpuKey:    "4",
+			},
+			expectErr: false,
+		},
+		{
+			name:                "with a case insensitive Standard_NC24 #2",
+			vmSize:              "sTaNdArD_nC24",
+			existingAnnotations: make(map[string]string),
+			expectedAnnotations: map[string]string{
+				cpuKey:    "24",
+				memoryKey: "229376",
+				gpuKey:    "4",
+			},
+			expectErr: false,
+		},
+		{
 			name:   "with existing annotations",
 			vmSize: "Standard_NC24",
 			existingAnnotations: map[string]string{

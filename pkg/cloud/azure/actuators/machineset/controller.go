@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -48,6 +49,17 @@ type Reconciler struct {
 
 	recorder record.EventRecorder
 	scheme   *runtime.Scheme
+}
+
+func init() {
+	// Convert InstanceTypes map keys to lowercase since instance types are case insensitive
+	// in Azure API.
+	newInstanceTypes := make(map[string]*instanceType)
+	for itName, itValue := range InstanceTypes {
+		newInstanceTypes[strings.ToLower(itName)] = itValue
+	}
+
+	InstanceTypes = newInstanceTypes
 }
 
 // SetupWithManager creates a new controller for a manager.
@@ -124,7 +136,7 @@ func (r *Reconciler) reconcile(machineSet *machinev1.MachineSet) (ctrl.Result, e
 	if err != nil {
 		return ctrl.Result{}, mapierrors.InvalidMachineConfiguration("failed to get providerConfig: %v", err)
 	}
-	instanceType, ok := InstanceTypes[providerConfig.VMSize]
+	instanceType, ok := InstanceTypes[strings.ToLower(providerConfig.VMSize)]
 	if !ok {
 		klog.Error("Unable to set scale from zero annotations: unknown instance type: %s", providerConfig.VMSize)
 		klog.Error("Autoscaling from zero will not work. To fix this, manually populate machine annotations for your instance type: %v", []string{cpuKey, memoryKey, gpuKey})
