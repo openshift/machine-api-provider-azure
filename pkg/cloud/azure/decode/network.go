@@ -40,6 +40,30 @@ type PublicIPAddressDNSSettings struct {
 	Fqdn *string `json:"fqdn,omitempty"`
 }
 
+type LoadBalancer struct {
+	// LoadBalancerPropertiesFormat - Properties of load balancer.
+	*LoadBalancerPropertiesFormat `json:"properties,omitempty"`
+
+	Name *string `json:"name,omitempty"`
+}
+
+// LoadBalancerPropertiesFormat properties of the load balancer.
+type LoadBalancerPropertiesFormat struct {
+	FrontendIPConfigurations *[]FrontendIPConfiguration `json:"frontendIPConfigurations,omitempty"`
+}
+
+// FrontendIPConfiguration frontend IP address of the load balancer.
+type FrontendIPConfiguration struct {
+	// FrontendIPConfigurationPropertiesFormat - Properties of the load balancer probe.
+	*FrontendIPConfigurationPropertiesFormat `json:"properties,omitempty"`
+}
+
+// FrontendIPConfigurationPropertiesFormat properties of Frontend IP Configuration of the load balancer.
+type FrontendIPConfigurationPropertiesFormat struct {
+	// PrivateIPAddress - The private IP address of the IP configuration.
+	PrivateIPAddress *string `json:"privateIPAddress,omitempty"`
+}
+
 func GetNetworkInterface(nic interface{}) (*NetworkInterface, error) {
 	decodedNic := &NetworkInterface{}
 	err := mapstructure.Decode(nic, &decodedNic)
@@ -58,4 +82,15 @@ func GetPublicIPAdress(ip interface{}) (*PublicIPAddress, error) {
 	}
 
 	return decodedIP, nil
+}
+
+func GetLoadBalancers(lbs interface{}) ([]LoadBalancer, error) {
+	decodedLBs := []LoadBalancer{}
+
+	err := mapstructure.Decode(lbs, &decodedLBs)
+	if err != nil {
+		return nil, err
+	}
+
+	return decodedLBs, nil
 }

@@ -38,6 +38,7 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/availabilitysets"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/availabilityzones"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/disks"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/interfaceloadbalancers"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachineextensions"
@@ -71,27 +72,29 @@ const (
 
 // Reconciler are list of services required by cluster actuator, easy to create a fake
 type Reconciler struct {
-	scope                 *actuators.MachineScope
-	availabilityZonesSvc  azure.Service
-	networkInterfacesSvc  azure.Service
-	publicIPSvc           azure.Service
-	virtualMachinesSvc    azure.Service
-	virtualMachinesExtSvc azure.Service
-	disksSvc              azure.Service
-	availabilitySetsSvc   azure.Service
+	scope                     *actuators.MachineScope
+	availabilityZonesSvc      azure.Service
+	interfaceLoadBalancersSvc azure.Service
+	networkInterfacesSvc      azure.Service
+	publicIPSvc               azure.Service
+	virtualMachinesSvc        azure.Service
+	virtualMachinesExtSvc     azure.Service
+	disksSvc                  azure.Service
+	availabilitySetsSvc       azure.Service
 }
 
 // NewReconciler populates all the services based on input scope
 func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 	return &Reconciler{
-		scope:                 scope,
-		availabilityZonesSvc:  availabilityzones.NewService(scope),
-		networkInterfacesSvc:  networkinterfaces.NewService(scope),
-		virtualMachinesSvc:    virtualmachines.NewService(scope),
-		virtualMachinesExtSvc: virtualmachineextensions.NewService(scope),
-		publicIPSvc:           publicips.NewService(scope),
-		disksSvc:              disks.NewService(scope),
-		availabilitySetsSvc:   availabilitysets.NewService(scope),
+		scope:                     scope,
+		availabilityZonesSvc:      availabilityzones.NewService(scope),
+		interfaceLoadBalancersSvc: interfaceloadbalancers.NewService(scope),
+		networkInterfacesSvc:      networkinterfaces.NewService(scope),
+		virtualMachinesSvc:        virtualmachines.NewService(scope),
+		virtualMachinesExtSvc:     virtualmachineextensions.NewService(scope),
+		publicIPSvc:               publicips.NewService(scope),
+		disksSvc:                  disks.NewService(scope),
+		availabilitySetsSvc:       availabilitysets.NewService(scope),
 	}
 }
 
@@ -251,6 +254,48 @@ func (s *Reconciler) Update(ctx context.Context) error {
 				}
 			}
 		}
+
+		// If the internal load balancer isn't set on a control plane machine,
+		// we should attempt to populate it else if the machine is later replaced,
+		// its replacement will not get attached to the load balancer.
+		if s.scope.Role() == actuators.ControlPlane && s.scope.MachineConfig.InternalLoadBalancer == "" {
+			for _, iface := range *vm.NetworkProfile.NetworkInterfaces {
+				// Get iface name from the ID
+				ifaceName := path.Base(*iface.ID)
+
+				lbsiface, err := s.interfaceLoadBalancersSvc.Get(ctx, &interfaceloadbalancers.Spec{
+					NicName:           ifaceName,
+					ResourceGroupName: s.scope.MachineConfig.ResourceGroup,
+				})
+				if err != nil {
+					klog.Errorf("Unable to get load balancers for interface %s: %v", ifaceName, err)
+					continue
+				}
+
+				lbs, err := decode.GetLoadBalancers(lbsiface)
+				if err != nil {
+					klog.Errorf("LoadBalancers interfaces get returned invalid load balancers interface, getting %T instead", lbsiface)
+					continue
+				}
+
+				for _, lb := range lbs {
+					if lb.LoadBalancerPropertiesFormat == nil || lb.LoadBalancerPropertiesFormat.FrontendIPConfigurations == nil {
+						continue
+					}
+
+					for _, frontendIP := range *lb.LoadBalancerPropertiesFormat.FrontendIPConfigurations {
+						if frontendIP.FrontendIPConfigurationPropertiesFormat != nil && frontendIP.FrontendIPConfigurationPropertiesFormat.PrivateIPAddress != nil {
+							// On Azure, each VM can only have one private load balancer and each private load balance can only have
+							// private IP addresses. If we have found a load balancer with a private IP address frontend, then this is
+							// the internal load balancer for this machine.
+							s.scope.MachineConfig.InternalLoadBalancer = pointer.StringDeref(lb.Name, "")
+							break
+						}
+					}
+				}
+			}
+		}
+
 	}
 
 	s.scope.Machine.Status.Addresses = networkAddresses
