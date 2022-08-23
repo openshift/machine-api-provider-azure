@@ -85,7 +85,7 @@ func stubMachine() (*machinev1.Machine, error) {
 	return machine, nil
 }
 
-func stubAzureCredentialsSecret() *corev1.Secret {
+func StubAzureCredentialsSecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      azureCredentialsSecretName,

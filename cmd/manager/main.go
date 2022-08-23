@@ -27,6 +27,7 @@ import (
 	"github.com/openshift/machine-api-operator/pkg/metrics"
 	actuator "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	machinesetcontroller "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/record"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
@@ -137,8 +138,9 @@ func main() {
 	ctrl.SetLogger(klogr.New())
 	setupLog := ctrl.Log.WithName("setup")
 	if err = (&machinesetcontroller.Reconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("MachineSet"),
+		Client:                     mgr.GetClient(),
+		Log:                        ctrl.Log.WithName("controllers").WithName("MachineSet"),
+		ResourceSkusServiceBuilder: resourceskus.NewService,
 	}).SetupWithManager(mgr, controller.Options{}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MachineSet")
 		os.Exit(1)

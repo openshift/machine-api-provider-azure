@@ -82,7 +82,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
 
-	cloudEnv, armEndpoint, err := getCloudEnvironment(params.CoreClient)
+	cloudEnv, armEndpoint, err := GetCloudEnvironment(params.CoreClient)
 	if err != nil {
 		return nil, fmt.Errorf("failed azure environment: %w", err)
 	}
@@ -243,7 +243,7 @@ func (m *MachineScope) IsStackHub() bool {
 	return strings.EqualFold(m.cloudEnv, string(configv1.AzureStackCloud))
 }
 
-func getCloudEnvironment(client controllerclient.Client) (string, string, error) {
+func GetCloudEnvironment(client controllerclient.Client) (string, string, error) {
 	infra := &configv1.Infrastructure{}
 	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
 

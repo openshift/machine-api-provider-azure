@@ -421,7 +421,7 @@ func TestGetCloudEnvironment(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			env, armEndpoint, err := getCloudEnvironment(tc.client)
+			env, armEndpoint, err := GetCloudEnvironment(tc.client)
 
 			if tc.expectedError {
 				if err == nil {

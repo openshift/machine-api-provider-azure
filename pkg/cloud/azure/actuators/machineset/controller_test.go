@@ -18,13 +18,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +40,42 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
+
+const globalInfrastuctureName = "cluster"
+
+type fakeResourceSkusService struct {
+	cache *resourceskus.Cache
+}
+
+func NewFakeResourceSkusService(data []compute.ResourceSku, location string) *fakeResourceSkusService {
+	return &fakeResourceSkusService{
+		cache: resourceskus.NewStaticCache(data, location),
+	}
+}
+
+// Get returns SKU for given name and resourceType from the cache.
+func (f *fakeResourceSkusService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
+	skuSpec := spec.(resourceskus.Spec)
+	sku, err := f.cache.Get(ctx, skuSpec.Name, skuSpec.ResourceType)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return sku, nil
+}
+
+// CreateOrUpdate no-op.
+func (f *fakeResourceSkusService) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
+	// Not implemented since there is nothing to create or update
+	return nil
+}
+
+// Delete no-op.
+func (f *fakeResourceSkusService) Delete(ctx context.Context, spec azure.Spec) error {
+	// Not implemented since there is nothing to delete
+	return nil
+}
 
 var _ = Describe("Reconciler", func() {
 	var c client.Client
@@ -51,8 +93,60 @@ var _ = Describe("Reconciler", func() {
 		}
 		Expect(r.SetupWithManager(mgr, controller.Options{})).To(Succeed())
 
+		infra := &configv1.Infrastructure{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: globalInfrastuctureName,
+			},
+			Status: configv1.InfrastructureStatus{
+				PlatformStatus: &configv1.PlatformStatus{
+					Azure: &configv1.AzurePlatformStatus{
+						CloudName: configv1.AzurePublicCloud,
+					},
+				},
+			},
+		}
+		mgr.GetClient().Create(ctx, infra)
+		mgr.GetClient().Create(ctx, machine.StubAzureCredentialsSecret())
+
 		fakeRecorder = record.NewFakeRecorder(1)
 		r.recorder = fakeRecorder
+		fakeResourceSkusService := NewFakeResourceSkusService([]compute.ResourceSku{
+			{
+				Name:         to.StringPtr("Standard_D4s_v3"),
+				ResourceType: to.StringPtr("virtualMachines"),
+				Capabilities: &[]compute.ResourceSkuCapabilities{
+					{
+						Name:  to.StringPtr(resourceskus.VCPUs),
+						Value: to.StringPtr("4"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.MemoryGB),
+						Value: to.StringPtr("16"),
+					},
+				},
+			},
+			{
+				Name:         to.StringPtr("Standard_NC24"),
+				ResourceType: to.StringPtr("virtualMachines"),
+				Capabilities: &[]compute.ResourceSkuCapabilities{
+					{
+						Name:  to.StringPtr(resourceskus.VCPUs),
+						Value: to.StringPtr("24"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.MemoryGB),
+						Value: to.StringPtr("224"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.GPUs),
+						Value: to.StringPtr("4"),
+					},
+				},
+			},
+		}, "centralus")
+		r.ResourceSkusServiceBuilder = func(scope *actuators.MachineScope) azure.Service {
+			return fakeResourceSkusService
+		}
 
 		c = mgr.GetClient()
 		stopMgr = StartTestManager(mgr)
@@ -189,116 +283,6 @@ func deleteMachineSets(c client.Client, namespaceName string) error {
 	}, timeout).Should(Succeed())
 
 	return nil
-}
-
-func TestReconcile(t *testing.T) {
-	testCases := []struct {
-		name                string
-		vmSize              string
-		existingAnnotations map[string]string
-		expectedAnnotations map[string]string
-		expectErr           bool
-	}{
-		{
-			name:                "with no vmSize set",
-			vmSize:              "",
-			existingAnnotations: make(map[string]string),
-			expectedAnnotations: make(map[string]string),
-			// Expect no error and only log entry in such case as we don't update instance types dynamically
-			expectErr: false,
-		},
-		{
-			name:                "with a Standard_D4s_v3",
-			vmSize:              "Standard_D4s_v3",
-			existingAnnotations: make(map[string]string),
-			expectedAnnotations: map[string]string{
-				cpuKey:    "4",
-				memoryKey: "16384",
-				gpuKey:    "0",
-			},
-			expectErr: false,
-		},
-		{
-			name:                "with a Standard_NC24",
-			vmSize:              "Standard_NC24",
-			existingAnnotations: make(map[string]string),
-			expectedAnnotations: map[string]string{
-				cpuKey:    "24",
-				memoryKey: "229376",
-				gpuKey:    "4",
-			},
-			expectErr: false,
-		},
-		{
-			name:                "with a case insensitive Standard_NC24 #1",
-			vmSize:              "standard_nc24",
-			existingAnnotations: make(map[string]string),
-			expectedAnnotations: map[string]string{
-				cpuKey:    "24",
-				memoryKey: "229376",
-				gpuKey:    "4",
-			},
-			expectErr: false,
-		},
-		{
-			name:                "with a case insensitive Standard_NC24 #2",
-			vmSize:              "sTaNdArD_nC24",
-			existingAnnotations: make(map[string]string),
-			expectedAnnotations: map[string]string{
-				cpuKey:    "24",
-				memoryKey: "229376",
-				gpuKey:    "4",
-			},
-			expectErr: false,
-		},
-		{
-			name:   "with existing annotations",
-			vmSize: "Standard_NC24",
-			existingAnnotations: map[string]string{
-				"existing": "annotation",
-				"annother": "existingAnnotation",
-			},
-			expectedAnnotations: map[string]string{
-				"existing": "annotation",
-				"annother": "existingAnnotation",
-				cpuKey:     "24",
-				memoryKey:  "229376",
-				gpuKey:     "4",
-			},
-			expectErr: false,
-		},
-		{
-			name:   "with an invalid vmSize",
-			vmSize: "r4.xLarge",
-			existingAnnotations: map[string]string{
-				"existing": "annotation",
-				"annother": "existingAnnotation",
-			},
-			expectedAnnotations: map[string]string{
-				"existing": "annotation",
-				"annother": "existingAnnotation",
-			},
-			// Expect no error and only log entry in such case as we don't update instance types dynamically
-			expectErr: false,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(tt *testing.T) {
-			g := NewWithT(tt)
-
-			machineSet, err := newTestMachineSet("default", tc.vmSize, tc.existingAnnotations)
-			g.Expect(err).ToNot(HaveOccurred())
-
-			r := Reconciler{
-				recorder: record.NewFakeRecorder(1),
-			}
-
-			_, err = r.reconcile(machineSet)
-			g.Expect(err != nil).To(Equal(tc.expectErr))
-			g.Expect(machineSet.Annotations).To(Equal(tc.expectedAnnotations))
-		})
-	}
 }
 
 func newTestMachineSet(namespace string, vmSize string, existingAnnotations map[string]string) (*machinev1.MachineSet, error) {

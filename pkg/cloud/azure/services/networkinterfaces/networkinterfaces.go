@@ -24,11 +24,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
-	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicloadbalancers"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/securitygroups"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/subnets"
 	"k8s.io/klog/v2"
@@ -85,15 +85,22 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 	nicProp := network.InterfacePropertiesFormat{}
 
+	skuService := resourceskus.NewService(s.Scope)
+	skuSpec := resourceskus.Spec{
+		Name:         s.Scope.MachineConfig.VMSize,
+		ResourceType: resourceskus.VirtualMachines,
+	}
+	skuI, err := skuService.Get(ctx, skuSpec)
+	if err != nil {
+		return fmt.Errorf("failed to find sku %s", s.Scope.MachineConfig.VMSize)
+	}
+
+	sku := skuI.(resourceskus.SKU)
+
 	// Enaled Accelerated networking
 	if s.Scope.MachineConfig.AcceleratedNetworking {
-		nicProperties, ok := machineset.InstanceTypes[s.Scope.MachineConfig.VMSize]
-		if ok {
-			if !nicProperties.AcceleratedNetworking {
-				return fmt.Errorf("accelerated networking not supported on instance type %s", s.Scope.MachineConfig.VMSize)
-			}
-		} else {
-			klog.V(4).Infof("could not determine nic properties for instance type %s", s.Scope.MachineConfig.VMSize)
+		if !sku.HasCapability(resourceskus.AcceleratedNetworking) {
+			return errors.New("accelerated networking not supported on instance type " + s.Scope.MachineConfig.VMSize)
 		}
 		klog.V(4).Infof("setting EnableAcceleratedNetworking to %v", s.Scope.MachineConfig.AcceleratedNetworking)
 		nicProp.EnableAcceleratedNetworking = to.BoolPtr(s.Scope.MachineConfig.AcceleratedNetworking)
