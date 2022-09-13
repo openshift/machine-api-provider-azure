@@ -569,8 +569,8 @@ func TestMachineEvents(t *testing.T) {
 	invalidMachine := machine.DeepCopy()
 	invalidMachine.Spec.ProviderSpec = machinev1.ProviderSpec{Value: providerSpec}
 
-	azureCredentialsSecret := stubAzureCredentialsSecret()
-	invalidAzureCredentialsSecret := stubAzureCredentialsSecret()
+	azureCredentialsSecret := StubAzureCredentialsSecret()
+	invalidAzureCredentialsSecret := StubAzureCredentialsSecret()
 	delete(invalidAzureCredentialsSecret.Data, "azure_client_id")
 
 	cases := []struct {
@@ -778,7 +778,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClient(stubAzureCredentialsSecret(), &corev1.Secret{
+			cs := controllerfake.NewFakeClient(StubAzureCredentialsSecret(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "azure-actuator-user-data-secret",
 					Namespace: "default",
@@ -888,7 +888,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClient(stubAzureCredentialsSecret(), &corev1.Secret{
+			cs := controllerfake.NewFakeClient(StubAzureCredentialsSecret(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "azure-actuator-user-data-secret",
 					Namespace: "default",
