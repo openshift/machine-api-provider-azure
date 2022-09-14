@@ -505,7 +505,8 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		VnetName: s.scope.MachineConfig.Vnet,
 	}
 	if s.scope.MachineConfig.AcceleratedNetworking {
-		if !machineset.InstanceTypes[s.scope.MachineConfig.VMSize].AcceleratedNetworking {
+		// If we know the instance type isn't compatible, return an error early. Else let Azure return an error.
+		if instanceInfo, ok := machineset.InstanceTypes[s.scope.MachineConfig.VMSize]; ok && instanceInfo != nil && !instanceInfo.AcceleratedNetworking {
 			return machinecontroller.InvalidMachineConfiguration("accelerated networking not supported on instance type: %v", s.scope.MachineConfig.VMSize)
 		}
 		networkInterfaceSpec.AcceleratedNetworking = s.scope.MachineConfig.AcceleratedNetworking
