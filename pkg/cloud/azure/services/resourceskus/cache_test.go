@@ -55,10 +55,15 @@ func TestCacheGet(t *testing.T) {
 			resourceType: "bar",
 			have: []compute.ResourceSku{
 				{
-					Name: to.StringPtr("other"),
+					Name:         to.StringPtr("other"),
+					ResourceType: to.StringPtr("bar"),
+				},
+				{
+					Name:         to.StringPtr("other2"),
+					ResourceType: to.StringPtr("bar"),
 				},
 			},
-			err: "resource SKU with name 'foo' and category 'bar' not found in location 'test': resource not found",
+			err: "resource SKU with name 'foo' and category 'bar' not found in location 'test': resource not found: The valid bar in the current region are: [\"other\" \"other2\"]. Find out more on the valid resources in each region at https://aka.ms/azure-regionservices",
 		},
 	}
 

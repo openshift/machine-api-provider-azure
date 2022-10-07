@@ -562,7 +562,11 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 
 		skuI, err := s.resourcesSkus.Get(ctx, skuSpec)
 		if err != nil {
-			return fmt.Errorf("failed to find sku %s", s.scope.MachineConfig.VMSize)
+			if errors.Is(err, resourceskus.ErrResourceNotFound) {
+				return machinecontroller.InvalidMachineConfiguration("failed to obtain instance type information for VMSize '%s' from Azure: %s", skuSpec.Name, err)
+			} else {
+				return fmt.Errorf("failed to obtain instance type information for VMSize '%s' from Azure: %w", skuSpec.Name, err)
+			}
 		}
 
 		sku := skuI.(resourceskus.SKU)

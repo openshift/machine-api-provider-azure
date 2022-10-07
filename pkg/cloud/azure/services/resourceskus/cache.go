@@ -26,6 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
 	"github.com/pkg/errors"
+	"k8s.io/utils/pointer"
 
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/util/cache/ttllru"
@@ -133,7 +134,15 @@ func (c *Cache) Get(ctx context.Context, name string, kind ResourceType) (SKU, e
 			return SKU(sku), nil
 		}
 	}
-	return SKU{}, fmt.Errorf("resource SKU with name '%s' and category '%s' not found in location '%s': %w", name, string(kind), c.location, ErrResourceNotFound)
+
+	availableInRegion := []string{}
+	for _, sku := range c.data {
+		if pointer.StringDeref(sku.ResourceType, "") == string(kind) {
+			availableInRegion = append(availableInRegion, pointer.StringDeref(sku.Name, ""))
+		}
+	}
+
+	return SKU{}, fmt.Errorf("resource SKU with name '%s' and category '%s' not found in location '%s': %w: The valid %s in the current region are: %q. Find out more on the valid resources in each region at https://aka.ms/azure-regionservices", name, string(kind), c.location, ErrResourceNotFound, string(kind), availableInRegion)
 }
 
 // Map invokes a function over all cached values.

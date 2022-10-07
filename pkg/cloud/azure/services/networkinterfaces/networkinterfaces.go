@@ -23,6 +23,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
@@ -92,7 +93,11 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	}
 	skuI, err := skuService.Get(ctx, skuSpec)
 	if err != nil {
-		return fmt.Errorf("failed to find sku %s", s.Scope.MachineConfig.VMSize)
+		if errors.Is(err, resourceskus.ErrResourceNotFound) {
+			return machinecontroller.InvalidMachineConfiguration("failed to obtain instance type information for VMSize '%s' from Azure: %s", skuSpec.Name, err)
+		} else {
+			return fmt.Errorf("failed to obtain instance type information for VMSize '%s' from Azure: %w", skuSpec.Name, err)
+		}
 	}
 
 	sku := skuI.(resourceskus.SKU)
