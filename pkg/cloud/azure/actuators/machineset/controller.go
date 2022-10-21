@@ -169,9 +169,10 @@ func getStockKeepUnit(r *Reconciler, machineSet *machinev1.MachineSet) (resource
 	skuI, err := resourceSkusService.Get(context.Background(), skuSpec)
 	if err != nil {
 		if errors.Is(err, resourceskus.ErrResourceNotFound) {
-			return resourceskus.SKU{}, mapierrors.InvalidMachineConfiguration("machine SKU information for machine type %s does not exist: %v", providerConfig.VMSize, err)
+			return resourceskus.SKU{}, mapierrors.InvalidMachineConfiguration("failed to obtain instance type information for VMSize '%s' from Azure: %s", skuSpec.Name, err)
+		} else {
+			return resourceskus.SKU{}, fmt.Errorf("failed to obtain instance type information for VMSize '%s' from Azure: %w", skuSpec.Name, err)
 		}
-		return resourceskus.SKU{}, fmt.Errorf("failed to get SKU information for %s: %w", providerConfig.VMSize, err)
 	}
 
 	sku := skuI.(resourceskus.SKU)
