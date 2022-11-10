@@ -105,7 +105,7 @@ func (s *Reconciler) Create(ctx context.Context) error {
 	if err := s.CreateMachine(ctx); err != nil {
 		s.scope.MachineStatus.Conditions = setCondition(s.scope.MachineStatus.Conditions, metav1.Condition{
 			Type:    string(machinev1.MachineCreated),
-			Status:  metav1.ConditionTrue,
+			Status:  metav1.ConditionFalse,
 			Reason:  machineCreationFailedReason,
 			Message: err.Error(),
 		})
