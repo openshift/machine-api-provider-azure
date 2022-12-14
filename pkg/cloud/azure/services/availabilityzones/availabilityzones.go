@@ -30,6 +30,8 @@ type Spec struct {
 	VMSize string
 }
 
+const vmResourceType = "virtualMachines"
+
 // Get provides information about a availability zones.
 func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
 	var zones []string
@@ -45,10 +47,29 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 
 	for _, resSku := range res.Values() {
+		if skusSpec.VMSize == "" {
+			// if empty vmSize was passed we need to check if there is availability zones support within the location.
+			// For this we are picking VM SKU which supports most AZ's
+			if strings.EqualFold(*resSku.ResourceType, vmResourceType) {
+				fmt.Println(*resSku.Name)
+				for _, locationInfo := range *resSku.LocationInfo {
+					if strings.EqualFold(*locationInfo.Location, s.Scope.MachineConfig.Location) {
+						// Different vm sizes might have different AZ support
+						// for example Basic_A0 does not support AZs at all.
+						if len(*locationInfo.Zones) > len(zones) {
+							zones = *locationInfo.Zones
+						}
+						break
+					}
+				}
+			}
+		}
+
 		if strings.EqualFold(*resSku.Name, skusSpec.VMSize) {
 			for _, locationInfo := range *resSku.LocationInfo {
 				if strings.EqualFold(*locationInfo.Location, s.Scope.MachineConfig.Location) {
 					zones = *locationInfo.Zones
+					return zones, nil // zones for specific VMSize found, we can return early
 				}
 			}
 		}

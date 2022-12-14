@@ -690,9 +690,16 @@ func (s *Reconciler) getOrCreateAvailabilitySet() (string, error) {
 		return s.scope.MachineConfig.AvailabilitySet, nil
 	}
 
+	var vmSize string
+	/// Check if we do know the vmSize.
+	// In case of known vmSize `availabilityZonesSvc` will try to determine availabilityZones for this specific vmSize,
+	// otherwise empty string will be used, and we will try to determine availabilityZones presence for vms within a region.
+	if _, ok := machineset.InstanceTypes[s.scope.MachineConfig.VMSize]; ok {
+		vmSize = s.scope.MachineConfig.VMSize
+	}
 	// Try to find the zone for the machine location
 	availabilityZones, err := s.availabilityZonesSvc.Get(context.Background(), &availabilityzones.Spec{
-		VMSize: s.scope.MachineConfig.VMSize,
+		VMSize: vmSize,
 	})
 	if err != nil {
 		return "", err
