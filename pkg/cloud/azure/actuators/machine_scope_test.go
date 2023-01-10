@@ -80,7 +80,6 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 			AzureCredsTenantIDKey:       []byte("dummyTenantID"),
 			AzureCredsResourceGroupKey:  []byte("dummyResourceGroup"),
 			AzureCredsRegionKey:         []byte("dummyRegion"),
-			AzureResourcePrefix:         []byte("dummyClusterName"),
 		},
 	}
 
@@ -106,10 +105,6 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 
 	if scope.Location() != "dummyRegion" {
 		t.Errorf("Expected location to be dummyRegion but found %s", scope.Location())
-	}
-
-	if scope.MachineConfig.Name != "dummyClusterName" {
-		t.Errorf("Expected cluster name to be dummyClusterName but found %s", scope.MachineConfig.Name)
 	}
 
 	if scope.MachineConfig.ResourceGroup != "dummyResourceGroup" {
@@ -171,11 +166,6 @@ func TestCredentialsSecretFailures(t *testing.T) {
 	}
 
 	credentialsSecret.Data["azure_region"] = []byte("dummyValue")
-	if err := testCredentialFields(credentialsSecret); err == nil {
-		t.Errorf("Expected New credentials secrets to fail")
-	}
-
-	credentialsSecret.Data["azure_resource_prefix"] = []byte("dummyValue")
 	if err := testCredentialFields(credentialsSecret); err != nil {
 		t.Errorf("Expected New credentials secrets to succeed but found : %v", err)
 	}
