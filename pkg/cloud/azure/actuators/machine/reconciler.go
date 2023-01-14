@@ -562,6 +562,12 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 
 		skuI, err := s.resourcesSkus.Get(ctx, skuSpec)
 		if err != nil {
+			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+				Name:      s.scope.Machine.Name,
+				Namespace: s.scope.Machine.Namespace,
+				Reason:    err.Error(),
+			})
+
 			if errors.Is(err, resourceskus.ErrResourceNotFound) {
 				return machinecontroller.InvalidMachineConfiguration("failed to obtain instance type information for VMSize '%s' from Azure: %s", skuSpec.Name, err)
 			} else {
@@ -572,6 +578,11 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		sku := skuI.(resourceskus.SKU)
 
 		if !sku.HasCapability(resourceskus.AcceleratedNetworking) {
+			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+				Name:      s.scope.Machine.Name,
+				Namespace: s.scope.Machine.Namespace,
+				Reason:    fmt.Sprintf("accelerated networking not supported on instance type: %v", s.scope.MachineConfig.VMSize),
+			})
 			return machinecontroller.InvalidMachineConfiguration("accelerated networking not supported on instance type: %v", s.scope.MachineConfig.VMSize)
 		}
 		networkInterfaceSpec.AcceleratedNetworking = s.scope.MachineConfig.AcceleratedNetworking
