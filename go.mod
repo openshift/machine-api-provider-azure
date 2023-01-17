@@ -1,6 +1,6 @@
 module github.com/openshift/machine-api-provider-azure
 
-go 1.18
+go 1.19
 
 require (
 	github.com/Azure/azure-sdk-for-go v66.0.0+incompatible
