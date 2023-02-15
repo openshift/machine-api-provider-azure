@@ -37,7 +37,7 @@ type (
 	Cacher interface {
 		Get(key interface{}) (value interface{}, ok bool)
 		Add(key interface{}, value interface{}) (evicted bool)
-		Remove(key interface{})
+		Remove(key interface{}) (present bool)
 	}
 
 	// PeekingCacher describes a basic cache with the ability to peek.
