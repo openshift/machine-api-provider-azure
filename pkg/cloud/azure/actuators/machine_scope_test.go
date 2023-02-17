@@ -411,17 +411,22 @@ func TestGetCloudEnvironment(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			env, armEndpoint, err := GetCloudEnvironment(tc.client)
-
+			infra, err := GetInfrastructure(tc.client)
 			if tc.expectedError {
 				if err == nil {
-					t.Fatal("getCloudEnvironment() was expected to return error")
+					t.Fatal("GetInfrastructure() was expected to return error")
 				}
+
+				// We expected an error and got one.
+				// Do not proceed as we are happy with this result.
+				return
 			} else {
 				if err != nil {
-					t.Fatalf("getCloudEnvironment() was not expected to return error: %v", err)
+					t.Fatalf("GetInfrastructure() was not expected to return error: %v", err)
 				}
 			}
+
+			env, armEndpoint := GetCloudEnvironment(infra)
 
 			if env != tc.expectedEnvironment {
 				t.Fatalf("expected environment %s, got: %s", tc.expectedEnvironment, env)
