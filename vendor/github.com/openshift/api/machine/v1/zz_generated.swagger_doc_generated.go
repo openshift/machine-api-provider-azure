@@ -182,6 +182,7 @@ func (ControlPlaneMachineSetList) SwaggerDoc() map[string]string {
 
 var map_ControlPlaneMachineSetSpec = map[string]string{
 	"":         "ControlPlaneMachineSet represents the configuration of the ControlPlaneMachineSet.",
+	"state":    "State defines whether the ControlPlaneMachineSet is Active or Inactive. When Inactive, the ControlPlaneMachineSet will not take any action on the state of the Machines within the cluster. When Active, the ControlPlaneMachineSet will reconcile the Machines and will update the Machines as necessary. Once Active, a ControlPlaneMachineSet cannot be made Inactive. To prevent further action please remove the ControlPlaneMachineSet.",
 	"replicas": "Replicas defines how many Control Plane Machines should be created by this ControlPlaneMachineSet. This field is immutable and cannot be changed after cluster installation. The ControlPlaneMachineSet only operates with 3 or 5 node control planes, 3 and 5 are the only valid values for this field.",
 	"strategy": "Strategy defines how the ControlPlaneMachineSet will update Machines when it detects a change to the ProviderSpec.",
 	"selector": "Label selector for Machines. Existing Machines selected by this selector will be the ones affected by this ControlPlaneMachineSet. It must match the template's labels. This field is considered immutable after creation of the resource.",
@@ -227,7 +228,7 @@ func (ControlPlaneMachineSetTemplate) SwaggerDoc() map[string]string {
 
 var map_ControlPlaneMachineSetTemplateObjectMeta = map[string]string{
 	"":            "ControlPlaneMachineSetTemplateObjectMeta is a subset of the metav1.ObjectMeta struct. It allows users to specify labels and annotations that will be copied onto Machines created from this template.",
-	"labels":      "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels",
+	"labels":      "Map of string keys and values that can be used to organize and categorize (scope and select) objects. May match selectors of replication controllers and services. More info: http://kubernetes.io/docs/user-guide/labels. This field must contain both the 'machine.openshift.io/cluster-api-machine-role' and 'machine.openshift.io/cluster-api-machine-type' labels, both with a value of 'master'. It must also contain a label with the key 'machine.openshift.io/cluster-api-cluster'.",
 	"annotations": "Annotations is an unstructured key value map stored with a resource that may be set by external tools to store and retrieve arbitrary metadata. They are not queryable and should be preserved when modifying objects. More info: http://kubernetes.io/docs/user-guide/annotations",
 }
 
@@ -267,6 +268,16 @@ func (OpenShiftMachineV1Beta1MachineTemplate) SwaggerDoc() map[string]string {
 	return map_OpenShiftMachineV1Beta1MachineTemplate
 }
 
+var map_NutanixCategory = map[string]string{
+	"":      "NutanixCategory identifies a pair of prism category key and value",
+	"key":   "key is the prism category key name",
+	"value": "value is the prism category value associated with the key",
+}
+
+func (NutanixCategory) SwaggerDoc() map[string]string {
+	return map_NutanixCategory
+}
+
 var map_NutanixMachineProviderConfig = map[string]string{
 	"":                  "NutanixMachineProviderConfig is the Schema for the nutanixmachineproviderconfigs API Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).",
 	"cluster":           "cluster is to identify the cluster (the Prism Element under management of the Prism Central), in which the Machine's VM will be created. The cluster identifier (uuid or name) can be obtained from the Prism Central console or using the prism_central API.",
@@ -276,6 +287,9 @@ var map_NutanixMachineProviderConfig = map[string]string{
 	"vcpuSockets":       "vcpuSockets is the number of vCPU sockets of the VM",
 	"memorySize":        "memorySize is the memory size (in Quantity format) of the VM The minimum memorySize is 2Gi bytes",
 	"systemDiskSize":    "systemDiskSize is size (in Quantity format) of the system disk of the VM The minimum systemDiskSize is 20Gi bytes",
+	"bootType":          "bootType indicates the boot type (Legacy, UEFI or SecureBoot) the Machine's VM uses to boot. If this field is empty or omitted, the VM will use the default boot type \"Legacy\" to boot. \"SecureBoot\" depends on \"UEFI\" boot, i.e., enabling \"SecureBoot\" means that \"UEFI\" boot is also enabled.",
+	"project":           "project optionally identifies a Prism project for the Machine's VM to associate with.",
+	"categories":        "categories optionally adds one or more prism categories (each with key and value) for the Machine's VM to associate with. All the category key and value pairs specified must already exist in the prism central.",
 	"userDataSecret":    "userDataSecret is a local reference to a secret that contains the UserData to apply to the VM",
 	"credentialsSecret": "credentialsSecret is a local reference to a secret that contains the credentials data to access Nutanix PC client",
 }

@@ -80,9 +80,11 @@ func (mr *MockCacherMockRecorder) Get(key interface{}) *gomock.Call {
 }
 
 // Remove mocks base method.
-func (m *MockCacher) Remove(key interface{}) {
+func (m *MockCacher) Remove(key interface{}) bool {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Remove", key)
+	ret := m.ctrl.Call(m, "Remove", key)
+	ret0 := ret[0].(bool)
+	return ret0
 }
 
 // Remove indicates an expected call of Remove.
