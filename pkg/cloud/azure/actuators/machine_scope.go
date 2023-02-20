@@ -82,10 +82,12 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, fmt.Errorf("failed to get machine provider status: %w", err)
 	}
 
-	cloudEnv, armEndpoint, err := GetCloudEnvironment(params.CoreClient)
+	infra, err := GetInfrastructure(params.CoreClient)
 	if err != nil {
-		return nil, fmt.Errorf("failed azure environment: %w", err)
+		return nil, fmt.Errorf("failed to get cluster infrastructure: %w", err)
 	}
+
+	cloudEnv, armEndpoint := GetCloudEnvironment(infra)
 
 	machineScope := &MachineScope{
 		Context:      context.Background(),
@@ -97,6 +99,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		CoreClient:    params.CoreClient,
 		MachineConfig: machineConfig,
 		MachineStatus: machineStatus,
+		ClusterName:   infra.Status.InfrastructureName,
 		// Once set, they can not be changed. Otherwise, status change computation
 		// might be invalid and result in skipping the status update.
 		origMachine:        params.Machine.DeepCopy(),
@@ -122,6 +125,7 @@ type MachineScope struct {
 	CoreClient    controllerclient.Client
 	MachineConfig *machinev1.AzureMachineProviderSpec
 	MachineStatus *machinev1.AzureMachineProviderStatus
+	ClusterName   string
 
 	// cloudEnv azure environment: AzurePublic, AzureStackCloud, etc.
 	cloudEnv string
@@ -243,17 +247,21 @@ func (m *MachineScope) IsStackHub() bool {
 	return strings.EqualFold(m.cloudEnv, string(configv1.AzureStackCloud))
 }
 
-func GetCloudEnvironment(client controllerclient.Client) (string, string, error) {
+func GetInfrastructure(client controllerclient.Client) (*configv1.Infrastructure, error) {
 	infra := &configv1.Infrastructure{}
 	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
 
 	if err := client.Get(context.Background(), infraName, infra); err != nil {
-		return "", "", err
+		return nil, fmt.Errorf("failed to get infrastructure: %w", err)
 	}
 
+	return infra, nil
+}
+
+func GetCloudEnvironment(infra *configv1.Infrastructure) (string, string) {
 	// When cloud environment is missing default to Azure Public Cloud
 	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.Azure == nil || infra.Status.PlatformStatus.Azure.CloudName == "" {
-		return string(configv1.AzurePublicCloud), "", nil
+		return string(configv1.AzurePublicCloud), ""
 	}
 
 	armEndpoint := ""
@@ -261,7 +269,7 @@ func GetCloudEnvironment(client controllerclient.Client) (string, string, error)
 		armEndpoint = infra.Status.PlatformStatus.Azure.ARMEndpoint
 	}
 
-	return string(infra.Status.PlatformStatus.Azure.CloudName), armEndpoint, nil
+	return string(infra.Status.PlatformStatus.Azure.CloudName), armEndpoint
 }
 
 // MachineConfigFromProviderSpec tries to decode the JSON-encoded spec, falling back on getting a MachineClass if the value is absent.

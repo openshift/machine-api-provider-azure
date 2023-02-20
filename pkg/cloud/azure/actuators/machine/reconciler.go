@@ -508,7 +508,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.MachineConfig.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterName, s.scope.Machine.Name)
 		if err != nil {
 			// Only when the generated name is longer than allowed by the Azure portal
 			// That can happen only when
@@ -613,7 +613,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	}
 
 	if s.scope.MachineConfig.PublicIP {
-		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.MachineConfig.Name, s.scope.Machine.Name)
+		publicIPName, err := azure.GenerateMachinePublicIPName(s.scope.ClusterName, s.scope.Machine.Name)
 		if err != nil {
 			return machinecontroller.InvalidMachineConfiguration("unable to create Public IP: %v", err)
 		}
