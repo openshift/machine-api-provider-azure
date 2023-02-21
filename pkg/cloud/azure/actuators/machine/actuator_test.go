@@ -544,6 +544,7 @@ func TestMachineEvents(t *testing.T) {
 			Name: globalInfrastuctureName,
 		},
 		Status: configv1.InfrastructureStatus{
+			InfrastructureName: "test-ghfd",
 			PlatformStatus: &configv1.PlatformStatus{
 				Azure: &configv1.AzurePlatformStatus{
 					CloudName: configv1.AzurePublicCloud,
@@ -736,6 +737,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			Name: globalInfrastuctureName,
 		},
 		Status: configv1.InfrastructureStatus{
+			InfrastructureName: "test-yuhg",
 			PlatformStatus: &configv1.PlatformStatus{
 				Azure: &configv1.AzurePlatformStatus{
 					CloudName: configv1.AzurePublicCloud,
@@ -846,6 +848,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 			Name: globalInfrastuctureName,
 		},
 		Status: configv1.InfrastructureStatus{
+			InfrastructureName: "test-tgfj",
 			PlatformStatus: &configv1.PlatformStatus{
 				Azure: &configv1.AzurePlatformStatus{
 					CloudName: configv1.AzurePublicCloud,

@@ -61,6 +61,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		asgSpec.Name,
 		network.ApplicationSecurityGroup{
 			Location: to.StringPtr(s.Scope.MachineConfig.Location),
+			Tags:     s.Scope.Tags,
 		},
 	)
 	if err != nil {

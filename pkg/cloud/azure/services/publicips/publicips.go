@@ -73,6 +73,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					DomainNameLabel: to.StringPtr(strings.ToLower(ipName)),
 				},
 			},
+			Tags: s.Scope.Tags,
 		},
 	)
 

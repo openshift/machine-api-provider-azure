@@ -299,6 +299,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		network.Interface{
 			Location:                  to.StringPtr(s.Scope.MachineConfig.Location),
 			InterfacePropertiesFormat: &nicProp,
+			Tags:                      s.Scope.Tags,
 		})
 
 	if err != nil {

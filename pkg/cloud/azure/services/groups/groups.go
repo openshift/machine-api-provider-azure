@@ -37,7 +37,8 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 // CreateOrUpdate creates or updates a resource group.
 func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	klog.V(2).Infof("creating resource group %s", s.Scope.MachineConfig.ResourceGroup)
-	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, resources.Group{Location: to.StringPtr(s.Scope.MachineConfig.Location)})
+	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, resources.Group{
+		Location: to.StringPtr(s.Scope.MachineConfig.Location), Tags: s.Scope.Tags})
 	klog.V(2).Infof("successfully created resource group %s", s.Scope.MachineConfig.ResourceGroup)
 	return err
 }

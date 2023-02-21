@@ -77,6 +77,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					AddressPrefixes: &[]string{vnetSpec.CIDR},
 				},
 			},
+			Tags: s.Scope.Tags,
 		})
 	if err != nil {
 		return err

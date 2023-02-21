@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/Azure/go-autorest/autorest/to"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -87,6 +88,18 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		return nil, fmt.Errorf("failed to get cluster infrastructure: %w", err)
 	}
 
+	infraTags := getInfraResourceTags(infra.Status.PlatformStatus)
+
+	ocpTags, err := getOCPTagList(infra.Status.InfrastructureName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get OCP tag list: %w", err)
+	}
+
+	tags, err := getTagList(ocpTags, infraTags, machineConfig.Tags)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get combined tag list: %w", err)
+	}
+
 	cloudEnv, armEndpoint := GetCloudEnvironment(infra)
 
 	machineScope := &MachineScope{
@@ -107,6 +120,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		machineToBePatched: controllerclient.MergeFrom(params.Machine.DeepCopy()),
 		cloudEnv:           cloudEnv,
 		armEndpoint:        armEndpoint,
+		Tags:               tags,
 	}
 
 	if err = updateFromSecret(params.CoreClient, machineScope); err != nil {
@@ -141,6 +155,10 @@ type MachineScope struct {
 	origMachineStatus *machinev1.AzureMachineProviderStatus
 
 	machineToBePatched controllerclient.Patch
+
+	// Tags is a list of tags to apply to the resources created
+	// for the cluster
+	Tags map[string]*string
 }
 
 // Name returns the machine name.
@@ -399,4 +417,100 @@ func getEnvironment(m *MachineScope) (*azure.Environment, error) {
 	}
 
 	return &env, nil
+}
+
+// getTagList is for getting the merged tag list present in
+// AzureMachineProviderSpec and Infrastructure.Status. Both
+// will have the same tags, unless AzureMachineProviderSpec.Tags
+// has been modified to add/update/delete any tag. Merge will be
+// necessary in delete case, to honour the user-defined tags
+// in Infrastructure.Status and those to newly created resources.
+func getTagList(ocpTags, infraStatusTags, machineSpecTags map[string]string) (map[string]*string, error) {
+	if machineSpecTags == nil && infraStatusTags == nil {
+		return *to.StringMapPtr(ocpTags), nil
+	}
+
+	// Tag keys are case-insensitive. A tag with a key, regardless of
+	// the casing, is updated or retrieved. An Azure service might keep
+	// the casing as provided for the tag key. To allow user to choose
+	// the required variant of the key to add. return error when
+	// duplicate tag keys are found in machineSpecTags. Tags in
+	// infraStatusTags is vetted by installer.
+	if err := findDuplicateTagKeys(machineSpecTags); err != nil {
+		return nil, fmt.Errorf("Machine.Spec.ProviderSpec.Tags validation failed: %w", err)
+	}
+
+	tags := make(map[string]*string)
+	// copy user defined tags in Infrastructure.Status.
+	for k, v := range infraStatusTags {
+		tags[k] = to.StringPtr(v)
+	}
+
+	// merge tags present in Infrastructure.Status with
+	// the tags configured in AzureMachineProviderSpec, with
+	// precedence given to those in AzureMachineProviderSpec
+	// for new or updated tags.
+	for k, v := range machineSpecTags {
+		tags[k] = to.StringPtr(v)
+	}
+
+	// copy OCP tags, overwrite any OCP reserved tags found in
+	// the user defined tag list.
+	for k, v := range ocpTags {
+		tags[k] = to.StringPtr(v)
+	}
+
+	// Automation, Content Delivery Network, DNS Azure resources can have a
+	// maximum of 15 tags. OpenShift is reserved with 5 tags for internal use,
+	// allowing 10 tags for user configuration. But this operator does not create
+	// any of the above resources and supports configuring additional tags, hence
+	// increasing the user tags max limit to 45.
+	if len(ocpTags) > 5 || (len(tags)-len(ocpTags)) > 45 {
+		return nil, fmt.Errorf("ocp can define upto 5 tags and user can define upto 45 tags,"+
+			"infrstructure.status.resourceTags and Machine.Spec.ProviderSpec.Tags put together, current tag count: %d", len(tags))
+	}
+
+	return tags, nil
+}
+
+func getInfraResourceTags(platformStatus *configv1.PlatformStatus) (tags map[string]string) {
+	if platformStatus != nil && platformStatus.Azure != nil && platformStatus.Azure.ResourceTags != nil {
+		tags = make(map[string]string, len(platformStatus.Azure.ResourceTags))
+		for _, tag := range platformStatus.Azure.ResourceTags {
+			tags[tag.Key] = tag.Value
+		}
+	}
+	return
+}
+
+func getOCPTagList(clusterID string) (map[string]string, error) {
+	if clusterID == "" {
+		return nil, fmt.Errorf("cluster ID required for generating OCP tag list")
+	}
+	return map[string]string{
+		fmt.Sprintf("kubernetes.io_cluster.%v", clusterID): "owned",
+	}, nil
+}
+
+func findDuplicateTagKeys(tagSet map[string]string) (err error) {
+	if len(tagSet) == 0 {
+		return nil
+	}
+
+	dupKeys := make(map[string]int)
+	for k := range tagSet {
+		dupKeys[strings.ToTitle(k)]++
+	}
+
+	var errMsg []string
+	for key, count := range dupKeys {
+		if count > 1 {
+			errMsg = append(errMsg, fmt.Sprintf("\"%s\" matches %d keys", key, count))
+		}
+	}
+	if len(errMsg) > 0 {
+		err = fmt.Errorf("found duplicate tag keys: %v", strings.Join(errMsg, ", "))
+	}
+
+	return err
 }
