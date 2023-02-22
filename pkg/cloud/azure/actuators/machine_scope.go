@@ -492,7 +492,7 @@ func getOCPTagList(clusterID string) (map[string]string, error) {
 	}, nil
 }
 
-func findDuplicateTagKeys(tagSet map[string]string) (err error) {
+func findDuplicateTagKeys(tagSet map[string]string) error {
 	if len(tagSet) == 0 {
 		return nil
 	}
@@ -509,8 +509,8 @@ func findDuplicateTagKeys(tagSet map[string]string) (err error) {
 		}
 	}
 	if len(errMsg) > 0 {
-		err = fmt.Errorf("found duplicate tag keys: %v", strings.Join(errMsg, ", "))
+		return fmt.Errorf("found duplicate tag keys: %v", strings.Join(errMsg, ", "))
 	}
 
-	return err
+	return nil
 }
