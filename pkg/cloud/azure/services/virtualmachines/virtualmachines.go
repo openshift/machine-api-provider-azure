@@ -78,7 +78,7 @@ type Spec struct {
 	DataDisks           []machinev1.DataDisk
 	CustomData          string
 	ManagedIdentity     string
-	Tags                map[string]string
+	Tags                map[string]*string
 	Priority            compute.VirtualMachinePriorityTypes
 	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile      *compute.BillingProfile
@@ -259,7 +259,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 
 	virtualMachine := &compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.MachineConfig.Location),
-		Tags:     getTagListFromSpec(vmSpec),
+		Tags:     vmSpec.Tags,
 		Plan:     generateImagePlan(vmSpec.Image),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
@@ -350,18 +350,6 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 	}
 
 	return virtualMachine, nil
-}
-
-func getTagListFromSpec(spec *Spec) map[string]*string {
-	if len(spec.Tags) < 1 {
-		return nil
-	}
-
-	tagList := map[string]*string{}
-	for key, element := range spec.Tags {
-		tagList[key] = to.StringPtr(element)
-	}
-	return tagList
 }
 
 // Delete deletes the virtual network with the provided name.

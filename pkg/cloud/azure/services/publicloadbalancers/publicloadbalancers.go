@@ -171,6 +171,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 					},
 				},
 			},
+			Tags: s.Scope.Tags,
 		})
 
 	if err != nil {

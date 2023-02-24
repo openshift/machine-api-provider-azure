@@ -26,19 +26,24 @@ import (
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 const (
-	timeout = 10 * time.Second
+	timeout                  = 10 * time.Second
+	globalInfrastructureName = "cluster"
 )
 
 var (
-	cfg     *rest.Config
-	testEnv *envtest.Environment
+	cfg       *rest.Config
+	testEnv   *envtest.Environment
+	k8sClient client.Client
 
 	ctx = context.Background()
 )
@@ -56,13 +61,43 @@ var _ = BeforeSuite(func() {
 			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
 		},
 	}
-	machinev1.AddToScheme(scheme.Scheme)
-	configv1.AddToScheme(scheme.Scheme)
+
+	Expect(machinev1.AddToScheme(scheme.Scheme)).Should(Succeed())
+	Expect(configv1.AddToScheme(scheme.Scheme)).Should(Succeed())
 
 	var err error
 	cfg, err = testEnv.Start()
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
+
+	k8sClient, err = client.New(cfg, client.Options{})
+	Expect(err).ToNot(HaveOccurred())
+	Expect(k8sClient).ToNot(BeNil())
+
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastructureName,
+		},
+		Spec: configv1.InfrastructureSpec{
+			PlatformSpec: configv1.PlatformSpec{
+				Type: configv1.AzurePlatformType,
+			},
+		},
+	}
+	Expect(k8sClient.Create(ctx, infra)).Should(Succeed())
+	Expect(k8sClient.Get(ctx, client.ObjectKey{Name: globalInfrastructureName}, infra)).Should(Succeed())
+
+	infra.Status = configv1.InfrastructureStatus{
+		ControlPlaneTopology:   configv1.SingleReplicaTopologyMode,
+		InfrastructureTopology: configv1.SingleReplicaTopologyMode,
+		InfrastructureName:     "test-rghk",
+		PlatformStatus: &configv1.PlatformStatus{
+			Type:  configv1.AzurePlatformType,
+			Azure: &configv1.AzurePlatformStatus{},
+		},
+	}
+	Expect(k8sClient.Status().Update(ctx, infra)).Should(Succeed())
+	Expect(k8sClient.Create(ctx, machine.StubAzureCredentialsSecret())).Should(Succeed())
 })
 
 var _ = AfterSuite(func() {

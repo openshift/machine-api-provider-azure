@@ -180,7 +180,7 @@ func (s *StackHubService) deriveVirtualMachineParametersStackHub(vmSpec *Spec, n
 
 	virtualMachine := &compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.MachineConfig.Location),
-		Tags:     getTagListFromSpecStackHub(vmSpec),
+		Tags:     vmSpec.Tags,
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			HardwareProfile: &compute.HardwareProfile{
 				VMSize: compute.VirtualMachineSizeTypes(vmSpec.Size),
@@ -250,16 +250,4 @@ func (s *StackHubService) Delete(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("successfully deleted vm %s ", vmSpec.Name)
 	return err
-}
-
-func getTagListFromSpecStackHub(spec *Spec) map[string]*string {
-	if len(spec.Tags) < 1 {
-		return nil
-	}
-
-	tagList := map[string]*string{}
-	for key, element := range spec.Tags {
-		tagList[key] = to.StringPtr(element)
-	}
-	return tagList
 }

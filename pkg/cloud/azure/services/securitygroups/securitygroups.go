@@ -99,6 +99,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			SecurityGroupPropertiesFormat: &network.SecurityGroupPropertiesFormat{
 				SecurityRules: securityRules,
 			},
+			Tags: s.Scope.Tags,
 		},
 	)
 	if err != nil {

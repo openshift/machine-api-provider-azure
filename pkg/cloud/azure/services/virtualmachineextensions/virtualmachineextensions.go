@@ -74,6 +74,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 				Publisher:               to.StringPtr("Microsoft.Azure.Extensions"),
 				ProtectedSettings:       map[string]string{"script": vmExtSpec.ScriptData},
 			},
+			Tags: s.Scope.Tags,
 		})
 	if err != nil {
 		return fmt.Errorf("cannot create vm extension: %w", err)

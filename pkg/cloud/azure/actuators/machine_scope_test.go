@@ -18,8 +18,10 @@ package actuators
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -218,6 +220,23 @@ func testMachine(t *testing.T) *machinev1.Machine {
 	return testMachineWithProviderSpec(t, testProviderSpec())
 }
 
+func testMachineWithProviderSpecTags(t *testing.T, providerSpec *machinev1.AzureMachineProviderSpec) *machinev1.Machine {
+	providerSpecWithValues, err := providerSpecFromMachine(providerSpec)
+	if err != nil {
+		t.Fatalf("error encoding provider config: %v", err)
+	}
+
+	return &machinev1.Machine{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "test",
+			Annotations: map[string]string{},
+		},
+		Spec: machinev1.MachineSpec{
+			ProviderSpec: *providerSpecWithValues,
+		},
+	}
+}
+
 func TestPersistMachineScope(t *testing.T) {
 	machine := testMachine(t)
 
@@ -226,6 +245,7 @@ func TestPersistMachineScope(t *testing.T) {
 			Name: globalInfrastuctureName,
 		},
 		Status: configv1.InfrastructureStatus{
+			InfrastructureName: "test-sdgh",
 			PlatformStatus: &configv1.PlatformStatus{
 				Azure: &configv1.AzurePlatformStatus{
 					CloudName: configv1.AzurePublicCloud,
@@ -299,23 +319,45 @@ func TestNewMachineScope(t *testing.T) {
 		CredentialsSecret: &corev1.SecretReference{Name: "testCredentials", Namespace: "dummyNamespace"},
 	}
 
+	machineConfigWithTags := &machinev1.AzureMachineProviderSpec{
+		Tags: map[string]string{"environment": "test"},
+	}
+
 	testCases := []struct {
 		machine               *machinev1.Machine
 		secret                *corev1.Secret
 		expectedLocation      string
 		expectedResourceGroup string
+		expectedTags          map[string]*string
 	}{
 		{
 			machine:               testMachine(t),
 			secret:                testCredentialSecret(),
 			expectedLocation:      "test",
 			expectedResourceGroup: "test",
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-shfj": to.StringPtr("owned"),
+				"created-for":                     to.StringPtr("ocp"),
+			},
 		},
 		{
 			machine:               testMachineWithProviderSpec(t, machineConfigNoValues),
 			secret:                testCredentialSecret(),
 			expectedLocation:      "dummyRegion",
 			expectedResourceGroup: "dummyResourceGroup",
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-shfj": to.StringPtr("owned"),
+				"created-for":                     to.StringPtr("ocp"),
+			},
+		},
+		{
+			machine: testMachineWithProviderSpecTags(t, machineConfigWithTags),
+			secret:  testCredentialSecret(),
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-shfj": to.StringPtr("owned"),
+				"created-for":                     to.StringPtr("ocp"),
+				"environment":                     to.StringPtr("test"),
+			},
 		},
 	}
 
@@ -325,9 +367,16 @@ func TestNewMachineScope(t *testing.T) {
 				Name: globalInfrastuctureName,
 			},
 			Status: configv1.InfrastructureStatus{
+				InfrastructureName: "test-shfj",
 				PlatformStatus: &configv1.PlatformStatus{
 					Azure: &configv1.AzurePlatformStatus{
 						CloudName: configv1.AzurePublicCloud,
+						ResourceTags: []configv1.AzureResourceTag{
+							{
+								Key:   "created-for",
+								Value: "ocp",
+							},
+						},
 					},
 				},
 			},
@@ -346,6 +395,10 @@ func TestNewMachineScope(t *testing.T) {
 		}
 		if scope.MachineConfig.ResourceGroup != tc.expectedResourceGroup {
 			t.Errorf("Expected %v, got: %v", tc.expectedResourceGroup, scope.MachineConfig.ResourceGroup)
+		}
+		if !reflect.DeepEqual(scope.Tags, tc.expectedTags) {
+			t.Errorf("Expected %+v, Got: %+v, MachineSpec: %+v, InfraStatus: %+v",
+				tc.expectedTags, scope.Tags, scope.MachineConfig.Tags, infra.Status.PlatformStatus.Azure.ResourceTags)
 		}
 	}
 }
@@ -369,7 +422,9 @@ func TestGetCloudEnvironment(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalInfrastuctureName,
 				},
-				Status: configv1.InfrastructureStatus{},
+				Status: configv1.InfrastructureStatus{
+					InfrastructureName: "test-yuhk",
+				},
 			}),
 			expectedEnvironment: string(configv1.AzurePublicCloud),
 		},
@@ -380,9 +435,16 @@ func TestGetCloudEnvironment(t *testing.T) {
 					Name: globalInfrastuctureName,
 				},
 				Status: configv1.InfrastructureStatus{
+					InfrastructureName: "test-yuhk",
 					PlatformStatus: &configv1.PlatformStatus{
 						Azure: &configv1.AzurePlatformStatus{
 							CloudName: configv1.AzureUSGovernmentCloud,
+							ResourceTags: []configv1.AzureResourceTag{
+								{
+									Key:   "created-for",
+									Value: "ocp",
+								},
+							},
 						},
 					},
 				},
@@ -396,10 +458,21 @@ func TestGetCloudEnvironment(t *testing.T) {
 					Name: globalInfrastuctureName,
 				},
 				Status: configv1.InfrastructureStatus{
+					InfrastructureName: "test-yuhk",
 					PlatformStatus: &configv1.PlatformStatus{
 						Azure: &configv1.AzurePlatformStatus{
 							CloudName:   configv1.AzureStackCloud,
 							ARMEndpoint: "test",
+							ResourceTags: []configv1.AzureResourceTag{
+								{
+									Key:   "created-for",
+									Value: "ocp",
+								},
+								{
+									Key:   "environment",
+									Value: "test",
+								},
+							},
 						},
 					},
 				},
@@ -434,6 +507,238 @@ func TestGetCloudEnvironment(t *testing.T) {
 
 			if armEndpoint != tc.expectedARMEndpoint {
 				t.Fatalf("expected arm endpoint %s, got: %s", tc.expectedARMEndpoint, armEndpoint)
+			}
+		})
+	}
+}
+
+func TestGetTagList(t *testing.T) {
+	ocpDefaultTags := map[string]string{
+		"kubernetes.io_cluster.test-fhbv": "owned",
+	}
+
+	testCases := []struct {
+		name            string
+		machineSpecTags map[string]string
+		infraStatusTags map[string]string
+		ocpTags         map[string]string
+		expectedTags    map[string]*string
+		wantErr         bool
+	}{
+		{
+			name:            "OCPTags, InfraStatusTags and MachineSpecTags are empty",
+			ocpTags:         nil,
+			machineSpecTags: nil,
+			infraStatusTags: nil,
+			expectedTags:    map[string]*string{},
+			wantErr:         false,
+		},
+		{
+			name:            "InfraStatusTags and MachineSpecTags are empty",
+			ocpTags:         ocpDefaultTags,
+			machineSpecTags: nil,
+			infraStatusTags: nil,
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+			},
+			wantErr: false,
+		},
+		{
+			name:            "InfraStatusTags is empty",
+			ocpTags:         ocpDefaultTags,
+			machineSpecTags: map[string]string{"environment": "test"},
+			infraStatusTags: nil,
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+				"environment":                     to.StringPtr("test"),
+			},
+			wantErr: false,
+		},
+		{
+			name:            "MachineSpecTags is empty",
+			ocpTags:         ocpDefaultTags,
+			machineSpecTags: nil,
+			infraStatusTags: map[string]string{"owned-by": "ocp"},
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+				"owned-by":                        to.StringPtr("ocp"),
+			},
+			wantErr: false,
+		},
+		{
+			name:            "InfraStatusTags and MachineSpecTags are not empty",
+			ocpTags:         ocpDefaultTags,
+			machineSpecTags: map[string]string{"environment": "test"},
+			infraStatusTags: map[string]string{"createdFor": "ocp"},
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+				"environment":                     to.StringPtr("test"),
+				"createdFor":                      to.StringPtr("ocp"),
+			},
+			wantErr: false,
+		},
+		{
+			name:    "InfraStatusTags and MachineSpecTags differ",
+			ocpTags: ocpDefaultTags,
+			machineSpecTags: map[string]string{
+				"environment": "test",
+				"billing":     "test",
+				"createdFor":  "ocp-test",
+			},
+			infraStatusTags: map[string]string{
+				"createdFor": "ocp",
+			},
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+				"createdFor":                      to.StringPtr("ocp-test"),
+				"environment":                     to.StringPtr("test"),
+				"billing":                         to.StringPtr("test"),
+			},
+			wantErr: false,
+		},
+		{
+			name:    "InfraStatusTags and MachineSpecTags differ, tag removed",
+			ocpTags: ocpDefaultTags,
+			machineSpecTags: map[string]string{
+				"environment": "test",
+				"billing":     "test",
+			},
+			infraStatusTags: map[string]string{
+				"createdFor": "ocp",
+			},
+			expectedTags: map[string]*string{
+				"kubernetes.io_cluster.test-fhbv": to.StringPtr("owned"),
+				"createdFor":                      to.StringPtr("ocp"),
+				"environment":                     to.StringPtr("test"),
+				"billing":                         to.StringPtr("test"),
+			},
+			wantErr: false,
+		},
+		{
+			name: "OCP reserved tag tally is more than 5",
+			ocpTags: map[string]string{
+				"key1": "value40", "key2": "value39", "key3": "value38",
+				"key4": "value37", "key5": "value36", "key6": "value35",
+			},
+			machineSpecTags: map[string]string{
+				"key1": "value40", "key2": "value39", "key3": "value38",
+				"key4": "value37", "key5": "value36", "key6": "value35",
+				"key7": "value34", "key8": "value33", "key9": "value32",
+				"key10": "value31", "key11": "value30", "key12": "value29",
+				"key13": "value28", "key14": "value27", "key15": "value26",
+				"key16": "value25", "key17": "value24", "key18": "value23",
+				"key19": "value22", "key20": "value21", "key21": "value20",
+				"key22": "value19", "key23": "value18", "key24": "value17",
+				"key25": "value16", "key26": "value15", "key27": "value14",
+				"key28": "value13", "key29": "value12", "key30": "value11",
+				"key31": "value10", "key32": "value9", "key33": "value8",
+				"key34": "value7", "key35": "value6", "key36": "value5",
+				"key37": "value4", "key38": "value3", "key39": "value2",
+				"key40": "value1",
+			},
+			infraStatusTags: map[string]string{
+				"key20": "value1", "key26": "value2", "key15": "value3",
+				"key79": "value4", "key59": "value5", "key63": "value6",
+			},
+			expectedTags: nil,
+			wantErr:      true,
+		},
+		{
+			name:    "InfraStatusTags and MachineSpecTags together contains more than 45 tags",
+			ocpTags: ocpDefaultTags,
+			machineSpecTags: map[string]string{
+				"key1": "value40", "key2": "value39", "key3": "value38",
+				"key4": "value37", "key5": "value36", "key6": "value35",
+				"key7": "value34", "key8": "value33", "key9": "value32",
+				"key10": "value31", "key11": "value30", "key12": "value29",
+				"key13": "value28", "key14": "value27", "key15": "value26",
+				"key16": "value25", "key17": "value24", "key18": "value23",
+				"key19": "value22", "key20": "value21", "key21": "value20",
+				"key22": "value19", "key23": "value18", "key24": "value17",
+				"key25": "value16", "key26": "value15", "key27": "value14",
+				"key28": "value13", "key29": "value12", "key30": "value11",
+				"key31": "value10", "key32": "value9", "key33": "value8",
+				"key34": "value7", "key35": "value6", "key36": "value5",
+				"key37": "value4", "key38": "value3", "key39": "value2",
+				"key40": "value1",
+			},
+			infraStatusTags: map[string]string{
+				"key20": "value1", "key26": "value2", "key15": "value3",
+				"key79": "value4", "key59": "value5", "key63": "value6",
+				"key73": "value7", "key85": "value8", "key91": "value9",
+				"key25": "value10",
+			},
+			expectedTags: nil,
+			wantErr:      true,
+		},
+		{
+			name:    "MachineSpecTags has duplicate tag keys",
+			ocpTags: ocpDefaultTags,
+			machineSpecTags: map[string]string{
+				"environment": "test",
+				"billing":     "test",
+				"Billing":     "dev",
+				"CreatedFor":  "dev",
+				"createdfor":  "test",
+			},
+			infraStatusTags: map[string]string{
+				"createdFor": "ocp",
+			},
+			expectedTags: nil,
+			wantErr:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tags, err := getTagList(tc.ocpTags, tc.infraStatusTags, tc.machineSpecTags)
+
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Got: %v, wantErr: %v", err, tc.wantErr)
+			}
+
+			if !reflect.DeepEqual(tags, tc.expectedTags) {
+				t.Errorf("Expected %+v, Got: %+v, OCP: %+v, MachineSpec: %+v, InfraStatus: %+v",
+					tc.expectedTags, tags, tc.ocpTags, tc.machineSpecTags, tc.infraStatusTags)
+			}
+		})
+	}
+}
+
+func TestGetOCPTagList(t *testing.T) {
+
+	testCases := []struct {
+		name         string
+		clusterID    string
+		expectedTags map[string]string
+		wantErr      bool
+	}{
+		{
+			name:      "OCP tag list generation success",
+			clusterID: "test-fghd",
+			expectedTags: map[string]string{
+				"kubernetes.io_cluster.test-fghd": "owned",
+			},
+			wantErr: false,
+		},
+		{
+			name:         "OCP tag list generation fails, clusterID empty",
+			clusterID:    "",
+			expectedTags: nil,
+			wantErr:      true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tags, err := getOCPTagList(tc.clusterID)
+
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Got: %v, wantErr: %v", err, tc.wantErr)
+			}
+
+			if !reflect.DeepEqual(tags, tc.expectedTags) {
+				t.Errorf("Expected %+v, Got: %+v", tc.expectedTags, tags)
 			}
 		})
 	}

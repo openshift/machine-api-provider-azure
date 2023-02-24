@@ -24,11 +24,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	gtypes "github.com/onsi/gomega/types"
-	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
-	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,8 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
-
-const globalInfrastuctureName = "cluster"
 
 type fakeResourceSkusService struct {
 	cache *resourceskus.Cache
@@ -77,7 +73,6 @@ func (f *fakeResourceSkusService) Delete(ctx context.Context, spec azure.Spec) e
 }
 
 var _ = Describe("Reconciler", func() {
-	var c client.Client
 	var stopMgr context.CancelFunc
 	var fakeRecorder *record.FakeRecorder
 	var namespace *corev1.Namespace
@@ -87,25 +82,10 @@ var _ = Describe("Reconciler", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		r := Reconciler{
-			Client: mgr.GetClient(),
+			Client: k8sClient,
 			Log:    log.Log,
 		}
 		Expect(r.SetupWithManager(mgr, controller.Options{})).To(Succeed())
-
-		infra := &configv1.Infrastructure{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: globalInfrastuctureName,
-			},
-			Status: configv1.InfrastructureStatus{
-				PlatformStatus: &configv1.PlatformStatus{
-					Azure: &configv1.AzurePlatformStatus{
-						CloudName: configv1.AzurePublicCloud,
-					},
-				},
-			},
-		}
-		mgr.GetClient().Create(ctx, infra)
-		mgr.GetClient().Create(ctx, machine.StubAzureCredentialsSecret())
 
 		fakeRecorder = record.NewFakeRecorder(1)
 		r.recorder = fakeRecorder
@@ -146,16 +126,14 @@ var _ = Describe("Reconciler", func() {
 		r.ResourceSkusServiceBuilder = func(scope *actuators.MachineScope) azure.Service {
 			return fakeResourceSkusService
 		}
-
-		c = mgr.GetClient()
 		stopMgr = StartTestManager(mgr)
 
 		namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{GenerateName: "mhc-test-"}}
-		Expect(c.Create(ctx, namespace)).To(Succeed())
+		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 	})
 
 	AfterEach(func() {
-		Expect(deleteMachineSets(c, namespace.Name)).To(Succeed())
+		Expect(deleteMachineSets(k8sClient, namespace.Name)).To(Succeed())
 		stopMgr()
 	})
 
@@ -172,12 +150,12 @@ var _ = Describe("Reconciler", func() {
 
 		replicas := int32(1)
 		machineSet.Spec.Replicas = &replicas
-		Expect(c.Create(ctx, machineSet)).To(Succeed())
+		Expect(k8sClient.Create(ctx, machineSet)).To(Succeed())
 
 		Eventually(func() map[string]string {
 			m := &machinev1.MachineSet{}
 			key := client.ObjectKey{Namespace: machineSet.Namespace, Name: machineSet.Name}
-			err := c.Get(ctx, key, m)
+			err := k8sClient.Get(ctx, key, m)
 			if err != nil {
 				return nil
 			}

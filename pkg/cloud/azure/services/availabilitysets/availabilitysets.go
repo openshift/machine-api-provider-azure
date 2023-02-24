@@ -32,6 +32,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			PlatformFaultDomainCount:  to.Int32Ptr(int32(2)),
 			PlatformUpdateDomainCount: to.Int32Ptr(int32(5)),
 		},
+		Tags: s.Scope.Tags,
 	}
 
 	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, availabilitysetsSpec.Name, asParams)

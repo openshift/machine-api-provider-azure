@@ -2,7 +2,6 @@ package virtualmachines
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"testing"
 
@@ -15,38 +14,6 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
-
-func TestGetTagListFromSpec(t *testing.T) {
-	testCases := []struct {
-		spec     *Spec
-		expected map[string]*string
-	}{
-		{
-			spec: &Spec{
-				Name: "test",
-				Tags: map[string]string{
-					"foo": "bar",
-				},
-			},
-			expected: map[string]*string{
-				"foo": to.StringPtr("bar"),
-			},
-		},
-		{
-			spec: &Spec{
-				Name: "test",
-			},
-			expected: nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		tagList := getTagListFromSpec(tc.spec)
-		if !reflect.DeepEqual(tagList, tc.expected) {
-			t.Errorf("Expected %v, got: %v", tc.expected, tagList)
-		}
-	}
-}
 
 func TestDeriveVirtualMachineParameters(t *testing.T) {
 	testCases := []struct {
@@ -485,6 +452,36 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					"testvm"+"_"+"datadisk-test", "testvm",
 					"", machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)),
 		},
+		{
+			name: "user-tags not configured",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.Tags = map[string]*string{
+					"kubernetes.io_cluster.test": to.StringPtr("owned"),
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.Tags).Should(Equal(map[string]*string{"kubernetes.io_cluster.test": to.StringPtr("owned")}))
+			},
+			expectedError: nil,
+		},
+		{
+			name: "user-tags configured",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.Tags = map[string]*string{
+					"kubernetes.io_cluster.test": to.StringPtr("owned"),
+					"created-by":                 to.StringPtr("ocp"),
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.Tags).Should(Equal(map[string]*string{
+					"kubernetes.io_cluster.test": to.StringPtr("owned"),
+					"created-by":                 to.StringPtr("ocp"),
+				}))
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -558,7 +555,7 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		},
 		CustomData:      "",
 		ManagedIdentity: "",
-		Tags:            map[string]string{},
+		Tags:            map[string]*string{},
 		Priority:        compute.VirtualMachinePriorityTypesRegular,
 		EvictionPolicy:  compute.VirtualMachineEvictionPolicyTypesDelete,
 		BillingProfile:  nil,
