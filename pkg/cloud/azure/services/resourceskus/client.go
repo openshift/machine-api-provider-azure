@@ -19,7 +19,7 @@ package resourceskus
 import (
 	"context"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/pkg/errors"
@@ -54,7 +54,7 @@ func newResourceSkusClient(azureClients actuators.AzureClients) compute.Resource
 
 // List returns all Resource SKUs available to the subscription.
 func (ac *AzureClient) List(ctx context.Context, filter string) ([]compute.ResourceSku, error) {
-	iter, err := ac.skus.ListComplete(ctx, filter)
+	iter, err := ac.skus.ListComplete(ctx, filter, "true")
 	if err != nil {
 		return nil, errors.Wrap(err, "could not list resource skus")
 	}

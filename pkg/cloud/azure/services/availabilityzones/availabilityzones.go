@@ -39,7 +39,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 
 	filter := fmt.Sprintf("location eq '%s'", s.Scope.Location())
-	res, err := s.Client.List(ctx, filter)
+	res, err := s.Client.List(ctx, filter, "true")
 	if err != nil {
 		return zones, err
 	}
