@@ -21,10 +21,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/jongio/azidext/go/azidext"
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -365,22 +367,28 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 		return err
 	}
 
-	oauthConfig, err := adal.NewOAuthConfig(
-		env.ActiveDirectoryEndpoint, string(tenantID))
+	options := azidentity.ClientSecretCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: getCloudConfig(env),
+		},
+	}
+
+	cred, err := azidentity.NewClientSecretCredential(string(tenantID), string(clientID), string(clientSecret), &options)
 	if err != nil {
 		return err
 	}
 
-	token, err := adal.NewServicePrincipalToken(
-		*oauthConfig, string(clientID), string(clientSecret), env.TokenAudience)
-	if err != nil {
-		return err
+	endpointScope := env.TokenAudience
+	if !strings.HasSuffix(endpointScope, "/.default") {
+		endpointScope += "/.default"
 	}
-
-	authorizer, err := autorest.NewBearerAuthorizer(token), nil
-	if err != nil {
-		return fmt.Errorf("failed to create azure session: %v", err)
-	}
+	// Use an adapter so azidentity in the Azure SDK can be used as
+	// Authorizer when calling the Azure Management Packages, which we
+	// currently use. Once the Azure SDK clients (found in /sdk) move to
+	// stable, we can update our clients and they will be able to use the creds
+	// directly without the authorizer. The schedule is here:
+	// https://azure.github.io/azure-sdk/releases/latest/index.html#go
+	authorizer := azidext.NewTokenCredentialAdapter(cred, []string{endpointScope})
 
 	if scope.MachineConfig.ResourceGroup == "" {
 		scope.MachineConfig.ResourceGroup = string(resourceGroup)
@@ -513,4 +521,27 @@ func findDuplicateTagKeys(tagSet map[string]string) error {
 	}
 
 	return nil
+}
+
+func getCloudConfig(env *azure.Environment) cloud.Configuration {
+	var cloudConfig cloud.Configuration
+	switch env.Name {
+	case azure.ChinaCloud.Name:
+		cloudConfig = cloud.AzureChina
+	case azure.USGovernmentCloud.Name:
+		cloudConfig = cloud.AzureGovernment
+	case azure.PublicCloud.Name:
+		cloudConfig = cloud.AzurePublic
+	default:
+		cloudConfig = cloud.Configuration{
+			ActiveDirectoryAuthorityHost: env.ActiveDirectoryEndpoint,
+			Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+				cloud.ResourceManager: {
+					Audience: env.TokenAudience,
+					Endpoint: env.ResourceManagerEndpoint,
+				},
+			},
+		}
+	}
+	return cloudConfig
 }
