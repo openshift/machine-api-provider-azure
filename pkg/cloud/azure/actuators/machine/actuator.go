@@ -28,6 +28,7 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
@@ -221,6 +222,9 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool
 	}
 
 	isExists, err := a.reconcilerBuilder(scope).Exists(context.Background())
+	if apierrors.IsUnexpectedObjectError(err) {
+		return isExists, nil
+	}
 	if err != nil {
 		klog.Errorf("failed to check machine %s exists: %v", machine.Name, err)
 	}
