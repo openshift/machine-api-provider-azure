@@ -764,13 +764,13 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 		},
 		{
 			name:       "CreateMachine",
-			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create or get machine: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
+			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create VM: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
 			statusCode: 300,
 			requeable:  true,
 		},
 		{
 			name:       "CreateMachine",
-			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create or get machine: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=401",
+			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create VM: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=401",
 			statusCode: 401,
 			requeable:  true,
 		},
