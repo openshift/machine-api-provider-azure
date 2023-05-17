@@ -486,7 +486,7 @@ func TestCustomUserData(t *testing.T) {
 			"userData": []byte("test-userdata"),
 		},
 	}
-	fakeScope.CoreClient = controllerfake.NewFakeClient(userDataSecret)
+	fakeScope.CoreClient = controllerfake.NewClientBuilder().WithObjects(userDataSecret).Build()
 	fakeScope.MachineConfig.UserDataSecret = &corev1.SecretReference{Name: userDataSecret.Name, Namespace: fakeScope.Namespace()}
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{}
@@ -515,7 +515,7 @@ func TestCustomDataFailures(t *testing.T) {
 			"userData": []byte("test-userdata"),
 		},
 	}
-	fakeScope.CoreClient = controllerfake.NewFakeClient(userDataSecret)
+	fakeScope.CoreClient = controllerfake.NewClientBuilder().WithObjects(userDataSecret).Build()
 	fakeScope.MachineConfig.UserDataSecret = &corev1.SecretReference{Name: "testCustomUserData"}
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{}
@@ -532,7 +532,7 @@ func TestCustomDataFailures(t *testing.T) {
 	userDataSecret.Data = map[string][]byte{
 		"notUserData": []byte("test-notuserdata"),
 	}
-	fakeScope.CoreClient = controllerfake.NewFakeClient(userDataSecret)
+	fakeScope.CoreClient = controllerfake.NewClientBuilder().WithObjects(userDataSecret).Build()
 	if _, err := fakeReconciler.getCustomUserData(); err == nil {
 		t.Errorf("expected get custom data to fail, due to missing userdata")
 	}
@@ -658,7 +658,7 @@ func TestMachineEvents(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.credSecret, infra)
+			cs := controllerfake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(tc.credSecret, infra).WithStatusSubresource(&machinev1.Machine{}).Build()
 
 			m := tc.machine.DeepCopy()
 			if err := cs.Create(context.TODO(), m); err != nil {
@@ -780,16 +780,17 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClient(StubAzureCredentialsSecret(), &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azure-actuator-user-data-secret",
-					Namespace: "default",
+			cs := controllerfake.NewClientBuilder().WithObjects(
+				StubAzureCredentialsSecret(), &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "azure-actuator-user-data-secret",
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"userData": []byte("S3CR3T"),
+					},
 				},
-				Data: map[string][]byte{
-					"userData": []byte("S3CR3T"),
-				},
-			},
-				infra)
+				infra).Build()
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
@@ -891,7 +892,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewFakeClient(StubAzureCredentialsSecret(), &corev1.Secret{
+			cs := controllerfake.NewClientBuilder().WithObjects(StubAzureCredentialsSecret(), &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "azure-actuator-user-data-secret",
 					Namespace: "default",
@@ -900,7 +901,7 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 					"userData": []byte("S3CR3T"),
 				},
 			},
-				infra)
+				infra).Build()
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)

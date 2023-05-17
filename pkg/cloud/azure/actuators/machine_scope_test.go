@@ -85,7 +85,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 		},
 	}
 
-	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
+	fakeclient := controllerfake.NewClientBuilder().WithObjects(credentialsSecret).Build()
 
 	scope := &MachineScope{
 		MachineConfig: &machinev1.AzureMachineProviderSpec{
@@ -115,7 +115,7 @@ func TestCredentialsSecretSuccess(t *testing.T) {
 }
 
 func testCredentialFields(credentialsSecret *corev1.Secret) error {
-	fakeclient := controllerfake.NewFakeClient(credentialsSecret)
+	fakeclient := controllerfake.NewClientBuilder().WithObjects(credentialsSecret).Build()
 
 	scope := &MachineScope{
 		MachineConfig: &machinev1.AzureMachineProviderSpec{
@@ -256,7 +256,7 @@ func TestPersistMachineScope(t *testing.T) {
 
 	params := MachineScopeParams{
 		Machine:    machine,
-		CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, testCredentialSecret(), infra),
+		CoreClient: controllerfake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(testCredentialSecret(), infra).WithStatusSubresource(&machinev1.Machine{}).Build(),
 	}
 
 	scope, err := NewMachineScope(params)
@@ -384,7 +384,7 @@ func TestNewMachineScope(t *testing.T) {
 
 		scope, err := NewMachineScope(MachineScopeParams{
 			Machine:    tc.machine,
-			CoreClient: controllerfake.NewFakeClientWithScheme(scheme.Scheme, tc.secret, infra),
+			CoreClient: controllerfake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(tc.secret, infra).Build(),
 		})
 		if err != nil {
 			t.Fatalf("Unexpected error %v", err)
@@ -413,24 +413,24 @@ func TestGetCloudEnvironment(t *testing.T) {
 	}{
 		{
 			name:          "fail when infrastructure is missing",
-			client:        controllerfake.NewFakeClient(),
+			client:        controllerfake.NewClientBuilder().Build(),
 			expectedError: true,
 		},
 		{
 			name: "when cloud environment is missing default to Azure Public Cloud",
-			client: controllerfake.NewFakeClient(&configv1.Infrastructure{
+			client: controllerfake.NewClientBuilder().WithObjects(&configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalInfrastuctureName,
 				},
 				Status: configv1.InfrastructureStatus{
 					InfrastructureName: "test-yuhk",
 				},
-			}),
+			}).Build(),
 			expectedEnvironment: string(configv1.AzurePublicCloud),
 		},
 		{
 			name: "when cloud environment is present return it",
-			client: controllerfake.NewFakeClient(&configv1.Infrastructure{
+			client: controllerfake.NewClientBuilder().WithObjects(&configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalInfrastuctureName,
 				},
@@ -448,12 +448,12 @@ func TestGetCloudEnvironment(t *testing.T) {
 						},
 					},
 				},
-			}),
+			}).Build(),
 			expectedEnvironment: string(configv1.AzureUSGovernmentCloud),
 		},
 		{
 			name: "when cloud environment is present return it",
-			client: controllerfake.NewFakeClient(&configv1.Infrastructure{
+			client: controllerfake.NewClientBuilder().WithObjects(&configv1.Infrastructure{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: globalInfrastuctureName,
 				},
@@ -476,7 +476,7 @@ func TestGetCloudEnvironment(t *testing.T) {
 						},
 					},
 				},
-			}),
+			}).Build(),
 			expectedEnvironment: string(configv1.AzureStackCloud),
 			expectedARMEndpoint: "test",
 		},
