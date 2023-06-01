@@ -23,6 +23,7 @@ import (
 	"github.com/go-logr/logr"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	mapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"github.com/openshift/machine-api-operator/pkg/util"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +36,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 )
 
+// We define a new type to represent the normalized architecture as the Azure APIs use a different format.
+type normalizedArch string
+
+const (
+	// ArchitectureAmd64 is the normalized architecture for amd64.
+	ArchitectureAmd64 normalizedArch = "amd64"
+	// ArchitectureArm64 is the normalized architecture for arm64.
+	ArchitectureArm64 normalizedArch = "arm64"
+)
+
 const (
 	// This exposes compute information based on the providerSpec input.
 	// This is needed by the autoscaler to foresee upcoming capacity when scaling from zero.
@@ -42,6 +53,7 @@ const (
 	cpuKey    = "machine.openshift.io/vCPU"
 	memoryKey = "machine.openshift.io/memoryMb"
 	gpuKey    = "machine.openshift.io/GPU"
+	labelsKey = "machine.openshift.io/labels"
 )
 
 // Reconciler reconciles machineSets.
@@ -231,6 +243,17 @@ func updateMachineSetAnnotations(machineSet *machinev1.MachineSet, sku resources
 		machineSet.Annotations[gpuKey] = gpuCap
 	}
 
+	// Architecture
+	architecture, ok := sku.GetCapability(resourceskus.CPUArchitectureType)
+	if !ok {
+		klog.V(2).Infof("SKU '%s' does not have the CPUArchitecture capability. Defaulting to amd64", *sku.Name)
+	}
+	// We guarantee that any existing labels provided via the capacity annotations are preserved.
+	// See https://github.com/kubernetes/autoscaler/pull/5382 and https://github.com/kubernetes/autoscaler/pull/5697
+	machineSet.Annotations[labelsKey] = util.MergeCommaSeparatedKeyValuePairs(
+		fmt.Sprintf("kubernetes.io/arch=%s", normalizedArchitecture(architecture)),
+		machineSet.Annotations[labelsKey])
+
 	return nil
 }
 
@@ -247,4 +270,20 @@ func memoryGiBtoMiB(memoryGiB string) (string, error) {
 
 func getproviderConfig(machineSet *machinev1.MachineSet) (*machinev1.AzureMachineProviderSpec, error) {
 	return actuators.MachineConfigFromProviderSpec(machineSet.Spec.Template.Spec.ProviderSpec)
+}
+
+// normalizedArchitecture adapts the value of the architecture capability for the SKU to the
+// one required by the kubernetes APIs.
+// For example, the x86_64 architecture is called "x64" in the Azure API.
+// The kubernetes.io/arch label, instead, expects the Golang/LLVM names.
+func normalizedArchitecture(architecture string) normalizedArch {
+	switch architecture {
+	case resourceskus.X64:
+		return ArchitectureAmd64
+	case resourceskus.Arm64:
+		return ArchitectureArm64
+	}
+	klog.V(2).Infof("unknown architecture '%s'. Defaulting to amd64", architecture)
+	// Default to amd64 if we don't recognize the architecture.
+	return ArchitectureAmd64
 }
