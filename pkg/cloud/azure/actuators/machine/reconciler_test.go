@@ -85,7 +85,7 @@ func TestExists(t *testing.T) {
 				ID:                "machine-test-ID",
 				ProvisioningState: "Failed",
 			},
-			expected:    true,
+			expected:    false,
 			errExpected: true,
 		},
 		{
