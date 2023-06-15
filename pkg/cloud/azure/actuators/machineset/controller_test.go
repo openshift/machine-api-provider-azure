@@ -102,6 +102,10 @@ var _ = Describe("Reconciler", func() {
 						Name:  to.StringPtr(resourceskus.MemoryGB),
 						Value: to.StringPtr("16"),
 					},
+					{
+						Name:  to.StringPtr(resourceskus.CPUArchitectureType),
+						Value: to.StringPtr(resourceskus.X64),
+					},
 				},
 			},
 			{
@@ -119,6 +123,60 @@ var _ = Describe("Reconciler", func() {
 					{
 						Name:  to.StringPtr(resourceskus.GPUs),
 						Value: to.StringPtr("4"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.CPUArchitectureType),
+						Value: to.StringPtr(resourceskus.X64),
+					},
+				},
+			},
+			{
+				Name:         to.StringPtr("Standard_D4ps_v5"),
+				ResourceType: to.StringPtr("virtualMachines"),
+				Capabilities: &[]compute.ResourceSkuCapabilities{
+					{
+						Name:  to.StringPtr(resourceskus.VCPUs),
+						Value: to.StringPtr("4"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.MemoryGB),
+						Value: to.StringPtr("16"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.CPUArchitectureType),
+						Value: to.StringPtr(resourceskus.Arm64),
+					},
+				},
+			},
+			{
+				Name:         to.StringPtr("Standard_D4s_v3_wrong-arch"),
+				ResourceType: to.StringPtr("virtualMachines"),
+				Capabilities: &[]compute.ResourceSkuCapabilities{
+					{
+						Name:  to.StringPtr(resourceskus.VCPUs),
+						Value: to.StringPtr("4"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.MemoryGB),
+						Value: to.StringPtr("16"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.CPUArchitectureType),
+						Value: to.StringPtr("wrong-arch"),
+					},
+				},
+			},
+			{
+				Name:         to.StringPtr("Standard_D4s_v3_missing-arch"),
+				ResourceType: to.StringPtr("virtualMachines"),
+				Capabilities: &[]compute.ResourceSkuCapabilities{
+					{
+						Name:  to.StringPtr(resourceskus.VCPUs),
+						Value: to.StringPtr("4"),
+					},
+					{
+						Name:  to.StringPtr(resourceskus.MemoryGB),
+						Value: to.StringPtr("16"),
 					},
 				},
 			},
@@ -190,6 +248,7 @@ var _ = Describe("Reconciler", func() {
 				cpuKey:    "4",
 				memoryKey: "16384",
 				gpuKey:    "0",
+				labelsKey: "kubernetes.io/arch=amd64",
 			},
 			expectedEvents: []string{},
 		}),
@@ -200,6 +259,7 @@ var _ = Describe("Reconciler", func() {
 				cpuKey:    "24",
 				memoryKey: "229376",
 				gpuKey:    "4",
+				labelsKey: "kubernetes.io/arch=amd64",
 			},
 			expectedEvents: []string{},
 		}),
@@ -215,6 +275,7 @@ var _ = Describe("Reconciler", func() {
 				cpuKey:     "24",
 				memoryKey:  "229376",
 				gpuKey:     "4",
+				labelsKey:  "kubernetes.io/arch=amd64",
 			},
 			expectedEvents: []string{},
 		}),
@@ -229,6 +290,39 @@ var _ = Describe("Reconciler", func() {
 				"annother": "existingAnnotation",
 			},
 			expectedEvents: []string{"FailedUpdate"},
+		}),
+		Entry("with a Standard_D4ps_v5 (aarch64)", reconcileTestCase{
+			vmSize:              "Standard_D4ps_v5",
+			existingAnnotations: make(map[string]string),
+			expectedAnnotations: map[string]string{
+				cpuKey:    "4",
+				memoryKey: "16384",
+				gpuKey:    "0",
+				labelsKey: "kubernetes.io/arch=arm64",
+			},
+			expectedEvents: []string{},
+		}),
+		Entry("with a vmSize missing the architecture capability", reconcileTestCase{
+			vmSize:              "Standard_D4s_v3_missing-arch",
+			existingAnnotations: make(map[string]string),
+			expectedAnnotations: map[string]string{
+				cpuKey:    "4",
+				memoryKey: "16384",
+				gpuKey:    "0",
+				labelsKey: "kubernetes.io/arch=amd64",
+			},
+			expectedEvents: []string{},
+		}),
+		Entry("with a vmSize missing an unknown architecture", reconcileTestCase{
+			vmSize:              "Standard_D4s_v3_wrong-arch",
+			existingAnnotations: make(map[string]string),
+			expectedAnnotations: map[string]string{
+				cpuKey:    "4",
+				memoryKey: "16384",
+				gpuKey:    "0",
+				labelsKey: "kubernetes.io/arch=amd64",
+			},
+			expectedEvents: []string{},
 		}),
 	)
 })

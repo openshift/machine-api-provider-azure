@@ -16,7 +16,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
 	github.com/openshift/api v0.0.0-20230509100629-894b49f57a15
-	github.com/openshift/machine-api-operator v0.2.1-0.20230526095704-3938d727319b
+	github.com/openshift/machine-api-operator v0.2.1-0.20230531233206-931f6f67c1c7
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.7.0
 	golang.org/x/crypto v0.6.0
