@@ -98,7 +98,7 @@ func (h *handler) run(ctx context.Context) error {
 	logger := h.log.WithValues("node", h.nodeName)
 	logger.V(1).Info("Monitoring node termination")
 
-	if err := wait.PollImmediateUntil(h.pollInterval, func() (bool, error) {
+	if err := wait.PollUntilContextCancel(ctx, h.pollInterval, true, func(ctx context.Context) (bool, error) {
 		req, err := http.NewRequest("GET", h.pollURL.String(), nil)
 		if err != nil {
 			return false, fmt.Errorf("could not create request %q: %w", h.pollURL.String(), err)
@@ -135,7 +135,7 @@ func (h *handler) run(ctx context.Context) error {
 		// Instance not terminated yet
 		logger.V(2).Info("Instance not marked for termination")
 		return false, nil
-	}, ctx.Done()); err != nil {
+	}); err != nil {
 		return fmt.Errorf("error polling termination endpoint: %w", err)
 	}
 

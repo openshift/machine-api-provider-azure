@@ -589,7 +589,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Create(context.TODO(), machine)
 			},
-			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedCreate InvalidConfiguration: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: azure client id not found in secret default/azure-credentials-secret (azure_client_id) or environment variable AZURE_CLIENT_ID",
 		},
 		{
 			name:       "Create machine event failed (reconciler)",
@@ -616,7 +616,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Update(context.TODO(), machine)
 			},
-			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedUpdate UpdateError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: azure client id not found in secret default/azure-credentials-secret (azure_client_id) or environment variable AZURE_CLIENT_ID",
 		},
 		{
 			name:       "Update machine event succeed",
@@ -634,7 +634,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Delete(context.TODO(), machine)
 			},
-			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: Azure client id default/azure-credentials-secret did not contain key azure_client_id",
+			event: "Warning FailedDelete DeleteError: failed to create machine \"azure-actuator-testing-machine\" scope: failed to update cluster: azure client id not found in secret default/azure-credentials-secret (azure_client_id) or environment variable AZURE_CLIENT_ID",
 		},
 		{
 			name:       "Delete machine event failed (reconciler)",
