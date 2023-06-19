@@ -19,6 +19,7 @@ package actuators
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -42,7 +43,7 @@ import (
 const (
 	// AzureCredsSubscriptionIDKey subcription ID
 	AzureCredsSubscriptionIDKey = "azure_subscription_id"
-	// AzureCredsClientIDKey client id
+	// AzureCredsClientIDKey client ID
 	AzureCredsClientIDKey = "azure_client_id"
 	// AzureCredsClientSecretKey client secret
 	AzureCredsClientSecretKey = "azure_client_secret"
@@ -54,6 +55,17 @@ const (
 	AzureCredsRegionKey = "azure_region"
 	// AzureResourcePrefix resource prefix for created azure resources
 	AzureResourcePrefix = "azure_resource_prefix"
+	// AzureFederatedTokenFileKey path for federated identity token
+	AzureFederatedTokenFileKey = "azure_federated_token_file"
+
+	// AzureCredsTenantIDEnvironmentVar tenant ID (environment variable)
+	AzureCredsTenantIDEnvironmentVar = "AZURE_TENANT_ID"
+	// AzureCredsClientIDEnvironmentVar client ID (environment variable)
+	AzureCredsClientIDEnvironmentVar = "AZURE_CLIENT_ID"
+	// AzureCredsClientSecretEnvironmentVar client secret (environment variable)
+	AzureCredsClientSecretEnvironmentVar = "AZURE_CLIENT_SECRET"
+	// AzureFederatedTokenFileEnvironmentVar path for federated identity token (environment variable)
+	AzureFederatedTokenFileEnvironmentVar = "AZURE_FEDERATED_TOKEN_FILE"
 
 	globalInfrastuctureName = "cluster"
 
@@ -68,8 +80,9 @@ const (
 // MachineScopeParams defines the input parameters used to create a new MachineScope.
 type MachineScopeParams struct {
 	AzureClients
-	Machine    *machinev1.Machine
-	CoreClient controllerclient.Client
+	Machine                      *machinev1.Machine
+	CoreClient                   controllerclient.Client
+	AzureWorkloadIdentityEnabled bool
 }
 
 // NewMachineScope creates a new MachineScope from the supplied parameters.
@@ -89,6 +102,8 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get cluster infrastructure: %w", err)
 	}
+
+	resourceGroup := getInfraResourceGroup(infra.Status.PlatformStatus)
 
 	infraTags := getInfraResourceTags(infra.Status.PlatformStatus)
 
@@ -123,6 +138,9 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 		cloudEnv:           cloudEnv,
 		armEndpoint:        armEndpoint,
 		Tags:               tags,
+		azureResourceGroup: resourceGroup,
+
+		azureWorkloadIdentityEnabled: params.AzureWorkloadIdentityEnabled,
 	}
 
 	if err = updateFromSecret(params.CoreClient, machineScope); err != nil {
@@ -161,6 +179,12 @@ type MachineScope struct {
 	// Tags is a list of tags to apply to the resources created
 	// for the cluster
 	Tags map[string]*string
+
+	// azureResourceGroup is the resource group pulled from the cluster infrastructure object
+	azureResourceGroup string
+
+	// azureWorkloadIdentityEnabled for if the cluster has opted in to azure workload identity
+	azureWorkloadIdentityEnabled bool
 }
 
 // Name returns the machine name.
@@ -331,35 +355,42 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 		return err
 	}
 
-	subscriptionID, ok := secret.Data[AzureCredsSubscriptionIDKey]
+	subscriptionID, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsSubscriptionIDKey, "")
 	if !ok {
-		return fmt.Errorf("Azure subscription id %v did not contain key %v",
+		return fmt.Errorf("azure subscription id not found in secret %v (%v)",
 			secretType.String(), AzureCredsSubscriptionIDKey)
 	}
-	clientID, ok := secret.Data[AzureCredsClientIDKey]
+	clientID, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsClientIDKey, AzureCredsClientIDEnvironmentVar)
 	if !ok {
-		return fmt.Errorf("Azure client id %v did not contain key %v",
-			secretType.String(), AzureCredsClientIDKey)
+		return fmt.Errorf("azure client id not found in secret %v (%v) or environment variable %v",
+			secretType.String(), AzureCredsClientIDKey, AzureCredsClientIDEnvironmentVar)
 	}
-	clientSecret, ok := secret.Data[AzureCredsClientSecretKey]
+	clientSecret, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsClientSecretKey, AzureCredsClientSecretEnvironmentVar)
 	if !ok {
-		return fmt.Errorf("Azure client secret %v did not contain key %v",
-			secretType.String(), AzureCredsClientSecretKey)
+		klog.V(4).Infof("azure client secret not found in secret %v (%v) or environment variable %v: attempting to use Azure Workload Identity",
+			secretType.String(), AzureCredsClientSecretKey, AzureCredsClientSecretEnvironmentVar)
 	}
-	tenantID, ok := secret.Data[AzureCredsTenantIDKey]
+	tenantID, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsTenantIDKey, AzureCredsTenantIDEnvironmentVar)
 	if !ok {
-		return fmt.Errorf("Azure tenant id %v did not contain key %v",
-			secretType.String(), AzureCredsTenantIDKey)
+		return fmt.Errorf("azure tenant id not found in secret %v (%v) or environment variable %v",
+			secretType.String(), AzureCredsTenantIDKey, AzureCredsTenantIDEnvironmentVar)
 	}
-	resourceGroup, ok := secret.Data[AzureCredsResourceGroupKey]
+	resourceGroup, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsResourceGroupKey, "")
 	if !ok {
-		return fmt.Errorf("Azure resource group %v did not contain key %v",
+		klog.V(4).Infof("azure resource group not found in secret %v (%v): attempting to use value from cluster infrastructure",
 			secretType.String(), AzureCredsResourceGroupKey)
+		resourceGroup = scope.azureResourceGroup
 	}
-	region, ok := secret.Data[AzureCredsRegionKey]
+	region, ok := getValueFromSecretOrEnvironment(secret.Data, AzureCredsRegionKey, "")
 	if !ok {
-		return fmt.Errorf("Azure region %v did not contain key %v",
+		return fmt.Errorf("azure region not found in secret %v (%v)",
 			secretType.String(), AzureCredsRegionKey)
+	}
+	federatedTokenFile, ok := getValueFromSecretOrEnvironment(secret.Data, AzureFederatedTokenFileKey, AzureFederatedTokenFileEnvironmentVar)
+	if !ok {
+		klog.V(4).Infof("azure federated token file not found in secret %v (%v) or environment variable %v: falling back to default value",
+			secretType.String(), AzureFederatedTokenFileKey, AzureFederatedTokenFileEnvironmentVar)
+		federatedTokenFile = "/var/run/secrets/openshift/serviceaccount/token"
 	}
 
 	env, err := getEnvironment(scope)
@@ -367,15 +398,32 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 		return err
 	}
 
-	options := azidentity.ClientSecretCredentialOptions{
-		ClientOptions: azcore.ClientOptions{
-			Cloud: getCloudConfig(env),
-		},
-	}
+	var cred azcore.TokenCredential
+	cloudConfig := getCloudConfig(env)
 
-	cred, err := azidentity.NewClientSecretCredential(string(tenantID), string(clientID), string(clientSecret), &options)
-	if err != nil {
-		return err
+	if scope.azureWorkloadIdentityEnabled && strings.TrimSpace(clientSecret) == "" {
+		options := azidentity.WorkloadIdentityCredentialOptions{
+			ClientOptions: azcore.ClientOptions{
+				Cloud: cloudConfig,
+			},
+			ClientID:      clientID,
+			TenantID:      tenantID,
+			TokenFilePath: federatedTokenFile,
+		}
+		cred, err = azidentity.NewWorkloadIdentityCredential(&options)
+		if err != nil {
+			return fmt.Errorf("failed to create NewWorkloadIdentityCredential: %w", err)
+		}
+	} else {
+		options := azidentity.ClientSecretCredentialOptions{
+			ClientOptions: azcore.ClientOptions{
+				Cloud: cloudConfig,
+			},
+		}
+		cred, err = azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &options)
+		if err != nil {
+			return fmt.Errorf("failed to create NewClientSecretCredential: %w", err)
+		}
 	}
 
 	endpointScope := env.TokenAudience
@@ -391,22 +439,35 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 	authorizer := azidext.NewTokenCredentialAdapter(cred, []string{endpointScope})
 
 	if scope.MachineConfig.ResourceGroup == "" {
-		scope.MachineConfig.ResourceGroup = string(resourceGroup)
+		scope.MachineConfig.ResourceGroup = resourceGroup
 	}
 
 	if scope.MachineConfig.NetworkResourceGroup == "" {
-		scope.MachineConfig.NetworkResourceGroup = string(resourceGroup)
+		scope.MachineConfig.NetworkResourceGroup = resourceGroup
 	}
 
 	if scope.MachineConfig.Location == "" {
-		scope.MachineConfig.Location = string(region)
+		scope.MachineConfig.Location = region
 	}
 
 	scope.Authorizer = authorizer
-	scope.SubscriptionID = string(subscriptionID)
+	scope.SubscriptionID = subscriptionID
 	scope.ResourceManagerEndpoint = env.ResourceManagerEndpoint
 
 	return nil
+}
+
+// getValueFromSecretOrEnvironment attempts to pull the string value from the given map and the OS
+// environment. The returned boolean value indicates whether the value was found ("ok")
+func getValueFromSecretOrEnvironment(secretData map[string][]byte, dataKey string, environmentKey string) (string, bool) {
+	valueBytes, ok := secretData[dataKey]
+	value := strings.TrimSpace(string(valueBytes))
+
+	if !ok && strings.TrimSpace(environmentKey) != "" {
+		value = strings.TrimSpace(os.Getenv(environmentKey))
+	}
+
+	return value, len(value) > 0
 }
 
 func getEnvironment(m *MachineScope) (*azure.Environment, error) {
@@ -479,6 +540,14 @@ func getTagList(ocpTags, infraStatusTags, machineSpecTags map[string]string) (ma
 	}
 
 	return tags, nil
+}
+
+func getInfraResourceGroup(platformStatus *configv1.PlatformStatus) string {
+	if platformStatus != nil && platformStatus.Azure != nil {
+		return platformStatus.Azure.ResourceGroupName
+	}
+
+	return ""
 }
 
 func getInfraResourceTags(platformStatus *configv1.PlatformStatus) (tags map[string]string) {

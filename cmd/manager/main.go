@@ -17,18 +17,27 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
 	"os"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
 	actuator "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	machinesetcontroller "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/record"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -116,11 +125,36 @@ func main() {
 	// Initialize event recorder.
 	record.InitFromRecorder(mgr.GetEventRecorderFor("azure-controller"))
 
+	stopSignalContext := ctrl.SetupSignalHandler()
+
+	featureGateAccessor, err := createFeatureGateAccessor(
+		context.Background(),
+		cfg,
+		"machine-api-provider-azure",
+		"openshift-machine-api",
+		"machine-api-controllers",
+		getReleaseVersion(),
+		"0.0.1-snapshot",
+		syncPeriod,
+		stopSignalContext.Done(),
+	)
+	if err != nil {
+		klog.Fatalf("Failed to create feature gate accessor: %w", err)
+	}
+
+	featureGates, err := awaitEnabledFeatureGates(featureGateAccessor, 1*time.Minute)
+	if err != nil {
+		klog.Fatalf("Failed to get feature gates: %w", err)
+	}
+
+	azureWorkloadIdentityEnabled := featureGates.Enabled(configv1.FeatureGateAzureWorkloadIdentity)
+
 	// Initialize machine actuator.
 	machineActuator := actuator.NewActuator(actuator.ActuatorParams{
-		CoreClient:        mgr.GetClient(),
-		ReconcilerBuilder: actuator.NewReconciler,
-		EventRecorder:     mgr.GetEventRecorderFor("azure-controller"),
+		CoreClient:                   mgr.GetClient(),
+		ReconcilerBuilder:            actuator.NewReconciler,
+		EventRecorder:                mgr.GetEventRecorderFor("azure-controller"),
+		AzureWorkloadIdentityEnabled: azureWorkloadIdentityEnabled,
 	})
 
 	if err := machinev1.AddToScheme(mgr.GetScheme()); err != nil {
@@ -141,6 +175,8 @@ func main() {
 		Client:                     mgr.GetClient(),
 		Log:                        ctrl.Log.WithName("controllers").WithName("MachineSet"),
 		ResourceSkusServiceBuilder: resourceskus.NewService,
+
+		AzureWorkloadIdentityEnabled: azureWorkloadIdentityEnabled,
 	}).SetupWithManager(mgr, controller.Options{}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "MachineSet")
 		os.Exit(1)
@@ -154,7 +190,66 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(stopSignalContext); err != nil {
 		klog.Fatalf("Failed to run manager: %v", err)
 	}
+}
+
+func createFeatureGateAccessor(ctx context.Context, cfg *rest.Config, operatorName, deploymentNamespace, deploymentName, desiredVersion, missingVersion string, syncPeriod time.Duration, stop <-chan struct{}) (featuregates.FeatureGateAccess, error) {
+	ctx, cancelFn := context.WithCancel(ctx)
+	go func() {
+		defer cancelFn()
+		<-stop
+	}()
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kube client: %w", err)
+	}
+
+	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events(deploymentNamespace), operatorName, &corev1.ObjectReference{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Namespace:  deploymentNamespace,
+		Name:       deploymentName,
+	})
+
+	configClient, err := configclient.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create config client: %w", err)
+	}
+	configInformers := configinformers.NewSharedInformerFactory(configClient, syncPeriod)
+
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
+		eventRecorder,
+	)
+	go featureGateAccessor.Run(ctx)
+	go configInformers.Start(stop)
+
+	return featureGateAccessor, nil
+}
+
+func awaitEnabledFeatureGates(accessor featuregates.FeatureGateAccess, timeout time.Duration) (featuregates.FeatureGate, error) {
+	select {
+	case <-accessor.InitialFeatureGatesObserved():
+		featureGates, err := accessor.CurrentFeatureGates()
+		if err != nil {
+			return nil, err
+		} else {
+			klog.Infof("FeatureGates initialized: knownFeatureGates=%v", featureGates.KnownFeatures())
+			return featureGates, nil
+		}
+	case <-time.After(timeout):
+		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+}
+
+func getReleaseVersion() string {
+	releaseVersion := os.Getenv("RELEASE_VERSION")
+	if len(releaseVersion) == 0 {
+		return "0.0.1-snapshot"
+	}
+	return releaseVersion
 }
