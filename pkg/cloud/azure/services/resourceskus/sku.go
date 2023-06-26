@@ -71,7 +71,7 @@ const (
 	// UltraSSDAvailable identifies the capability for the support of UltraSSD data disks.
 	UltraSSDAvailable = "UltraSSDAvailable"
 	// CPUArchitectureType identifies the capability for the CPU architecture.
-	CPUArchitectureType = "CpuArchitecture"
+	CPUArchitectureType = "CpuArchitectureType"
 	// X64 and Arm64 are the possible values for CPUArchitectureType, in the Azure APIs. We will adapt them in the controller
 	// to the ones kubernetes expect.
 	X64   = "x64"
