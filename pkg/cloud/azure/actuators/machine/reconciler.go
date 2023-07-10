@@ -196,6 +196,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			networkIface, err := s.networkInterfacesSvc.Get(ctx, &networkinterfaces.Spec{
 				Name:     ifaceName,
 				VnetName: s.scope.MachineConfig.Vnet,
+				Tags:     s.scope.Tags,
 			})
 			if err != nil {
 				klog.Errorf("Unable to get %q network interface: %v", ifaceName, err)
@@ -499,6 +500,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     azure.GenerateNetworkInterfaceName(s.scope.Machine.Name),
 		VnetName: s.scope.MachineConfig.Vnet,
+		Tags:     s.scope.Tags,
 	}
 
 	err = s.networkInterfacesSvc.Delete(ctx, networkInterfaceSpec)
@@ -557,6 +559,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     nicName,
 		VnetName: s.scope.MachineConfig.Vnet,
+		Tags:     s.scope.Tags,
 	}
 	if s.scope.MachineConfig.AcceleratedNetworking {
 		skuSpec := resourceskus.Spec{

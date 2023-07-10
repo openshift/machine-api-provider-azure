@@ -49,6 +49,7 @@ type Spec struct {
 	SecurityGroupName             string
 	ApplicationSecurityGroupNames []string
 	AcceleratedNetworking         bool
+	Tags                          map[string]*string
 }
 
 // Get provides information about a network interface.
