@@ -26,7 +26,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -36,6 +36,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -235,16 +236,11 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 		}
 	}
 
-	var diskEncryptionSet *compute.DiskEncryptionSetParameters
-	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
-		diskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
-	}
+	osDisk := generateOSDisk(vmSpec)
 
-	var securityProfile *compute.SecurityProfile
-	if vmSpec.SecurityProfile != nil {
-		securityProfile = &compute.SecurityProfile{
-			EncryptionAtHost: vmSpec.SecurityProfile.EncryptionAtHost,
-		}
+	securityProfile, err := generateSecurityProfile(vmSpec, osDisk)
+	if err != nil {
+		return nil, err
 	}
 
 	priority, evictionPolicy, billingProfile, err := getSpotVMOptions(s.Scope.MachineConfig.SpotVMOptions)
@@ -267,17 +263,8 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 			},
 			StorageProfile: &compute.StorageProfile{
 				ImageReference: imageReference,
-				OsDisk: &compute.OSDisk{
-					Name:         to.StringPtr(fmt.Sprintf("%s_OSDisk", vmSpec.Name)),
-					OsType:       compute.OperatingSystemTypes(vmSpec.OSDisk.OSType),
-					CreateOption: compute.DiskCreateOptionTypesFromImage,
-					DiskSizeGB:   to.Int32Ptr(vmSpec.OSDisk.DiskSizeGB),
-					ManagedDisk: &compute.ManagedDiskParameters{
-						StorageAccountType: compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType),
-						DiskEncryptionSet:  diskEncryptionSet,
-					},
-				},
-				DataDisks: &dataDisks,
+				OsDisk:         osDisk,
+				DataDisks:      &dataDisks,
 			},
 			SecurityProfile: securityProfile,
 			OsProfile:       osProfile,
@@ -434,6 +421,125 @@ func generateImagePlan(image machinev1.Image) *compute.Plan {
 		Name:      to.StringPtr(image.SKU),
 		Product:   to.StringPtr(image.Offer),
 	}
+}
+
+func generateOSDisk(vmSpec *Spec) *compute.OSDisk {
+	osDisk := &compute.OSDisk{
+		Name:         to.StringPtr(fmt.Sprintf("%s_OSDisk", vmSpec.Name)),
+		OsType:       compute.OperatingSystemTypes(vmSpec.OSDisk.OSType),
+		CreateOption: compute.DiskCreateOptionTypesFromImage,
+		ManagedDisk:  &compute.ManagedDiskParameters{},
+		DiskSizeGB:   to.Int32Ptr(vmSpec.OSDisk.DiskSizeGB),
+	}
+
+	if vmSpec.OSDisk.ManagedDisk.StorageAccountType != "" {
+		osDisk.ManagedDisk.StorageAccountType = compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType)
+	}
+	if vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet != nil {
+		osDisk.ManagedDisk.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: to.StringPtr(vmSpec.OSDisk.ManagedDisk.DiskEncryptionSet.ID)}
+	}
+	if vmSpec.OSDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType != "" {
+		osDisk.ManagedDisk.SecurityProfile = &compute.VMDiskSecurityProfile{}
+
+		osDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType = compute.SecurityEncryptionTypes(string(vmSpec.OSDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType))
+
+		if vmSpec.OSDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet.ID != "" {
+			osDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: pointer.String(vmSpec.OSDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet.ID)}
+		}
+	}
+
+	return osDisk
+}
+
+func generateSecurityProfile(vmSpec *Spec, osDisk *compute.OSDisk) (*compute.SecurityProfile, error) {
+	if vmSpec.SecurityProfile == nil {
+		return nil, nil
+	}
+
+	securityProfile := &compute.SecurityProfile{
+		EncryptionAtHost: vmSpec.SecurityProfile.EncryptionAtHost,
+	}
+
+	if osDisk.ManagedDisk != nil &&
+		osDisk.ManagedDisk.SecurityProfile != nil &&
+		osDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType != "" {
+
+		if vmSpec.SecurityProfile.Settings.SecurityType != machinev1.SecurityTypesConfidentialVM {
+			return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+				"SecurityType should be set to %s when SecurityEncryptionType is defined.",
+				vmSpec.Name, compute.SecurityTypesConfidentialVM)
+		}
+
+		if vmSpec.SecurityProfile.Settings.ConfidentialVM == nil {
+			return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+				"UEFISettings should be set when SecurityEncryptionType is defined.", vmSpec.Name)
+		}
+
+		if vmSpec.SecurityProfile.Settings.ConfidentialVM.UEFISettings.VirtualizedTrustedPlatformModule != machinev1.VirtualizedTrustedPlatformModulePolicyEnabled {
+			return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+				"VirtualizedTrustedPlatformModule should be enabled when SecurityEncryptionType is defined.", vmSpec.Name)
+		}
+
+		if osDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType == compute.SecurityEncryptionTypesDiskWithVMGuestState {
+			if vmSpec.SecurityProfile.EncryptionAtHost != nil && *vmSpec.SecurityProfile.EncryptionAtHost {
+				return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+					"EncryptionAtHost cannot be set to true when SecurityEncryptionType is set to %s.",
+					vmSpec.Name, compute.SecurityEncryptionTypesDiskWithVMGuestState)
+			}
+			if vmSpec.SecurityProfile.Settings.ConfidentialVM.UEFISettings.SecureBoot != machinev1.SecureBootPolicyEnabled {
+				return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+					"SecureBoot should be enabled when SecurityEncryptionType is set to %s.",
+					vmSpec.Name, compute.SecurityEncryptionTypesDiskWithVMGuestState)
+			}
+		}
+
+		securityProfile.SecurityType = compute.SecurityTypesConfidentialVM
+
+		securityProfile.UefiSettings = &compute.UefiSettings{
+			SecureBootEnabled: pointer.Bool(false),
+			VTpmEnabled:       pointer.Bool(true),
+		}
+
+		if vmSpec.SecurityProfile.Settings.ConfidentialVM.UEFISettings.SecureBoot == machinev1.SecureBootPolicyEnabled {
+			securityProfile.UefiSettings.SecureBootEnabled = pointer.Bool(true)
+		}
+
+		return securityProfile, nil
+	}
+
+	if vmSpec.SecurityProfile.Settings.SecurityType == machinev1.SecurityTypesTrustedLaunch && vmSpec.SecurityProfile.Settings.TrustedLaunch == nil {
+		return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+			"UEFISettings should be set when SecurityType is set to %s.",
+			vmSpec.Name, compute.SecurityTypesTrustedLaunch)
+	}
+
+	if vmSpec.SecurityProfile.Settings.TrustedLaunch != nil &&
+		(vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.SecureBoot == machinev1.SecureBootPolicyEnabled ||
+			vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule == machinev1.VirtualizedTrustedPlatformModulePolicyEnabled) {
+
+		if vmSpec.SecurityProfile.Settings.SecurityType != machinev1.SecurityTypesTrustedLaunch {
+			return nil, apierrors.InvalidMachineConfiguration("failed to generate security profile for vm %s. "+
+				"SecurityType should be set to %s when UEFISettings are defined.",
+				vmSpec.Name, compute.SecurityTypesTrustedLaunch)
+		}
+
+		securityProfile.SecurityType = compute.SecurityTypesTrustedLaunch
+
+		securityProfile.UefiSettings = &compute.UefiSettings{
+			SecureBootEnabled: pointer.Bool(false),
+			VTpmEnabled:       pointer.Bool(false),
+		}
+
+		if vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.SecureBoot == machinev1.SecureBootPolicyEnabled {
+			securityProfile.UefiSettings.SecureBootEnabled = pointer.Bool(true)
+		}
+
+		if vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule == machinev1.VirtualizedTrustedPlatformModulePolicyEnabled {
+			securityProfile.UefiSettings.VTpmEnabled = pointer.Bool(true)
+		}
+	}
+
+	return securityProfile, nil
 }
 
 func generateDataDisks(vmSpec *Spec) ([]compute.DataDisk, error) {

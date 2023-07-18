@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/gomega"
@@ -13,6 +13,7 @@ import (
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/pointer"
 )
 
 func TestDeriveVirtualMachineParameters(t *testing.T) {
@@ -60,6 +61,236 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				g.Expect(vm.SecurityProfile).ToNot(BeNil())
 				g.Expect(vm.SecurityProfile.EncryptionAtHost).To(BeNil())
 			},
+		},
+		{
+			name: "Security profile with UEFISettings.SecureBoot enabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesTrustedLaunch,
+						TrustedLaunch: &machinev1.TrustedLaunch{
+							UEFISettings: machinev1.UEFISettings{
+								SecureBoot: machinev1.SecureBootPolicyEnabled,
+							},
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.SecurityProfile).ToNot(BeNil())
+				g.Expect(vm.SecurityProfile.UefiSettings).ToNot(BeNil())
+				g.Expect(vm.SecurityProfile.UefiSettings.SecureBootEnabled).ToNot(BeNil())
+				g.Expect(*vm.SecurityProfile.UefiSettings.SecureBootEnabled).To(BeTrue())
+				g.Expect(vm.SecurityProfile.SecurityType).To(Equal(compute.SecurityTypesTrustedLaunch))
+			},
+		},
+		{
+			name: "Security profile with UEFISettings.SecureBoot disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesTrustedLaunch,
+						TrustedLaunch: &machinev1.TrustedLaunch{
+							UEFISettings: machinev1.UEFISettings{
+								SecureBoot: machinev1.SecureBootPolicyDisabled,
+							},
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.SecurityProfile).ToNot(BeNil())
+				g.Expect(vm.SecurityProfile.UefiSettings).To(BeNil())
+			},
+		},
+		{
+			name: "Security profile with UEFISettings.VirtualizedTrustedPlatformModule enabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesTrustedLaunch,
+						TrustedLaunch: &machinev1.TrustedLaunch{
+							UEFISettings: machinev1.UEFISettings{
+								VirtualizedTrustedPlatformModule: machinev1.VirtualizedTrustedPlatformModulePolicyEnabled,
+							},
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.SecurityProfile).ToNot(BeNil())
+				g.Expect(vm.SecurityProfile.UefiSettings).ToNot(BeNil())
+				g.Expect(*vm.SecurityProfile.UefiSettings.VTpmEnabled).To(BeTrue())
+				g.Expect(vm.SecurityProfile.SecurityType).To(Equal(compute.SecurityTypesTrustedLaunch))
+			},
+		},
+		{
+			name: "Security profile with UEFISettings.VirtualizedTrustedPlatformModule disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesTrustedLaunch,
+						TrustedLaunch: &machinev1.TrustedLaunch{
+							UEFISettings: machinev1.UEFISettings{
+								VirtualizedTrustedPlatformModule: machinev1.VirtualizedTrustedPlatformModulePolicyDisabled,
+							},
+						},
+					},
+				}
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.SecurityProfile).ToNot(BeNil())
+				g.Expect(vm.SecurityProfile.UefiSettings).To(BeNil())
+			},
+		},
+		{
+			name: "Error when security profile with security encryption type is set and security type is not ConfidentialVM",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.OSDisk = machinev1.OSDisk{
+					ManagedDisk: machinev1.OSDiskManagedDiskParameters{
+						SecurityProfile: machinev1.VMDiskSecurityProfile{
+							SecurityEncryptionType: machinev1.SecurityEncryptionTypesVMGuestStateOnly,
+						},
+					},
+				}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
+				"SecurityType should be set to %s when SecurityEncryptionType is defined.",
+				machinev1.SecurityTypesConfidentialVM),
+		},
+		{
+			name: "Error when security profile with security encryption type is set and UEFISettings is not set",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.OSDisk = machinev1.OSDisk{
+					ManagedDisk: machinev1.OSDiskManagedDiskParameters{
+						SecurityProfile: machinev1.VMDiskSecurityProfile{
+							SecurityEncryptionType: machinev1.SecurityEncryptionTypesDiskWithVMGuestState,
+						},
+					},
+				}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesConfidentialVM,
+					},
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. " +
+				"UEFISettings should be set when SecurityEncryptionType is defined."),
+		},
+		{
+			name: "Error when security profile SecurityEncryptionType is set and UEFISettings.VirtualizedTrustedPlatformModule is disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.OSDisk = machinev1.OSDisk{
+					ManagedDisk: machinev1.OSDiskManagedDiskParameters{
+						SecurityProfile: machinev1.VMDiskSecurityProfile{
+							SecurityEncryptionType: machinev1.SecurityEncryptionTypesVMGuestStateOnly,
+						},
+					},
+				}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesConfidentialVM,
+						ConfidentialVM: &machinev1.ConfidentialVM{
+							UEFISettings: machinev1.UEFISettings{
+								VirtualizedTrustedPlatformModule: machinev1.VirtualizedTrustedPlatformModulePolicyDisabled,
+							},
+						},
+					},
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. " +
+				"VirtualizedTrustedPlatformModule should be enabled when SecurityEncryptionType is defined."),
+		},
+		{
+			name: "Error when security profile with DiskWithVMGuestState is set and encryption at host is set to true",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.OSDisk = machinev1.OSDisk{
+					ManagedDisk: machinev1.OSDiskManagedDiskParameters{
+						SecurityProfile: machinev1.VMDiskSecurityProfile{
+							SecurityEncryptionType: machinev1.SecurityEncryptionTypesDiskWithVMGuestState,
+						},
+					},
+				}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesConfidentialVM,
+						ConfidentialVM: &machinev1.ConfidentialVM{
+							UEFISettings: machinev1.UEFISettings{
+								SecureBoot:                       machinev1.SecureBootPolicyEnabled,
+								VirtualizedTrustedPlatformModule: machinev1.VirtualizedTrustedPlatformModulePolicyEnabled,
+							},
+						},
+					},
+					EncryptionAtHost: pointer.Bool(true),
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
+				"EncryptionAtHost cannot be set to true when SecurityEncryptionType is set to %s.",
+				machinev1.SecurityEncryptionTypesDiskWithVMGuestState),
+		},
+		{
+			name: "Error when security profile with DiskWithVMGuestState is set and secure boot disabled",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.OSDisk = machinev1.OSDisk{
+					ManagedDisk: machinev1.OSDiskManagedDiskParameters{
+						SecurityProfile: machinev1.VMDiskSecurityProfile{
+							SecurityEncryptionType: machinev1.SecurityEncryptionTypesDiskWithVMGuestState,
+						},
+					},
+				}
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesConfidentialVM,
+						ConfidentialVM: &machinev1.ConfidentialVM{
+							UEFISettings: machinev1.UEFISettings{
+								SecureBoot:                       machinev1.SecureBootPolicyDisabled,
+								VirtualizedTrustedPlatformModule: machinev1.VirtualizedTrustedPlatformModulePolicyEnabled,
+							},
+						},
+					},
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
+				"SecureBoot should be enabled when SecurityEncryptionType is set to %s.",
+				machinev1.SecurityEncryptionTypesDiskWithVMGuestState),
+		},
+		{
+			name: "Error when security profile with security type TrustedLaunch is set and UEFISettings is not set",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						SecurityType: machinev1.SecurityTypesTrustedLaunch,
+					},
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
+				"UEFISettings should be set when SecurityType is set to %s.",
+				compute.SecurityTypesTrustedLaunch),
+		},
+		{
+			name: "Error when security profile with UEFISettings is set and security type is not set to TrustedLaunch",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.SecurityProfile = &machinev1.SecurityProfile{
+					Settings: machinev1.SecuritySettings{
+						TrustedLaunch: &machinev1.TrustedLaunch{
+							UEFISettings: machinev1.UEFISettings{
+								SecureBoot: machinev1.SecureBootPolicyEnabled,
+							},
+						},
+					},
+				}
+			},
+			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
+				"SecurityType should be set to %s when UEFISettings are defined.",
+				machinev1.SecurityTypesTrustedLaunch),
 		},
 		{
 			name:       "Non-ThirdParty Marketplace Image",
