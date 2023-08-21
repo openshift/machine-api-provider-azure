@@ -36,6 +36,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 const (
@@ -78,7 +79,7 @@ type Spec struct {
 	DataDisks           []machinev1.DataDisk
 	CustomData          string
 	ManagedIdentity     string
-	Tags                map[string]*string
+	Tags                map[string]string
 	Priority            compute.VirtualMachinePriorityTypes
 	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
 	BillingProfile      *compute.BillingProfile
@@ -359,7 +360,7 @@ func getTagListFromSpec(spec *Spec) map[string]*string {
 
 	tagList := map[string]*string{}
 	for key, element := range spec.Tags {
-		tagList[key] = element
+		tagList[key] = pointer.String(element)
 	}
 	return tagList
 }

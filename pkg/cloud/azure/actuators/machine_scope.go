@@ -140,7 +140,7 @@ type MachineScope struct {
 
 	// Tags is a list of tags to apply to the resources created
 	// for the cluster
-	Tags map[string]*string
+	Tags map[string]string
 }
 
 // Name returns the machine name.
