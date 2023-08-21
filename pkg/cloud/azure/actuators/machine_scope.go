@@ -137,6 +137,10 @@ type MachineScope struct {
 	origMachineStatus *machinev1.AzureMachineProviderStatus
 
 	machineToBePatched controllerclient.Patch
+
+	// Tags is a list of tags to apply to the resources created
+	// for the cluster
+	Tags map[string]*string
 }
 
 // Name returns the machine name.

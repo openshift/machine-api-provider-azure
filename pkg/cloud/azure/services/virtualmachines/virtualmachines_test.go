@@ -14,6 +14,7 @@ import (
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/utils/pointer"
 )
 
 func TestGetTagListFromSpec(t *testing.T) {
@@ -24,8 +25,8 @@ func TestGetTagListFromSpec(t *testing.T) {
 		{
 			spec: &Spec{
 				Name: "test",
-				Tags: map[string]string{
-					"foo": "bar",
+				Tags: map[string]*string{
+					"foo": pointer.String("bar"),
 				},
 			},
 			expected: map[string]*string{
@@ -558,7 +559,7 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		},
 		CustomData:      "",
 		ManagedIdentity: "",
-		Tags:            map[string]string{},
+		Tags:            map[string]*string{},
 		Priority:        compute.VirtualMachinePriorityTypesRegular,
 		EvictionPolicy:  compute.VirtualMachineEvictionPolicyTypesDelete,
 		BillingProfile:  nil,

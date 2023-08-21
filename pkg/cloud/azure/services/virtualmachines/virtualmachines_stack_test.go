@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Azure/go-autorest/autorest/to"
+	"k8s.io/utils/pointer"
 )
 
 func TestGetTagListFromSpecStackHub(t *testing.T) {
@@ -15,8 +16,8 @@ func TestGetTagListFromSpecStackHub(t *testing.T) {
 		{
 			spec: &Spec{
 				Name: "test",
-				Tags: map[string]string{
-					"foo": "bar",
+				Tags: map[string]*string{
+					"foo": pointer.String("bar"),
 				},
 			},
 			expected: map[string]*string{

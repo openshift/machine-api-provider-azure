@@ -666,7 +666,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			DataDisks:           s.scope.MachineConfig.DataDisks,
 			Image:               s.scope.MachineConfig.Image,
 			Zone:                zone,
-			Tags:                s.scope.MachineConfig.Tags,
+			Tags:                s.scope.Tags,
 			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
 			UltraSSDCapability:  s.scope.MachineConfig.UltraSSDCapability,
 			AvailabilitySetName: asName,
@@ -678,10 +678,10 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 		}
 
 		if vmSpec.Tags == nil {
-			vmSpec.Tags = map[string]string{}
+			vmSpec.Tags = map[string]*string{}
 		}
 
-		vmSpec.Tags[fmt.Sprintf("kubernetes.io-cluster-%v", s.scope.Machine.Labels[machinev1.MachineClusterIDLabel])] = "owned"
+		vmSpec.Tags[fmt.Sprintf("kubernetes.io-cluster-%v", s.scope.Machine.Labels[machinev1.MachineClusterIDLabel])] = pointer.String("owned")
 
 		userData, userDataErr := s.getCustomUserData()
 		if userDataErr != nil {
