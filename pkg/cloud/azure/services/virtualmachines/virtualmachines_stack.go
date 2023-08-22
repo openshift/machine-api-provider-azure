@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/pointer"
 )
 
 // Get provides information about a virtual network.
@@ -259,7 +260,7 @@ func getTagListFromSpecStackHub(spec *Spec) map[string]*string {
 
 	tagList := map[string]*string{}
 	for key, element := range spec.Tags {
-		tagList[key] = to.StringPtr(element)
+		tagList[key] = pointer.String(element)
 	}
 	return tagList
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/to"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicips"
@@ -293,12 +294,15 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		nicProp.IPConfigurations = &ipConfigs
 	}
 
+	tags := actuators.ConvertTagsMap(s.Scope.MachineConfig.Tags)
+
 	f, err := s.Client.CreateOrUpdate(ctx,
 		s.Scope.MachineConfig.ResourceGroup,
 		nicSpec.Name,
 		network.Interface{
 			Location:                  to.StringPtr(s.Scope.MachineConfig.Location),
 			InterfacePropertiesFormat: &nicProp,
+			Tags:                      tags,
 		})
 
 	if err != nil {
