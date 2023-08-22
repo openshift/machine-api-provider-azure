@@ -24,6 +24,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/applicationsecuritygroups"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/internalloadbalancers"
@@ -281,12 +282,15 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		nicProp.IPConfigurations = &ipConfigs
 	}
 
+	tags := actuators.ConvertTagsMap(s.Scope.MachineConfig.Tags)
+
 	f, err := s.Client.CreateOrUpdate(ctx,
 		s.Scope.MachineConfig.ResourceGroup,
 		nicSpec.Name,
 		network.Interface{
 			Location:                  to.StringPtr(s.Scope.MachineConfig.Location),
 			InterfacePropertiesFormat: &nicProp,
+			Tags:                      tags,
 		})
 
 	if err != nil {
