@@ -27,7 +27,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
@@ -547,7 +546,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {
-	return to.String(s.scope.MachineConfig.Zone), nil
+	return s.scope.MachineConfig.Zone, nil
 }
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {

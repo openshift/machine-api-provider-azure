@@ -23,6 +23,16 @@ var (
 )
 
 var (
+	FeatureGateValidatingAdmissionPolicy = FeatureGateName("ValidatingAdmissionPolicy")
+	validatingAdmissionPolicy            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateValidatingAdmissionPolicy,
+		},
+		OwningJiraComponent: "kube-apiserver",
+		ResponsiblePerson:   "benluddy",
+		OwningProduct:       kubernetes,
+	}
+
 	FeatureGateGatewayAPI = FeatureGateName("GatewayAPI")
 	gateGatewayAPI        = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -143,16 +153,6 @@ var (
 		OwningProduct:       ocpSpecific,
 	}
 
-	FeatureGatePDBUnhealthyPodEvictionPolicy = FeatureGateName("PDBUnhealthyPodEvictionPolicy")
-	pdbUnhealthyPodEvictionPolicy            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGatePDBUnhealthyPodEvictionPolicy,
-		},
-		OwningJiraComponent: "apps",
-		ResponsiblePerson:   "atiratree",
-		OwningProduct:       kubernetes,
-	}
-
 	FeatureGateDynamicResourceAllocation = FeatureGateName("DynamicResourceAllocation")
 	dynamicResourceAllocation            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -177,16 +177,6 @@ var (
 	azureWorkloadIdentity            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
 			Name: FeatureGateAzureWorkloadIdentity,
-		},
-		OwningJiraComponent: "cloud-credential-operator",
-		ResponsiblePerson:   "abutcher",
-		OwningProduct:       ocpSpecific,
-	}
-
-	FeatureGateAWSSecurityTokenService = FeatureGateName("AWSSecurityTokenService")
-	awsSecurityTokenService            = FeatureGateDescription{
-		FeatureGateAttributes: FeatureGateAttributes{
-			Name: FeatureGateAWSSecurityTokenService,
 		},
 		OwningJiraComponent: "cloud-credential-operator",
 		ResponsiblePerson:   "abutcher",
@@ -282,6 +272,16 @@ var (
 		OwningProduct:       ocpSpecific,
 	}
 
+	FeatureGateAdminNetworkPolicy = FeatureGateName("AdminNetworkPolicy")
+	adminNetworkPolicy            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateAdminNetworkPolicy,
+		},
+		OwningJiraComponent: "Networking/ovn-kubernetes",
+		ResponsiblePerson:   "tssurya",
+		OwningProduct:       ocpSpecific,
+	}
+
 	FeatureGateAutomatedEtcdBackup = FeatureGateName("AutomatedEtcdBackup")
 	automatedEtcdBackup            = FeatureGateDescription{
 		FeatureGateAttributes: FeatureGateAttributes{
@@ -289,6 +289,16 @@ var (
 		},
 		OwningJiraComponent: "etcd",
 		ResponsiblePerson:   "hasbro17",
+		OwningProduct:       ocpSpecific,
+	}
+
+	FeatureGateMachineAPIOperatorDisableMachineHealthCheckController = FeatureGateName("MachineAPIOperatorDisableMachineHealthCheckController")
+	machineAPIOperatorDisableMachineHealthCheckController            = FeatureGateDescription{
+		FeatureGateAttributes: FeatureGateAttributes{
+			Name: FeatureGateMachineAPIOperatorDisableMachineHealthCheckController,
+		},
+		OwningJiraComponent: "ecoproject",
+		ResponsiblePerson:   "msluiter",
 		OwningProduct:       ocpSpecific,
 	}
 )
