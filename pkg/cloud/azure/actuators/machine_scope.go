@@ -337,11 +337,6 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 		return fmt.Errorf("Azure region %v did not contain key %v",
 			secretType.String(), AzureCredsRegionKey)
 	}
-	clusterName, ok := secret.Data[AzureResourcePrefix]
-	if !ok {
-		return fmt.Errorf("Azure resource prefix %v did not contain key %v",
-			secretType.String(), AzureResourcePrefix)
-	}
 
 	env, err := getEnvironment(scope)
 	if err != nil {
@@ -377,7 +372,6 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 		scope.MachineConfig.Location = string(region)
 	}
 
-	scope.MachineConfig.ObjectMeta.Name = string(clusterName)
 	scope.Authorizer = authorizer
 	scope.SubscriptionID = string(subscriptionID)
 	scope.ResourceManagerEndpoint = env.ResourceManagerEndpoint
