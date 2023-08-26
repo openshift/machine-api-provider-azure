@@ -15,7 +15,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
-	github.com/openshift/api v0.0.0-20230822121351-cd0541be0908
+	github.com/openshift/api v0.0.0-20230707123100-21c0ce73add5
 	github.com/openshift/machine-api-operator v0.2.1-0.20230531233206-931f6f67c1c7
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.7.0
