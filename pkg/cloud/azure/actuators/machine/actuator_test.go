@@ -414,7 +414,7 @@ func TestAvailabilityZones(t *testing.T) {
 	fakeScope := newFakeScope(t, actuators.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
-	fakeReconciler.scope.MachineConfig.Zone = "2"
+	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{"2"},
 	}
@@ -422,7 +422,7 @@ func TestAvailabilityZones(t *testing.T) {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.scope.MachineConfig.Zone = ""
+	fakeReconciler.scope.MachineConfig.Zone = nil
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{""},
 	}
@@ -430,7 +430,7 @@ func TestAvailabilityZones(t *testing.T) {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.scope.MachineConfig.Zone = "1"
+	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("1")
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{"3"},
 	}
@@ -441,15 +441,15 @@ func TestAvailabilityZones(t *testing.T) {
 
 func TestGetZone(t *testing.T) {
 	testCases := []struct {
-		inputZone string
+		inputZone *string
 		expected  string
 	}{
 		{
-			inputZone: "",
+			inputZone: nil,
 			expected:  "",
 		},
 		{
-			inputZone: "3",
+			inputZone: pointer.StringPtr("3"),
 			expected:  "3",
 		},
 	}
