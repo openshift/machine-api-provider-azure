@@ -4,6 +4,7 @@ import (
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
+	"k8s.io/utils/pointer"
 )
 
 // ProviderStatusFromRawExtension unmarshals a raw extension into an AzureMachineProviderStatus type.
@@ -56,4 +57,15 @@ func RawExtensionFromProviderSpec(spec *machinev1.AzureMachineProviderSpec) (*ru
 	return &runtime.RawExtension{
 		Raw: rawBytes,
 	}, nil
+}
+
+// ConvertTagsMap converts map's value from string to a pointer to a string
+func ConvertTagsMap(tags map[string]string) map[string]*string {
+	convertedTags := map[string]*string{}
+
+	for k, v := range tags {
+		convertedTags[k] = pointer.String(v)
+	}
+
+	return convertedTags
 }
