@@ -27,7 +27,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
@@ -47,7 +46,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -291,7 +290,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 							// On Azure, each VM can only have one private load balancer and each private load balance can only have
 							// private IP addresses. If we have found a load balancer with a private IP address frontend, then this is
 							// the internal load balancer for this machine.
-							s.scope.MachineConfig.InternalLoadBalancer = pointer.StringDeref(lb.Name, "")
+							s.scope.MachineConfig.InternalLoadBalancer = ptr.Deref[string](lb.Name, "")
 							break
 						}
 					}
@@ -547,7 +546,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {
-	return to.String(s.scope.MachineConfig.Zone), nil
+	return s.scope.MachineConfig.Zone, nil
 }
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
@@ -839,7 +838,7 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 	case machinev1.AzureManagedAzureDiagnosticsStorage:
 		return &compute.DiagnosticsProfile{
 			BootDiagnostics: &compute.BootDiagnostics{
-				Enabled: pointer.Bool(true),
+				Enabled: ptr.To[bool](true),
 			},
 		}, nil
 	case machinev1.CustomerManagedAzureDiagnosticsStorage:
@@ -849,8 +848,8 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 
 		return &compute.DiagnosticsProfile{
 			BootDiagnostics: &compute.BootDiagnostics{
-				Enabled:    pointer.Bool(true),
-				StorageURI: pointer.String(boot.CustomerManaged.StorageAccountURI),
+				Enabled:    ptr.To[bool](true),
+				StorageURI: ptr.To[string](boot.CustomerManaged.StorageAccountURI),
 			},
 		}, nil
 	default:

@@ -18,7 +18,7 @@ import (
 	mock_azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/mock"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestExists(t *testing.T) {
@@ -220,7 +220,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "good-worker") },
 			vm: decode.VirtualMachine{
 				VirtualMachineProperties: &decode.VirtualMachineProperties{
-					ProvisioningState: pointer.StringPtr("Running"),
+					ProvisioningState: ptr.To[string]("Running"),
 				},
 			},
 			expectedLabels: map[string]string{
@@ -256,7 +256,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			name:  "with a vm location",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "located-worker") },
 			vm: decode.VirtualMachine{
-				Location: pointer.StringPtr("nowhere"),
+				Location: ptr.To[string]("nowhere"),
 			},
 			expectedLabels: map[string]string{
 				actuators.MachineRoleLabel:      "located-worker",
@@ -548,7 +548,7 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 			},
 			expectedConfig: &compute.DiagnosticsProfile{
 				BootDiagnostics: &compute.BootDiagnostics{
-					Enabled: pointer.BoolPtr(true),
+					Enabled: ptr.To[bool](true),
 				},
 			},
 			expectedError: nil,
@@ -579,8 +579,8 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 			},
 			expectedConfig: &compute.DiagnosticsProfile{
 				BootDiagnostics: &compute.BootDiagnostics{
-					Enabled:    pointer.BoolPtr(true),
-					StorageURI: pointer.String("https://myaccount.blob.windows.net/"),
+					Enabled:    ptr.To[bool](true),
+					StorageURI: ptr.To[string]("https://myaccount.blob.windows.net/"),
 				},
 			},
 			expectedError: nil,

@@ -36,7 +36,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -444,7 +444,7 @@ func generateOSDisk(vmSpec *Spec) *compute.OSDisk {
 		osDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType = compute.SecurityEncryptionTypes(string(vmSpec.OSDisk.ManagedDisk.SecurityProfile.SecurityEncryptionType))
 
 		if vmSpec.OSDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet.ID != "" {
-			osDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: pointer.String(vmSpec.OSDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet.ID)}
+			osDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: ptr.To[string](vmSpec.OSDisk.ManagedDisk.SecurityProfile.DiskEncryptionSet.ID)}
 		}
 	}
 
@@ -496,12 +496,12 @@ func generateSecurityProfile(vmSpec *Spec, osDisk *compute.OSDisk) (*compute.Sec
 		securityProfile.SecurityType = compute.SecurityTypesConfidentialVM
 
 		securityProfile.UefiSettings = &compute.UefiSettings{
-			SecureBootEnabled: pointer.Bool(false),
-			VTpmEnabled:       pointer.Bool(true),
+			SecureBootEnabled: ptr.To[bool](false),
+			VTpmEnabled:       ptr.To[bool](true),
 		}
 
 		if vmSpec.SecurityProfile.Settings.ConfidentialVM.UEFISettings.SecureBoot == machinev1.SecureBootPolicyEnabled {
-			securityProfile.UefiSettings.SecureBootEnabled = pointer.Bool(true)
+			securityProfile.UefiSettings.SecureBootEnabled = ptr.To[bool](true)
 		}
 
 		return securityProfile, nil
@@ -526,16 +526,16 @@ func generateSecurityProfile(vmSpec *Spec, osDisk *compute.OSDisk) (*compute.Sec
 		securityProfile.SecurityType = compute.SecurityTypesTrustedLaunch
 
 		securityProfile.UefiSettings = &compute.UefiSettings{
-			SecureBootEnabled: pointer.Bool(false),
-			VTpmEnabled:       pointer.Bool(false),
+			SecureBootEnabled: ptr.To[bool](false),
+			VTpmEnabled:       ptr.To[bool](false),
 		}
 
 		if vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.SecureBoot == machinev1.SecureBootPolicyEnabled {
-			securityProfile.UefiSettings.SecureBootEnabled = pointer.Bool(true)
+			securityProfile.UefiSettings.SecureBootEnabled = ptr.To[bool](true)
 		}
 
 		if vmSpec.SecurityProfile.Settings.TrustedLaunch.UEFISettings.VirtualizedTrustedPlatformModule == machinev1.VirtualizedTrustedPlatformModulePolicyEnabled {
-			securityProfile.UefiSettings.VTpmEnabled = pointer.Bool(true)
+			securityProfile.UefiSettings.VTpmEnabled = ptr.To[bool](true)
 		}
 	}
 

@@ -26,7 +26,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/pkg/errors"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/util/cache/ttllru"
@@ -137,8 +137,8 @@ func (c *Cache) Get(ctx context.Context, name string, kind ResourceType) (SKU, e
 
 	availableInRegion := []string{}
 	for _, sku := range c.data {
-		if pointer.StringDeref(sku.ResourceType, "") == string(kind) {
-			availableInRegion = append(availableInRegion, pointer.StringDeref(sku.Name, ""))
+		if ptr.Deref[string](sku.ResourceType, "") == string(kind) {
+			availableInRegion = append(availableInRegion, ptr.Deref[string](sku.Name, ""))
 		}
 	}
 

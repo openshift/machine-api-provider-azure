@@ -41,10 +41,12 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
 
 // The default durations for the leader electrion operations.
@@ -104,16 +106,22 @@ func main() {
 		LeaderElectionNamespace: *leaderElectResourceNamespace,
 		LeaderElectionID:        "cluster-api-provider-azure-leader",
 		LeaseDuration:           leaderElectLeaseDuration,
-		MetricsBindAddress:      *metricsAddress,
-		SyncPeriod:              &syncPeriod,
+		Metrics: server.Options{
+			BindAddress: *metricsAddress,
+		},
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
 		// Slow the default retry and renew election rate to reduce etcd writes at idle: BZ 1858400
 		RetryPeriod:   &retryPeriod,
 		RenewDeadline: &renewDealine,
 	}
 
 	if *watchNamespace != "" {
-		opts.Namespace = *watchNamespace
-		klog.Infof("Watching machine-api objects only in namespace %q for reconciliation.", opts.Namespace)
+		opts.Cache.DefaultNamespaces = map[string]cache.Config{
+			*watchNamespace: {},
+		}
+		klog.Infof("Watching machine-api objects only in namespace %q for reconciliation.", *watchNamespace)
 	}
 
 	// Setup a Manager

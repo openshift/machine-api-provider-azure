@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -272,7 +272,7 @@ func TestPersistMachineScope(t *testing.T) {
 	}
 
 	scope.Machine.Annotations["test"] = "testValue"
-	scope.MachineStatus.VMID = pointer.StringPtr("vmid")
+	scope.MachineStatus.VMID = ptr.To[string]("vmid")
 	scope.Machine.Status.Addresses = make([]corev1.NodeAddress, len(nodeAddresses))
 	scope.MachineConfig.InternalLoadBalancer = "test"
 	copy(nodeAddresses, scope.Machine.Status.Addresses)
