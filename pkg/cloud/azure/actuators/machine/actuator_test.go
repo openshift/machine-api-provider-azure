@@ -44,7 +44,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -414,7 +414,7 @@ func TestAvailabilityZones(t *testing.T) {
 	fakeScope := newFakeScope(t, actuators.ControlPlane)
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
-	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("2")
+	fakeReconciler.scope.MachineConfig.Zone = "2"
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{"2"},
 	}
@@ -422,7 +422,7 @@ func TestAvailabilityZones(t *testing.T) {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.scope.MachineConfig.Zone = nil
+	fakeReconciler.scope.MachineConfig.Zone = ""
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{""},
 	}
@@ -430,7 +430,7 @@ func TestAvailabilityZones(t *testing.T) {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	fakeReconciler.scope.MachineConfig.Zone = to.StringPtr("1")
+	fakeReconciler.scope.MachineConfig.Zone = "1"
 	fakeReconciler.virtualMachinesSvc = &FakeVMCheckZonesService{
 		checkZones: []string{"3"},
 	}
@@ -441,15 +441,15 @@ func TestAvailabilityZones(t *testing.T) {
 
 func TestGetZone(t *testing.T) {
 	testCases := []struct {
-		inputZone *string
+		inputZone string
 		expected  string
 	}{
 		{
-			inputZone: nil,
+			inputZone: "",
 			expected:  "",
 		},
 		{
-			inputZone: pointer.StringPtr("3"),
+			inputZone: "3",
 			expected:  "3",
 		},
 	}
@@ -698,15 +698,15 @@ func TestMachineEvents(t *testing.T) {
 
 			networkSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{
-				ID:   pointer.StringPtr("vm-id"),
-				Name: pointer.StringPtr("vm-name"),
+				ID:   ptr.To[string]("vm-id"),
+				Name: ptr.To[string]("vm-name"),
 				VirtualMachineProperties: &compute.VirtualMachineProperties{
-					ProvisioningState: pointer.StringPtr("Succeeded"),
+					ProvisioningState: ptr.To[string]("Succeeded"),
 					HardwareProfile: &compute.HardwareProfile{
 						VMSize: compute.VirtualMachineSizeTypesStandardB2ms,
 					},
 					OsProfile: &compute.OSProfile{
-						ComputerName: pointer.StringPtr("vm-name"),
+						ComputerName: ptr.To[string]("vm-name"),
 					},
 				},
 			}, nil).AnyTimes()

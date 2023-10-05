@@ -13,7 +13,7 @@ import (
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"k8s.io/apimachinery/pkg/api/resource"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 )
 
 func TestDeriveVirtualMachineParameters(t *testing.T) {
@@ -226,7 +226,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 							},
 						},
 					},
-					EncryptionAtHost: pointer.Bool(true),
+					EncryptionAtHost: ptr.To[bool](true),
 				}
 			},
 			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
