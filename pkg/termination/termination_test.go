@@ -182,7 +182,9 @@ var _ = Describe("Handler Suite", func() {
 				Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
 			})
 		})
+	})
 
+	Context("when the termination endpoint is invalid", func() {
 		Context("and the poll URL cannot be reached", func() {
 			BeforeEach(func() {
 				h.pollURL = &url.URL{Opaque: "abc#1://localhost"}
