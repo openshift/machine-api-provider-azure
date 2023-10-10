@@ -175,14 +175,19 @@ var _ = Describe("Handler Suite", func() {
 
 		Context("and the instance termination notice is not fulfilled", func() {
 			BeforeEach(func() {
-				httpHandler = newMockHTTPHandler(emptyEvents)
+				httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
+					atomic.AddInt32(&counter, 1)
+					emptyEvents(rw, req)
+				})
 			})
 
 			It("should not mark the node for deletion", func() {
 				Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
 			})
 		})
+	})
 
+	Context("when the termination endpoint is invalid", func() {
 		Context("and the poll URL cannot be reached", func() {
 			BeforeEach(func() {
 				h.pollURL = &url.URL{Opaque: "abc#1://localhost"}
