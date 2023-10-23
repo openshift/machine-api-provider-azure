@@ -20,6 +20,13 @@ set -o pipefail
 
 REPO_ROOT=$(dirname "${BASH_SOURCE}")/..
 
+# Ensure that some home var is set and that it's not the root.
+# This is required for the kubebuilder cache.
+export HOME=${HOME:=/tmp/kubebuilder-testing}
+if [ $HOME == "/" ]; then
+  export HOME=/tmp/kubebuilder-testing
+fi
+
 cd $REPO_ROOT && \
 	source ./hack/fetch-ext-bins.sh && \
 	fetch_tools && \
