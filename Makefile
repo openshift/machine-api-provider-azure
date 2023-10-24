@@ -38,7 +38,9 @@ GOOS ?= $(shell go env GOOS)
 
 NO_DOCKER ?= 0
 
-ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
+ifeq (${IS_CONTAINER}, TRUE)
+	NO_DOCKER=1
+else ifeq ($(shell command -v podman > /dev/null 2>&1 ; echo $$? ), 0)
 	ENGINE=podman
 else ifeq ($(shell command -v docker > /dev/null 2>&1 ; echo $$? ), 0)
 	ENGINE=docker
@@ -90,6 +92,10 @@ gogen:
 
 .PHONY: vet
 vet:
+	# Ensure that some home var is set and that it's not the root.
+	# This is required for the kubebuilder cache.
+	export HOME=${HOME:=/tmp/kubebuilder-testing}; \
+	if [ ${HOME} == "/" ]; then mkdir -p /tmp/kubebuilder-testing; export HOME=/tmp/kubebuilder-testing; fi; \
 	$(DOCKER_CMD) go vet -composites=false ./pkg/... ./cmd/...
 
 .PHONY: test-e2e
