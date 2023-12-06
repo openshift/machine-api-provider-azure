@@ -93,6 +93,12 @@ func main() {
 		"The duration that non-leader candidates will wait after observing a leadership renewal until attempting to acquire leadership of a led but unrenewed leader slot. This is effectively the maximum duration that a leader can be stopped before it is replaced by another candidate. This is only applicable if leader election is enabled.",
 	)
 
+	maxConcurrentReconciles := flag.Int(
+		"max-concurrent-reconciles",
+		1,
+		"Maximum number of concurrent reconciles per controller instance.",
+	)
+
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
 	flag.Parse()
@@ -173,7 +179,9 @@ func main() {
 		klog.Fatal(err)
 	}
 
-	if err := machine.AddWithActuator(mgr, machineActuator); err != nil {
+	if err := machine.AddWithActuatorOpts(mgr, machineActuator, controller.Options{
+		MaxConcurrentReconciles: *maxConcurrentReconciles,
+	}); err != nil {
 		klog.Fatal(err)
 	}
 
