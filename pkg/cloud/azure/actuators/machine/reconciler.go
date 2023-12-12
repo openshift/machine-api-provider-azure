@@ -27,6 +27,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest"
+	autorestazure "github.com/Azure/go-autorest/autorest/azure"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -138,6 +139,13 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 
 	if err := s.createVirtualMachine(ctx, nicName, asName); err != nil {
 		return fmt.Errorf("failed to create vm %s: %w", s.scope.Machine.Name, err)
+	}
+
+	// Once we have created the machine, attempt to update it.
+	// This should set the network addresses and provider ID which should be set as soon
+	// as the machine is created, moving it to the provisioned phase.
+	if err := s.Update(ctx); err != nil {
+		return fmt.Errorf("failed to update machine %s: %w", s.scope.Machine.Name, err)
 	}
 
 	return nil
@@ -701,8 +709,8 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			vmSpec.CustomData = userData
 		}
 
-		err = s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec)
-		if err != nil {
+		// If we get an AsynOpIncompleteError, this means the VM is being created and we completed the request successfully.
+		if err := s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec); err != nil && !errors.Is(err, autorestazure.NewAsyncOpIncompleteError("compute.VirtualMachinesCreateOrUpdateFuture")) {
 			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
 				Name:      s.scope.Machine.Name,
 				Namespace: s.scope.Machine.Namespace,
@@ -713,6 +721,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
 				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s: %v", s.scope.Machine.Name, err)
 			}
+
 			return fmt.Errorf("failed to create VM: %w", err)
 		}
 	} else if err != nil {

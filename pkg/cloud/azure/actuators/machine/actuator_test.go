@@ -343,8 +343,9 @@ func TestReconcileVMSuceededState(t *testing.T) {
 		t.Errorf("failed to create machine: %+v", err)
 	}
 
-	if fakeVMService.GetCallCount != 1 {
-		t.Errorf("expected get to be called just once")
+	if fakeVMService.GetCallCount != 2 {
+		// One call for create, and one for the update that happens when the create is successful.
+		t.Errorf("expected get to be called exactly twice")
 	}
 
 	if fakeVMService.DeleteCallCount != 0 {
@@ -359,11 +360,18 @@ func TestReconcileVMSuceededState(t *testing.T) {
 // FakeVMCheckZonesService generic fake vm zone service
 type FakeVMCheckZonesService struct {
 	checkZones []string
+	created    bool
 }
 
 // Get returns fake success.
 func (s *FakeVMCheckZonesService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
-	return nil, errors.New("vm not found")
+	if !s.created {
+		return nil, errors.New("vm not found")
+	}
+
+	return &compute.VirtualMachine{
+		VirtualMachineProperties: &compute.VirtualMachineProperties{},
+	}, nil
 }
 
 // CreateOrUpdate returns fake success.
@@ -374,10 +382,12 @@ func (s *FakeVMCheckZonesService) CreateOrUpdate(ctx context.Context, spec azure
 	}
 
 	if len(s.checkZones) <= 0 {
+		s.created = true
 		return nil
 	}
 	for _, zone := range s.checkZones {
 		if strings.EqualFold(zone, vmSpec.Zone) {
+			s.created = true
 			return nil
 		}
 	}
