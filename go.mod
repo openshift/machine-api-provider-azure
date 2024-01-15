@@ -15,8 +15,8 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.12.1
 	github.com/onsi/gomega v1.28.0
-	github.com/openshift/api v0.0.0-20230928105710-23b54c280f99
-	github.com/openshift/machine-api-operator v0.2.1-0.20230929171041-2cc7fcf262f3
+	github.com/openshift/api v0.0.0-20231120222239-b86761094ee3
+	github.com/openshift/machine-api-operator v0.2.1-0.20240123172929-cf0b67126774
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.7.0
 	golang.org/x/crypto v0.14.0
@@ -38,7 +38,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.6.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.3.0
 	github.com/jongio/azidext/go/azidext v0.4.0
-	github.com/openshift/client-go v0.0.0-20230926161409-848405da69e1
+	github.com/openshift/client-go v0.0.0-20231121143148-910ca30a1a9a
 	github.com/openshift/library-go v0.0.0-20230927113136-405c34317fa4
 )
 
