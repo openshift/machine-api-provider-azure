@@ -24,10 +24,10 @@ endif
 VERSION     ?= $(shell git describe --always --abbrev=7)
 REPO_PATH   ?= github.com/openshift/machine-api-provider-azure
 LD_FLAGS    ?= -X $(REPO_PATH)/pkg/version.Raw=$(VERSION) -extldflags -static
-BUILD_IMAGE ?= registry.ci.openshift.org/openshift/release:golang-1.20
+BUILD_IMAGE ?= registry.ci.openshift.org/openshift/release:golang-1.21
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.28
+ENVTEST_K8S_VERSION = 1.29
 
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 CONTROLLER_GEN = go run ${PROJECT_DIR}/vendor/sigs.k8s.io/controller-tools/cmd/controller-gen

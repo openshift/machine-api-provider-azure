@@ -143,9 +143,9 @@ func (r *Reconciler) reconcile(machineSet *machinev1.MachineSet) (ctrl.Result, e
 	if err != nil {
 		if errors.Is(err, resourceskus.ErrResourceNotFound) {
 			// Print different error message when there is no failure, but SKU is not available.
-			klog.Errorf("Unable to set scale from zero annotations: instance type unknown or unavailabe for this account or location: %w", err)
+			klog.Errorf("Unable to set scale from zero annotations: instance type unknown or unavailabe for this account or location: %v", err)
 		} else {
-			klog.Errorf("Unable to set scale from zero annotations: Azure list SKU request failed: %w", err)
+			klog.Errorf("Unable to set scale from zero annotations: Azure list SKU request failed: %v", err)
 		}
 
 		if isInvalidConfigurationError(err) {

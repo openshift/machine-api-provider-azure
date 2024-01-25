@@ -153,12 +153,12 @@ func main() {
 		stopSignalContext.Done(),
 	)
 	if err != nil {
-		klog.Fatalf("Failed to create feature gate accessor: %w", err)
+		klog.Fatalf("Failed to create feature gate accessor: %v", err)
 	}
 
 	featureGates, err := awaitEnabledFeatureGates(featureGateAccessor, 1*time.Minute)
 	if err != nil {
-		klog.Fatalf("Failed to get feature gates: %w", err)
+		klog.Fatalf("Failed to get feature gates: %v", err)
 	}
 
 	azureWorkloadIdentityEnabled := featureGates.Enabled(configv1.FeatureGateAzureWorkloadIdentity)
