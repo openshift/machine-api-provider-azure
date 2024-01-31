@@ -97,7 +97,7 @@ func (s *Service) Get(ctx context.Context, spec azure.Spec) (interface{}, error)
 	}
 	vm, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, vmSpec.Name, compute.InstanceViewTypesInstanceView)
 	if err != nil && azure.ResourceNotFound(err) {
-		klog.Warningf("vm %s not found: %w", vmSpec.Name, err.Error())
+		klog.Warningf("vm %s not found: %v", vmSpec.Name, err)
 		return nil, err
 	} else if err != nil {
 		return vm, err
@@ -156,12 +156,12 @@ func generateOSProfile(vmSpec *Spec) (*compute.OSProfile, error) {
 	if sshKeyData == "" && compute.OperatingSystemTypes(vmSpec.OSDisk.OSType) != compute.OperatingSystemTypesWindows {
 		privateKey, perr := rsa.GenerateKey(rand.Reader, 2048)
 		if perr != nil {
-			return nil, fmt.Errorf("Failed to generate private key: %w", perr)
+			return nil, fmt.Errorf("failed to generate private key: %w", perr)
 		}
 
 		publicRsaKey, perr := ssh.NewPublicKey(&privateKey.PublicKey)
 		if perr != nil {
-			return nil, fmt.Errorf("Failed to generate public key: %w", perr)
+			return nil, fmt.Errorf("failed to generate public key: %w", perr)
 		}
 		sshKeyData = string(ssh.MarshalAuthorizedKey(publicRsaKey))
 	}
