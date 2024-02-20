@@ -483,7 +483,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
 			Name:      s.scope.Machine.Name,
 			Namespace: s.scope.Machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "failed to delete OS disk",
 		})
 		return fmt.Errorf("failed to delete OS disk: %w", err)
 	}
@@ -502,7 +502,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
 			Name:      s.scope.Machine.Name,
 			Namespace: s.scope.Machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "failed to delete network interface",
 		})
 		return fmt.Errorf("Unable to delete network interface: %w", err)
 	}
@@ -526,7 +526,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 			metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
 				Name:      s.scope.Machine.Name,
 				Namespace: s.scope.Machine.Namespace,
-				Reason:    err.Error(),
+				Reason:    "failed to delete Public IP",
 			})
 			return fmt.Errorf("unable to delete Public IP: %w", err)
 		}
@@ -611,7 +611,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
 				Name:      s.scope.Machine.Name,
 				Namespace: s.scope.Machine.Namespace,
-				Reason:    err.Error(),
+				Reason:    "failed to create public IP",
 			})
 			return fmt.Errorf("unable to create Public IP: %w", err)
 		}
@@ -623,7 +623,7 @@ func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string)
 		metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
 			Name:      s.scope.Machine.Name,
 			Namespace: s.scope.Machine.Namespace,
-			Reason:    err.Error(),
+			Reason:    "failed to create VM network interface",
 		})
 		return fmt.Errorf("unable to create VM network interface: %w", err)
 	}
@@ -697,14 +697,14 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
 				Name:      s.scope.Machine.Name,
 				Namespace: s.scope.Machine.Namespace,
-				Reason:    err.Error(),
+				Reason:    "failed to create VM",
 			})
 
 			var detailedError autorest.DetailedError
 			if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
 				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s: %v", s.scope.Machine.Name, err)
 			}
-			return fmt.Errorf("failed to create or get machine: %w", err)
+			return fmt.Errorf("failed to create VM: %w", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("failed to get vm: %w", err)
