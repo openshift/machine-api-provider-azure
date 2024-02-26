@@ -801,6 +801,11 @@ func (s *Reconciler) getOrCreateAvailabilitySet() (string, error) {
 		return "", nil
 	}
 
+	if s.scope.MachineConfig.SpotVMOptions != nil {
+		klog.V(4).Infof("MachineSet %s uses spot instances, skipping availability set creation", s.scope.Machine.Name)
+		return "", nil
+	}
+
 	klog.V(4).Infof("No availability zones were found for %s, an availability set will be created", s.scope.Machine.Name)
 
 	if err := s.availabilitySetsSvc.CreateOrUpdate(context.Background(), &availabilitysets.Spec{
