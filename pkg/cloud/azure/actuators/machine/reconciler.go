@@ -41,7 +41,6 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/publicips"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
-	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachineextensions"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 	apicorev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -93,7 +92,6 @@ func NewReconciler(scope *actuators.MachineScope) *Reconciler {
 		interfaceLoadBalancersSvc: interfaceloadbalancers.NewService(scope),
 		networkInterfacesSvc:      networkinterfaces.NewService(scope),
 		virtualMachinesSvc:        virtualmachines.NewService(scope),
-		virtualMachinesExtSvc:     virtualmachineextensions.NewService(scope),
 		publicIPSvc:               publicips.NewService(scope),
 		disksSvc:                  disks.NewService(scope),
 		availabilitySetsSvc:       availabilitysets.NewService(scope),
@@ -434,22 +432,6 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	vm, err := decode.GetVirtualMachine(vmInterface)
 	if err != nil {
 		return false, fmt.Errorf("returned incorrect vm interface: %v", err)
-	}
-
-	if s.scope.MachineConfig.UserDataSecret == nil {
-		vmExtSpec := &virtualmachineextensions.Spec{
-			Name:   "startupScript",
-			VMName: s.scope.Name(),
-		}
-
-		vmExt, err := s.virtualMachinesExtSvc.Get(ctx, vmExtSpec)
-		if err != nil && vmExt == nil {
-			return false, nil
-		}
-
-		if err != nil {
-			return false, fmt.Errorf("failed to get vm extension: %w", err)
-		}
 	}
 
 	switch machinev1.AzureVMState(*vm.ProvisioningState) {
