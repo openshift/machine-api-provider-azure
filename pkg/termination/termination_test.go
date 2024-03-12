@@ -124,6 +124,8 @@ var _ = Describe("Handler Suite", func() {
 		var counter int32
 
 		BeforeEach(func() {
+			counter = 0
+
 			// Ensure the polling logic is excercised in tests
 			httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
 				if atomic.LoadInt32(&counter) == 4 {
@@ -135,15 +137,15 @@ var _ = Describe("Handler Suite", func() {
 			})
 		})
 
-		JustBeforeEach(func() {
-			// Ensure the polling logic is excercised in tests
-			for atomic.LoadInt32(&counter) < 4 {
-				continue
-			}
-		})
-
 		Context("and the handler is stopped", func() {
 			JustBeforeEach(func() {
+				// Ensure the polling logic is tested as well
+				for atomic.LoadInt32(&counter) < 4 {
+					// use 50ms since polling is set to 100ms
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+
 				close(stop)
 			})
 
@@ -157,6 +159,15 @@ var _ = Describe("Handler Suite", func() {
 		})
 
 		Context("and the instance termination notice is fulfilled", func() {
+			JustBeforeEach(func() {
+				// Ensure the polling logic is tested as well
+				for atomic.LoadInt32(&counter) < 4 {
+					// use 50ms since polling is set to 100ms
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+			})
+
 			It("should mark the node for deletion", func() {
 				Eventually(nodeMarkedForDeletion(testNode.Name)).Should(BeTrue())
 			})

@@ -333,6 +333,7 @@ func TestCreateAvailabilitySet(t *testing.T) {
 		availabilitySetsSvc  func() *mock_azure.MockService
 		availabilityZonesSvc func() *mock_azure.MockService
 		inputASName          string
+		spotVMOptions        *machinev1.SpotVMOptions
 	}{
 		{
 			name:          "Error when availability zones client fails",
@@ -415,6 +416,22 @@ func TestCreateAvailabilitySet(t *testing.T) {
 			},
 		},
 		{
+			name: "Skip availability set creation when using Spot instances",
+			availabilityZonesSvc: func() *mock_azure.MockService {
+				availabilityZonesSvc := mock_azure.NewMockService(mockCtrl)
+				availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{}, nil).Times(1)
+				return availabilityZonesSvc
+			},
+			availabilitySetsSvc: func() *mock_azure.MockService {
+				availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+				availabilitySetsSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(0)
+				return availabilitySetsSvc
+			},
+			spotVMOptions: &machinev1.SpotVMOptions{
+				MaxPrice: resource.NewQuantity(-1, resource.DecimalSI),
+			},
+		},
+		{
 			name:           "Skip availability set creation when name was specified in provider spec",
 			labels:         map[string]string{},
 			inputASName:    "test-as",
@@ -486,6 +503,7 @@ func TestCreateAvailabilitySet(t *testing.T) {
 					MachineConfig: &machinev1.AzureMachineProviderSpec{
 						VMSize:          "Standard_D2_v2",
 						AvailabilitySet: tc.inputASName,
+						SpotVMOptions:   tc.spotVMOptions,
 					},
 				},
 			}
