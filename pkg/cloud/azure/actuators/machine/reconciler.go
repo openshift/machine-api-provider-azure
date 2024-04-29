@@ -47,7 +47,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-
+	azureutils "sigs.k8s.io/cluster-api-provider-azure/util/azure"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -681,6 +681,13 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
 		}
 
+		if s.scope.MachineConfig.CapacityReservationGroupID != "" {
+			if err = validateCapacityReservationGroupID(s.scope.MachineConfig.CapacityReservationGroupID); err != nil {
+				return fmt.Errorf("invalid capacityReservationGroupID : %w", err)
+			}
+			vmSpec.CapacityReservationGroupID = s.scope.MachineConfig.CapacityReservationGroupID
+		}
+
 		userData, userDataErr := s.getCustomUserData()
 		if userDataErr != nil {
 			return fmt.Errorf("failed to get custom script data: %w", userDataErr)
@@ -856,4 +863,11 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 			machinev1.CustomerManagedAzureDiagnosticsStorage,
 		)
 	}
+}
+
+func validateCapacityReservationGroupID(capacityReservationGroupID string) error {
+	if _, err := azureutils.ParseResourceID(capacityReservationGroupID); err != nil {
+		return err
+	}
+	return nil
 }
