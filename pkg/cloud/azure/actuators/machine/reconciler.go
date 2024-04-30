@@ -47,7 +47,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
-	azureutils "sigs.k8s.io/cluster-api-provider-azure/util/azure"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -682,9 +681,6 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 		}
 
 		if s.scope.MachineConfig.CapacityReservationGroupID != "" {
-			if err = validateCapacityReservationGroupID(s.scope.MachineConfig.CapacityReservationGroupID); err != nil {
-				return fmt.Errorf("invalid capacityReservationGroupID : %w", err)
-			}
 			vmSpec.CapacityReservationGroupID = s.scope.MachineConfig.CapacityReservationGroupID
 		}
 
@@ -863,11 +859,4 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 			machinev1.CustomerManagedAzureDiagnosticsStorage,
 		)
 	}
-}
-
-func validateCapacityReservationGroupID(capacityReservationGroupID string) error {
-	if _, err := azureutils.ParseResourceID(capacityReservationGroupID); err != nil {
-		return err
-	}
-	return nil
 }
