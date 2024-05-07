@@ -25,7 +25,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	configv1 "github.com/openshift/api/config/v1"
+	_ "github.com/openshift/api/config/v1/zz_generated.crd-manifests"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
+	_ "github.com/openshift/api/machine/v1beta1/zz_generated.crd-manifests"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machine"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -57,8 +59,8 @@ func TestReconciler(t *testing.T) {
 var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
+			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "zz_generated.crd-manifests"),
 		},
 	}
 
