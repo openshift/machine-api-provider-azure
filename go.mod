@@ -16,7 +16,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.15.0
 	github.com/onsi/gomega v1.31.1
-	github.com/openshift/api v0.0.0-20240124164020-e2ce40831f2e
+	github.com/openshift/api v0.0.0-20240521141249-8af21b7ed3e3
 	github.com/openshift/machine-api-operator v0.2.1-0.20240125175440-c9de8bda0dd1
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.8.0
@@ -147,5 +147,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace github.com/openshift/api => github.com/anirudhAgniRedhat/openshift-api v0.1.2
