@@ -28,7 +28,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest"
 	autorestazure "github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-operator/pkg/metrics"
@@ -68,7 +67,13 @@ const (
 	// MachineInstanceTypeLabelName as annotation name for a machine instance type
 	MachineInstanceTypeLabelName = "machine.openshift.io/instance-type"
 
-	MachineSetLabelName = "machine.openshift.io/cluster-api-machineset"
+	MachineSetLabelName           = "machine.openshift.io/cluster-api-machineset"
+	azureProviderIDPrefix         = "azure://"
+	azureProvidersKey             = "providers"
+	azureSubscriptionsKey         = "subscriptions"
+	azureResourceGroupsLowerKey   = "resourcegroups"
+	azureLocationsKey             = "locations"
+	azureBuiltInResourceNamespace = "Microsoft.Resources"
 )
 
 // Reconciler are list of services required by cluster actuator, easy to create a fake
@@ -537,7 +542,7 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 }
 
 func (s *Reconciler) getZone(ctx context.Context) (string, error) {
-	return to.String(s.scope.MachineConfig.Zone), nil
+	return s.scope.MachineConfig.Zone, nil
 }
 
 func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
@@ -680,6 +685,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 
 		if s.scope.MachineConfig.ManagedIdentity != "" {
 			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+		}
+		if s.scope.MachineConfig.CapacityReservationGroupID != "" {
+			if err = validateAzureCapacityReservationGroupID(s.scope.MachineConfig.CapacityReservationGroupID); err != nil {
+				return fmt.Errorf("failed to validate capacityReservationGroupID: %w", err)
+			}
+			vmSpec.CapacityReservationGroupID = s.scope.MachineConfig.CapacityReservationGroupID
 		}
 
 		userData, userDataErr := s.getCustomUserData()
@@ -857,4 +868,66 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 			machinev1.CustomerManagedAzureDiagnosticsStorage,
 		)
 	}
+}
+
+func validateAzureCapacityReservationGroupID(capacityReservationGroupID string) error {
+	id := strings.TrimPrefix(capacityReservationGroupID, azureProviderIDPrefix)
+	err := parseAzureResourceID(id)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// parseAzureResourceID parses a string to an instance of ResourceID
+func parseAzureResourceID(id string) error {
+	if len(id) == 0 {
+		return fmt.Errorf("invalid resource ID: id cannot be empty")
+	}
+	if !strings.HasPrefix(id, "/") {
+		return fmt.Errorf("invalid resource ID: resource id '%s' must start with '/'", id)
+	}
+	parts := splitStringAndOmitEmpty(id, "/")
+
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid resource ID: %s", id)
+	}
+	if !strings.EqualFold(parts[0], azureSubscriptionsKey) && !strings.EqualFold(parts[0], azureProvidersKey) {
+		return fmt.Errorf("invalid resource ID: %s", id)
+	}
+	return appendNextAzureResourceIDValidation(parts, id)
+}
+
+func splitStringAndOmitEmpty(v, sep string) []string {
+	r := make([]string, 0)
+	for _, s := range strings.Split(v, sep) {
+		if len(s) == 0 {
+			continue
+		}
+		r = append(r, s)
+	}
+	return r
+}
+
+func appendNextAzureResourceIDValidation(parts []string, id string) error {
+	if len(parts) == 0 {
+		return nil
+	}
+	if len(parts) == 1 {
+		// subscriptions and resourceGroups are not valid ids without their names
+		if strings.EqualFold(parts[0], azureSubscriptionsKey) || strings.EqualFold(parts[0], azureResourceGroupsLowerKey) {
+			return fmt.Errorf("invalid resource ID: %s", id)
+		}
+		return nil
+	}
+	if strings.EqualFold(parts[0], azureProvidersKey) && (len(parts) == 2 || strings.EqualFold(parts[2], azureProvidersKey)) {
+		return appendNextAzureResourceIDValidation(parts[2:], id)
+	}
+	if len(parts) > 3 && strings.EqualFold(parts[0], azureProvidersKey) {
+		return appendNextAzureResourceIDValidation(parts[4:], id)
+	}
+	if len(parts) > 1 && !strings.EqualFold(parts[0], azureProvidersKey) {
+		return appendNextAzureResourceIDValidation(parts[2:], id)
+	}
+	return fmt.Errorf("invalid resource ID: %s", id)
 }
