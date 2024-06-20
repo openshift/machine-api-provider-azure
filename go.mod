@@ -40,6 +40,7 @@ require (
 	github.com/jongio/azidext/go/azidext v0.5.0
 	github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 	github.com/openshift/library-go v0.0.0-20240607134135-aed018c215a1
+	go.uber.org/mock v0.4.0
 )
 
 require (
