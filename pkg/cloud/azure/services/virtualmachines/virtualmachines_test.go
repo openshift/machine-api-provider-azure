@@ -713,6 +713,28 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "capacity reservation group ID should be configured if the string is non empty",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.CapacityReservationGroupID = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(*vm.VirtualMachineProperties.CapacityReservation.CapacityReservationGroup.ID).Should(Equal("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"))
+			},
+			expectedError: nil,
+		},
+		{
+			name: "capacity reservation group ID should be nil if the string is empty",
+			updateSpec: func(vmSpec *Spec) {
+				vmSpec.Name = "testvm"
+				vmSpec.CapacityReservationGroupID = ""
+			},
+			validate: func(g *WithT, vm *compute.VirtualMachine) {
+				g.Expect(vm.VirtualMachineProperties.CapacityReservation).To(BeNil())
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {

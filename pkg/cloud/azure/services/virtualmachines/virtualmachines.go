@@ -69,24 +69,25 @@ const (
 
 // Spec input specification for Get/CreateOrUpdate/Delete calls
 type Spec struct {
-	Name                string
-	NICName             string
-	SSHKeyData          string
-	Size                string
-	Zone                string
-	Image               machinev1.Image
-	OSDisk              machinev1.OSDisk
-	DataDisks           []machinev1.DataDisk
-	CustomData          string
-	ManagedIdentity     string
-	Tags                map[string]*string
-	Priority            compute.VirtualMachinePriorityTypes
-	EvictionPolicy      compute.VirtualMachineEvictionPolicyTypes
-	BillingProfile      *compute.BillingProfile
-	SecurityProfile     *machinev1.SecurityProfile
-	DiagnosticsProfile  *compute.DiagnosticsProfile
-	UltraSSDCapability  machinev1.AzureUltraSSDCapabilityState
-	AvailabilitySetName string
+	Name                       string
+	NICName                    string
+	SSHKeyData                 string
+	Size                       string
+	Zone                       string
+	Image                      machinev1.Image
+	OSDisk                     machinev1.OSDisk
+	DataDisks                  []machinev1.DataDisk
+	CustomData                 string
+	ManagedIdentity            string
+	Tags                       map[string]*string
+	Priority                   compute.VirtualMachinePriorityTypes
+	EvictionPolicy             compute.VirtualMachineEvictionPolicyTypes
+	BillingProfile             *compute.BillingProfile
+	SecurityProfile            *machinev1.SecurityProfile
+	DiagnosticsProfile         *compute.DiagnosticsProfile
+	UltraSSDCapability         machinev1.AzureUltraSSDCapabilityState
+	AvailabilitySetName        string
+	CapacityReservationGroupID string
 }
 
 // Get provides information about a virtual network.
@@ -333,6 +334,14 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 	if vmSpec.AvailabilitySetName != "" {
 		virtualMachine.AvailabilitySet = &compute.SubResource{
 			ID: to.StringPtr(availabilitySetID(s.Scope.SubscriptionID, s.Scope.MachineConfig.ResourceGroup, vmSpec.AvailabilitySetName)),
+		}
+	}
+	// configure capacity reservation ID
+	if vmSpec.CapacityReservationGroupID != "" {
+		virtualMachine.VirtualMachineProperties.CapacityReservation = &compute.CapacityReservationProfile{
+			CapacityReservationGroup: &compute.SubResource{
+				ID: &vmSpec.CapacityReservationGroupID,
+			},
 		}
 	}
 

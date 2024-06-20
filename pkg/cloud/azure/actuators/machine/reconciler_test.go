@@ -620,3 +620,44 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateCapacityReservationGroupID(t *testing.T) {
+	testCases := []struct {
+		name          string
+		inputID       string
+		expectedError error
+	}{
+		{
+			name:          "validation for capacityReservationGroupID should return nil error if field input is valid",
+			inputID:       "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup",
+			expectedError: nil,
+		},
+		{
+			name:          "validation for capacityReservationGroupID should return error if field input does not start with '/'",
+			inputID:       "subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup",
+			expectedError: errors.New("invalid resource ID: resource id 'subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup' must start with '/'"),
+		},
+		{
+			name:          "validation for capacityReservationGroupID should return error if field input does not have field name subscriptions",
+			inputID:       "/subscripti/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup",
+			expectedError: errors.New("invalid resource ID: /subscripti/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"),
+		},
+		{
+			name:          "validation for capacityReservationGroupID should return error if field input is empty",
+			inputID:       "",
+			expectedError: errors.New("invalid resource ID: id cannot be empty"),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			err := validateAzureCapacityReservationGroupID(tc.inputID)
+			if tc.expectedError != nil {
+				g.Expect(err).To(MatchError(tc.expectedError))
+			} else {
+				g.Expect(err).ToNot(HaveOccurred())
+			}
+		})
+	}
+}
