@@ -57,8 +57,8 @@ func TestReconciler(t *testing.T) {
 var _ = BeforeSuite(func() {
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
-			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1"),
-			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1"),
+			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "machine", "v1beta1", "zz_generated.crd-manifests"),
+			filepath.Join("..", "..", "..", "..", "..", "vendor", "github.com", "openshift", "api", "config", "v1", "zz_generated.crd-manifests"),
 		},
 	}
 

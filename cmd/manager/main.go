@@ -24,6 +24,7 @@ import (
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	apifeatures "github.com/openshift/api/features"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
@@ -161,7 +162,7 @@ func main() {
 		klog.Fatalf("Failed to get feature gates: %v", err)
 	}
 
-	azureWorkloadIdentityEnabled := featureGates.Enabled(configv1.FeatureGateAzureWorkloadIdentity)
+	azureWorkloadIdentityEnabled := featureGates.Enabled(apifeatures.FeatureGateAzureWorkloadIdentity)
 
 	// Initialize machine actuator.
 	machineActuator := actuator.NewActuator(actuator.ActuatorParams{
