@@ -39,6 +39,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	k8sflag "k8s.io/component-base/cli/flag"
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -99,6 +100,9 @@ func main() {
 		1,
 		"Maximum number of concurrent reconciles per controller instance.",
 	)
+
+	featureGateArgs := map[string]bool{}
+	flag.Var(k8sflag.NewMapStringBool(&featureGateArgs), "feature-gates", "A set of key=value pairs that describe feature gates for alpha/experimen")
 
 	klog.InitFlags(nil)
 	flag.Set("logtostderr", "true")
