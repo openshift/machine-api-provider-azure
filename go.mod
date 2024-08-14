@@ -38,8 +38,9 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.12.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.6.0
 	github.com/jongio/azidext/go/azidext v0.5.0
-	github.com/openshift/library-go v0.0.0-20240723172506-8bb8fe6cc56d
+	github.com/openshift/library-go v0.0.0-20240822162747-42bcbbc4ccc6
 	go.uber.org/mock v0.4.0
+	k8s.io/apiserver v0.30.1
 	k8s.io/component-base v0.30.2
 )
 
@@ -134,7 +135,6 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/apiextensions-apiserver v0.30.1 // indirect
-	k8s.io/apiserver v0.30.1 // indirect
 	k8s.io/cli-runtime v0.30.0 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	k8s.io/kubectl v0.30.0 // indirect
@@ -143,5 +143,3 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.14.3-0.20230601165947-6ce0bf390ce3 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
-
-replace github.com/openshift/library-go => github.com/theobarberbany/library-go v0.0.0-20240815101832-67c243cfb5b5

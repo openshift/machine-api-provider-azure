@@ -332,94 +332,19 @@ github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
 # github.com/openshift/api v0.0.0-20240731195412-e863d9f8a215
 ## explicit; go 1.22.0
-github.com/openshift/api
-github.com/openshift/api/annotations
-github.com/openshift/api/apiserver
-github.com/openshift/api/apiserver/v1
-github.com/openshift/api/apps
-github.com/openshift/api/apps/v1
-github.com/openshift/api/authorization
-github.com/openshift/api/authorization/v1
-github.com/openshift/api/build
-github.com/openshift/api/build/v1
-github.com/openshift/api/cloudnetwork
-github.com/openshift/api/cloudnetwork/v1
-github.com/openshift/api/config
 github.com/openshift/api/config/v1
 github.com/openshift/api/config/v1/zz_generated.crd-manifests
 github.com/openshift/api/config/v1alpha1
-github.com/openshift/api/console
-github.com/openshift/api/console/v1
 github.com/openshift/api/features
-github.com/openshift/api/helm
-github.com/openshift/api/helm/v1beta1
-github.com/openshift/api/image
-github.com/openshift/api/image/docker10
-github.com/openshift/api/image/dockerpre012
-github.com/openshift/api/image/v1
-github.com/openshift/api/imageregistry
-github.com/openshift/api/imageregistry/v1
-github.com/openshift/api/kubecontrolplane
-github.com/openshift/api/kubecontrolplane/v1
-github.com/openshift/api/legacyconfig/v1
-github.com/openshift/api/machine
 github.com/openshift/api/machine/v1
-github.com/openshift/api/machine/v1alpha1
 github.com/openshift/api/machine/v1beta1
 github.com/openshift/api/machine/v1beta1/zz_generated.crd-manifests
-github.com/openshift/api/monitoring
-github.com/openshift/api/monitoring/v1
-github.com/openshift/api/network
-github.com/openshift/api/network/v1
-github.com/openshift/api/network/v1alpha1
-github.com/openshift/api/networkoperator
-github.com/openshift/api/networkoperator/v1
-github.com/openshift/api/oauth
-github.com/openshift/api/oauth/v1
-github.com/openshift/api/openshiftcontrolplane
-github.com/openshift/api/openshiftcontrolplane/v1
-github.com/openshift/api/operator
-github.com/openshift/api/operator/v1
-github.com/openshift/api/operator/v1alpha1
-github.com/openshift/api/operatorcontrolplane
-github.com/openshift/api/operatorcontrolplane/v1alpha1
-github.com/openshift/api/osin
-github.com/openshift/api/osin/v1
-github.com/openshift/api/pkg/serialization
-github.com/openshift/api/project
-github.com/openshift/api/project/v1
-github.com/openshift/api/quota
-github.com/openshift/api/quota/v1
-github.com/openshift/api/route
-github.com/openshift/api/route/v1
-github.com/openshift/api/samples
-github.com/openshift/api/samples/v1
-github.com/openshift/api/security
-github.com/openshift/api/security/v1
-github.com/openshift/api/servicecertsigner
-github.com/openshift/api/servicecertsigner/v1alpha1
-github.com/openshift/api/sharedresource
-github.com/openshift/api/sharedresource/v1alpha1
-github.com/openshift/api/template
-github.com/openshift/api/template/v1
-github.com/openshift/api/user
-github.com/openshift/api/user/v1
 # github.com/openshift/client-go v0.0.0-20240528061634-b054aa794d87
 ## explicit; go 1.22.0
 github.com/openshift/client-go/config/applyconfigurations/config/v1
-github.com/openshift/client-go/config/applyconfigurations/config/v1alpha1
 github.com/openshift/client-go/config/applyconfigurations/internal
-github.com/openshift/client-go/config/clientset/versioned
 github.com/openshift/client-go/config/clientset/versioned/scheme
 github.com/openshift/client-go/config/clientset/versioned/typed/config/v1
-github.com/openshift/client-go/config/clientset/versioned/typed/config/v1alpha1
-github.com/openshift/client-go/config/informers/externalversions
-github.com/openshift/client-go/config/informers/externalversions/config
-github.com/openshift/client-go/config/informers/externalversions/config/v1
-github.com/openshift/client-go/config/informers/externalversions/config/v1alpha1
-github.com/openshift/client-go/config/informers/externalversions/internalinterfaces
-github.com/openshift/client-go/config/listers/config/v1
-github.com/openshift/client-go/config/listers/config/v1alpha1
 github.com/openshift/client-go/machine/applyconfigurations/internal
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1
 github.com/openshift/client-go/machine/applyconfigurations/machine/v1beta1
@@ -430,25 +355,11 @@ github.com/openshift/client-go/machine/clientset/versioned/typed/machine/v1beta1
 github.com/openshift/client-go/machine/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/machine/informers/externalversions/machine/v1beta1
 github.com/openshift/client-go/machine/listers/machine/v1beta1
-# github.com/openshift/library-go v0.0.0-20240723172506-8bb8fe6cc56d
+# github.com/openshift/library-go v0.0.0-20240822162747-42bcbbc4ccc6
 ## explicit; go 1.22.0
-github.com/openshift/library-go/pkg/certs
 github.com/openshift/library-go/pkg/config/clusterstatus
 github.com/openshift/library-go/pkg/config/leaderelection
-github.com/openshift/library-go/pkg/controller/factory
-github.com/openshift/library-go/pkg/crypto
-github.com/openshift/library-go/pkg/operator/certrotation
-github.com/openshift/library-go/pkg/operator/condition
-github.com/openshift/library-go/pkg/operator/configobserver
-github.com/openshift/library-go/pkg/operator/configobserver/featuregates
-github.com/openshift/library-go/pkg/operator/events
-github.com/openshift/library-go/pkg/operator/management
-github.com/openshift/library-go/pkg/operator/resource/resourceapply
-github.com/openshift/library-go/pkg/operator/resource/resourcehelper
-github.com/openshift/library-go/pkg/operator/resource/resourcemerge
-github.com/openshift/library-go/pkg/operator/resource/resourceread
-github.com/openshift/library-go/pkg/operator/resourcesynccontroller
-github.com/openshift/library-go/pkg/operator/v1helpers
+github.com/openshift/library-go/pkg/features
 # github.com/openshift/machine-api-operator v0.2.1-0.20240813104042-5af274324af8
 ## explicit; go 1.22.0
 github.com/openshift/machine-api-operator/pkg/controller/machine
@@ -483,9 +394,6 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/robfig/cron v1.2.0
-## explicit
-github.com/robfig/cron
 # github.com/russross/blackfriday/v2 v2.1.0
 ## explicit
 github.com/russross/blackfriday/v2
@@ -819,7 +727,7 @@ k8s.io/apimachinery/third_party/forked/golang/netutil
 k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.30.1
 ## explicit; go 1.22.0
-k8s.io/apiserver/pkg/authentication/user
+k8s.io/apiserver/pkg/util/feature
 # k8s.io/cli-runtime v0.30.0
 ## explicit; go 1.22.0
 k8s.io/cli-runtime/pkg/genericclioptions
@@ -882,75 +790,6 @@ k8s.io/client-go/discovery/cached/disk
 k8s.io/client-go/discovery/cached/memory
 k8s.io/client-go/dynamic
 k8s.io/client-go/features
-k8s.io/client-go/informers
-k8s.io/client-go/informers/admissionregistration
-k8s.io/client-go/informers/admissionregistration/v1
-k8s.io/client-go/informers/admissionregistration/v1alpha1
-k8s.io/client-go/informers/admissionregistration/v1beta1
-k8s.io/client-go/informers/apiserverinternal
-k8s.io/client-go/informers/apiserverinternal/v1alpha1
-k8s.io/client-go/informers/apps
-k8s.io/client-go/informers/apps/v1
-k8s.io/client-go/informers/apps/v1beta1
-k8s.io/client-go/informers/apps/v1beta2
-k8s.io/client-go/informers/autoscaling
-k8s.io/client-go/informers/autoscaling/v1
-k8s.io/client-go/informers/autoscaling/v2
-k8s.io/client-go/informers/autoscaling/v2beta1
-k8s.io/client-go/informers/autoscaling/v2beta2
-k8s.io/client-go/informers/batch
-k8s.io/client-go/informers/batch/v1
-k8s.io/client-go/informers/batch/v1beta1
-k8s.io/client-go/informers/certificates
-k8s.io/client-go/informers/certificates/v1
-k8s.io/client-go/informers/certificates/v1alpha1
-k8s.io/client-go/informers/certificates/v1beta1
-k8s.io/client-go/informers/coordination
-k8s.io/client-go/informers/coordination/v1
-k8s.io/client-go/informers/coordination/v1beta1
-k8s.io/client-go/informers/core
-k8s.io/client-go/informers/core/v1
-k8s.io/client-go/informers/discovery
-k8s.io/client-go/informers/discovery/v1
-k8s.io/client-go/informers/discovery/v1beta1
-k8s.io/client-go/informers/events
-k8s.io/client-go/informers/events/v1
-k8s.io/client-go/informers/events/v1beta1
-k8s.io/client-go/informers/extensions
-k8s.io/client-go/informers/extensions/v1beta1
-k8s.io/client-go/informers/flowcontrol
-k8s.io/client-go/informers/flowcontrol/v1
-k8s.io/client-go/informers/flowcontrol/v1beta1
-k8s.io/client-go/informers/flowcontrol/v1beta2
-k8s.io/client-go/informers/flowcontrol/v1beta3
-k8s.io/client-go/informers/internalinterfaces
-k8s.io/client-go/informers/networking
-k8s.io/client-go/informers/networking/v1
-k8s.io/client-go/informers/networking/v1alpha1
-k8s.io/client-go/informers/networking/v1beta1
-k8s.io/client-go/informers/node
-k8s.io/client-go/informers/node/v1
-k8s.io/client-go/informers/node/v1alpha1
-k8s.io/client-go/informers/node/v1beta1
-k8s.io/client-go/informers/policy
-k8s.io/client-go/informers/policy/v1
-k8s.io/client-go/informers/policy/v1beta1
-k8s.io/client-go/informers/rbac
-k8s.io/client-go/informers/rbac/v1
-k8s.io/client-go/informers/rbac/v1alpha1
-k8s.io/client-go/informers/rbac/v1beta1
-k8s.io/client-go/informers/resource
-k8s.io/client-go/informers/resource/v1alpha2
-k8s.io/client-go/informers/scheduling
-k8s.io/client-go/informers/scheduling/v1
-k8s.io/client-go/informers/scheduling/v1alpha1
-k8s.io/client-go/informers/scheduling/v1beta1
-k8s.io/client-go/informers/storage
-k8s.io/client-go/informers/storage/v1
-k8s.io/client-go/informers/storage/v1alpha1
-k8s.io/client-go/informers/storage/v1beta1
-k8s.io/client-go/informers/storagemigration
-k8s.io/client-go/informers/storagemigration/v1alpha1
 k8s.io/client-go/kubernetes
 k8s.io/client-go/kubernetes/scheme
 k8s.io/client-go/kubernetes/typed/admissionregistration/v1
@@ -1005,53 +844,6 @@ k8s.io/client-go/kubernetes/typed/storage/v1
 k8s.io/client-go/kubernetes/typed/storage/v1alpha1
 k8s.io/client-go/kubernetes/typed/storage/v1beta1
 k8s.io/client-go/kubernetes/typed/storagemigration/v1alpha1
-k8s.io/client-go/listers/admissionregistration/v1
-k8s.io/client-go/listers/admissionregistration/v1alpha1
-k8s.io/client-go/listers/admissionregistration/v1beta1
-k8s.io/client-go/listers/apiserverinternal/v1alpha1
-k8s.io/client-go/listers/apps/v1
-k8s.io/client-go/listers/apps/v1beta1
-k8s.io/client-go/listers/apps/v1beta2
-k8s.io/client-go/listers/autoscaling/v1
-k8s.io/client-go/listers/autoscaling/v2
-k8s.io/client-go/listers/autoscaling/v2beta1
-k8s.io/client-go/listers/autoscaling/v2beta2
-k8s.io/client-go/listers/batch/v1
-k8s.io/client-go/listers/batch/v1beta1
-k8s.io/client-go/listers/certificates/v1
-k8s.io/client-go/listers/certificates/v1alpha1
-k8s.io/client-go/listers/certificates/v1beta1
-k8s.io/client-go/listers/coordination/v1
-k8s.io/client-go/listers/coordination/v1beta1
-k8s.io/client-go/listers/core/v1
-k8s.io/client-go/listers/discovery/v1
-k8s.io/client-go/listers/discovery/v1beta1
-k8s.io/client-go/listers/events/v1
-k8s.io/client-go/listers/events/v1beta1
-k8s.io/client-go/listers/extensions/v1beta1
-k8s.io/client-go/listers/flowcontrol/v1
-k8s.io/client-go/listers/flowcontrol/v1beta1
-k8s.io/client-go/listers/flowcontrol/v1beta2
-k8s.io/client-go/listers/flowcontrol/v1beta3
-k8s.io/client-go/listers/networking/v1
-k8s.io/client-go/listers/networking/v1alpha1
-k8s.io/client-go/listers/networking/v1beta1
-k8s.io/client-go/listers/node/v1
-k8s.io/client-go/listers/node/v1alpha1
-k8s.io/client-go/listers/node/v1beta1
-k8s.io/client-go/listers/policy/v1
-k8s.io/client-go/listers/policy/v1beta1
-k8s.io/client-go/listers/rbac/v1
-k8s.io/client-go/listers/rbac/v1alpha1
-k8s.io/client-go/listers/rbac/v1beta1
-k8s.io/client-go/listers/resource/v1alpha2
-k8s.io/client-go/listers/scheduling/v1
-k8s.io/client-go/listers/scheduling/v1alpha1
-k8s.io/client-go/listers/scheduling/v1beta1
-k8s.io/client-go/listers/storage/v1
-k8s.io/client-go/listers/storage/v1alpha1
-k8s.io/client-go/listers/storage/v1beta1
-k8s.io/client-go/listers/storagemigration/v1alpha1
 k8s.io/client-go/metadata
 k8s.io/client-go/openapi
 k8s.io/client-go/openapi/cached
@@ -1122,13 +914,6 @@ k8s.io/klog/v2/internal/serialize
 k8s.io/klog/v2/internal/severity
 k8s.io/klog/v2/internal/sloghandler
 k8s.io/klog/v2/klogr
-# k8s.io/kube-aggregator v0.30.1
-## explicit; go 1.22.0
-k8s.io/kube-aggregator/pkg/apis/apiregistration
-k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
-k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/scheme
-k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1
 # k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340
 ## explicit; go 1.20
 k8s.io/kube-openapi/pkg/cached
@@ -1244,12 +1029,6 @@ sigs.k8s.io/controller-tools/pkg/webhook
 ## explicit; go 1.18
 sigs.k8s.io/json
 sigs.k8s.io/json/internal/golang/encoding/json
-# sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96
-## explicit; go 1.20
-sigs.k8s.io/kube-storage-version-migrator/pkg/apis/migration/v1alpha1
-sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset
-sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/scheme
-sigs.k8s.io/kube-storage-version-migrator/pkg/clients/clientset/typed/migration/v1alpha1
 # sigs.k8s.io/kustomize/api v0.13.5-0.20230601165947-6ce0bf390ce3
 ## explicit; go 1.19
 sigs.k8s.io/kustomize/api/filters/annotations
