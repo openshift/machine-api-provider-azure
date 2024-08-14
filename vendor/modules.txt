@@ -330,7 +330,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/openshift/api v0.0.0-20240611134040-5c2b46e4709a
+# github.com/openshift/api v0.0.0-20240731195412-e863d9f8a215
 ## explicit; go 1.22.0
 github.com/openshift/api
 github.com/openshift/api/annotations
@@ -430,7 +430,7 @@ github.com/openshift/client-go/machine/clientset/versioned/typed/machine/v1beta1
 github.com/openshift/client-go/machine/informers/externalversions/internalinterfaces
 github.com/openshift/client-go/machine/informers/externalversions/machine/v1beta1
 github.com/openshift/client-go/machine/listers/machine/v1beta1
-# github.com/openshift/library-go v0.0.0-20240607134135-aed018c215a1
+# github.com/openshift/library-go v0.0.0-20240723172506-8bb8fe6cc56d
 ## explicit; go 1.22.0
 github.com/openshift/library-go/pkg/certs
 github.com/openshift/library-go/pkg/config/clusterstatus
@@ -449,7 +449,7 @@ github.com/openshift/library-go/pkg/operator/resource/resourcemerge
 github.com/openshift/library-go/pkg/operator/resource/resourceread
 github.com/openshift/library-go/pkg/operator/resourcesynccontroller
 github.com/openshift/library-go/pkg/operator/v1helpers
-# github.com/openshift/machine-api-operator v0.2.1-0.20240606171151-148e5dc759a6
+# github.com/openshift/machine-api-operator v0.2.1-0.20240813104042-5af274324af8
 ## explicit; go 1.22.0
 github.com/openshift/machine-api-operator/pkg/controller/machine
 github.com/openshift/machine-api-operator/pkg/metrics
@@ -1106,8 +1106,10 @@ k8s.io/client-go/util/workqueue
 # k8s.io/component-base v0.30.2
 ## explicit; go 1.22.0
 k8s.io/component-base/cli/flag
+k8s.io/component-base/featuregate
 k8s.io/component-base/metrics
 k8s.io/component-base/metrics/legacyregistry
+k8s.io/component-base/metrics/prometheus/feature
 k8s.io/component-base/metrics/prometheusextension
 k8s.io/component-base/version
 # k8s.io/klog/v2 v2.120.1
