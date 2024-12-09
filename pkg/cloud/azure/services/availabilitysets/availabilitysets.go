@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
+	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 )
 
 // Spec input specification for Get/CreateOrUpdate/Delete calls
@@ -21,6 +24,42 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if !ok {
 		return errors.New("invalid availability set specification")
 	}
+	// Get the MaximumPlatformFaultDomainCount
+	skuService := resourceskus.NewService(s.Scope)
+	skuSpec := resourceskus.Spec{
+		Name:         string(compute.AvailabilitySetSkuTypesAligned),
+		ResourceType: resourceskus.AvailabilitySets,
+	}
+
+	skuI, err := skuService.Get(ctx, skuSpec)
+	if err != nil {
+		if errors.Is(err, resourceskus.ErrResourceNotFound) {
+			return machinecontroller.InvalidMachineConfiguration("failed to obtain availability set information for Aligned '%s' from Azure: %s", skuSpec.Name, err)
+		} else {
+			return fmt.Errorf("failed to obtain aligned information: %w", err)
+		}
+	}
+
+	sku := skuI.(resourceskus.SKU)
+
+	fmt.Printf("Capabilities: %+v\n", sku.Capabilities)
+
+	faultDomainCountStr, ok := sku.GetCapability(resourceskus.MaximumPlatformFaultDomainCount)
+	if !ok {
+		return fmt.Errorf("failed to get MaximumPlatformFaultDomainCount from capabilities: %+v", sku.Capabilities)
+	}
+	if faultDomainCountStr == "" {
+		return fmt.Errorf("MaximumPlatformFaultDomainCount is empty in SKU capabilities: %+v", sku.Capabilities)
+	}
+
+	faultDomainCount := 2
+	if faultDomainCountStr != "" {
+		parsedCount, err := strconv.ParseInt(faultDomainCountStr, 10, 32)
+		if err != nil {
+			return fmt.Errorf("failed to parse fault domain count: %w", err)
+		}
+		faultDomainCount = int(parsedCount)
+	}
 
 	asParams := compute.AvailabilitySet{
 		Name: to.StringPtr(availabilitysetsSpec.Name),
@@ -29,13 +68,13 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		},
 		Location: to.StringPtr(s.Scope.Location()),
 		AvailabilitySetProperties: &compute.AvailabilitySetProperties{
-			PlatformFaultDomainCount:  to.Int32Ptr(int32(2)),
+			PlatformFaultDomainCount:  to.Int32Ptr(int32(faultDomainCount)),
 			PlatformUpdateDomainCount: to.Int32Ptr(int32(5)),
 		},
 		Tags: s.Scope.Tags,
 	}
 
-	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, availabilitysetsSpec.Name, asParams)
+	_, err = s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, availabilitysetsSpec.Name, asParams)
 	if err != nil {
 		return fmt.Errorf("failed to create availability set %s: %w", availabilitysetsSpec.Name, err)
 	}
