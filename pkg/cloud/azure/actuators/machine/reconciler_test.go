@@ -285,6 +285,26 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			expectedSpecLabels: nil,
 		},
 		{
+			name:  "with a vm with a faultdomain set",
+			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "availabilityset-worker") },
+			vm: decode.VirtualMachine{
+				VirtualMachineProperties: &decode.VirtualMachineProperties{
+					InstanceView: &decode.VirtualMachineInstanceView{
+						PlatformFaultDomain: ptr.To[int32](1),
+					},
+				},
+			},
+			expectedLabels: map[string]string{
+				actuators.MachineRoleLabel:      "availabilityset-worker",
+				machinev1.MachineClusterIDLabel: "clusterID",
+				MachineAZLabelName:              "1",
+			},
+			expectedAnnotations: map[string]string{
+				MachineInstanceStateAnnotationName: "",
+			},
+			expectedSpecLabels: nil,
+		},
+		{
 			name: "with a vm on spot",
 			scope: func(t *testing.T) *actuators.MachineScope {
 				scope := newFakeScope(t, "spot-worker")

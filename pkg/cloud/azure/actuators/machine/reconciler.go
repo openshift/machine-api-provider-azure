@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"strings"
 	"time"
 
@@ -405,6 +406,8 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine)
 	}
 	if vm.Zones != nil {
 		s.scope.Machine.Labels[MachineAZLabelName] = strings.Join(*vm.Zones, ",")
+	} else if getPlatformFaultDomain(vm) != nil {
+		s.scope.Machine.Labels[MachineAZLabelName] = strconv.Itoa(int(*getPlatformFaultDomain(vm)))
 	}
 
 	if s.scope.MachineConfig.SpotVMOptions != nil {
@@ -417,6 +420,13 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine)
 		// Label on the Spec so that it is propogated to the Node
 		s.scope.Machine.Spec.Labels[machinecontroller.MachineInterruptibleInstanceLabelName] = ""
 	}
+}
+
+func getPlatformFaultDomain(vm *decode.VirtualMachine) *int32 {
+	if vm.VirtualMachineProperties == nil || vm.InstanceView == nil {
+		return nil
+	}
+	return vm.InstanceView.PlatformFaultDomain
 }
 
 // Exists checks if machine exists
