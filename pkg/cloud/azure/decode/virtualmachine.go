@@ -24,7 +24,8 @@ type HardwareProfile struct {
 }
 
 type VirtualMachineInstanceView struct {
-	Statuses *[]InstanceViewStatus `json:"statuses,omitempty"`
+	PlatformFaultDomain *int32                `json:"platformFaultDomain,omitempty"`
+	Statuses            *[]InstanceViewStatus `json:"statuses,omitempty"`
 }
 
 type InstanceViewStatus struct {
