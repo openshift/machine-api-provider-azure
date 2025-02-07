@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 )
 
 // Spec input specification for Get/CreateOrUpdate/Delete calls
@@ -21,6 +23,10 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	if !ok {
 		return errors.New("invalid availability set specification")
 	}
+	faultDomainCount, err := s.getMaximumFaultDomainCount(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get fault domain count: %w", err)
+	}
 
 	asParams := compute.AvailabilitySet{
 		Name: to.StringPtr(availabilitysetsSpec.Name),
@@ -29,13 +35,13 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		},
 		Location: to.StringPtr(s.Scope.Location()),
 		AvailabilitySetProperties: &compute.AvailabilitySetProperties{
-			PlatformFaultDomainCount:  to.Int32Ptr(int32(2)),
+			PlatformFaultDomainCount:  to.Int32Ptr(int32(faultDomainCount)),
 			PlatformUpdateDomainCount: to.Int32Ptr(int32(5)),
 		},
 		Tags: s.Scope.Tags,
 	}
 
-	_, err := s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, availabilitysetsSpec.Name, asParams)
+	_, err = s.Client.CreateOrUpdate(ctx, s.Scope.MachineConfig.ResourceGroup, availabilitysetsSpec.Name, asParams)
 	if err != nil {
 		return fmt.Errorf("failed to create availability set %s: %w", availabilitysetsSpec.Name, err)
 	}
@@ -91,4 +97,36 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	}
 
 	return nil
+}
+
+// getMaximumFaultDomainCount retrieves the MaximumPlatformFaultDomainCount from the SKU service.
+func (s *Service) getMaximumFaultDomainCount(ctx context.Context) (int, error) {
+	skuService := resourceskus.NewService(s.Scope)
+	skuSpec := resourceskus.Spec{
+		Name:         string(compute.AvailabilitySetSkuTypesAligned),
+		ResourceType: resourceskus.AvailabilitySets,
+	}
+
+	defaultFaultDomainCount := 2
+	skuI, err := skuService.Get(ctx, skuSpec)
+	if err != nil {
+		if errors.Is(err, resourceskus.ErrResourceNotFound) {
+			return defaultFaultDomainCount, fmt.Errorf("failed to find aligned SKU '%s' in Azure: %w", skuSpec.Name, err)
+		}
+		return defaultFaultDomainCount, fmt.Errorf("failed to retrieve SKU '%s' information: %w", skuSpec.Name, err)
+	}
+
+	sku := skuI.(resourceskus.SKU)
+
+	faultDomainCountStr, ok := sku.GetCapability(resourceskus.MaximumPlatformFaultDomainCount)
+	if !ok || faultDomainCountStr == "" {
+		return defaultFaultDomainCount, fmt.Errorf("MaximumPlatformFaultDomainCount not found or empty in SKU capabilities: %+v", sku.Capabilities)
+	}
+
+	parsedCount, err := strconv.ParseInt(faultDomainCountStr, 10, 32)
+	if err != nil {
+		return defaultFaultDomainCount, fmt.Errorf("failed to parse fault domain count: %w", err)
+	}
+
+	return int(parsedCount), nil
 }
