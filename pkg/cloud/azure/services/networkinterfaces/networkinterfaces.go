@@ -36,6 +36,9 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
+// ProvisioningStateFailed exposes the Azure SDK constant to callers of this service without requiring them to import the SDK.
+const ProvisioningStateFailed = string(network.ProvisioningStateFailed)
+
 // Spec specification for networkinterface
 type Spec struct {
 	Name                          string
@@ -311,10 +314,18 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		return fmt.Errorf("cannot create, future response: %w", err)
 	}
 
-	_, err = f.Result(s.Client)
+	iface, err := f.Result(s.Client)
 	if err != nil {
 		return fmt.Errorf("result error: %w", err)
 	}
+
+	// Azure's API allows an operation to enter a failed state without returning an error, which then causes Machines to provision and fail, despite looking healthy.
+	// Returning an error in this case allows the Machine to enter a failed state and attempt to re-reconcile.
+	// See https://learn.microsoft.com/en-us/azure/networking/troubleshoot-failed-state#provisioning-states.
+	if iface.ProvisioningState == network.ProvisioningStateFailed {
+		return fmt.Errorf("network interface %s failed to provision", nicSpec.Name)
+	}
+
 	klog.V(2).Infof("successfully created network interface %s", nicSpec.Name)
 	return err
 }
