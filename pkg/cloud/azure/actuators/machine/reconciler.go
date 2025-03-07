@@ -128,7 +128,7 @@ func (s *Reconciler) CreateMachine(ctx context.Context) error {
 	}
 
 	nicName := azure.GenerateNetworkInterfaceName(s.scope.Machine.Name)
-	if err := s.createNetworkInterface(ctx, nicName); err != nil {
+	if err := s.createOrUpdateNetworkInterface(ctx); err != nil {
 		return fmt.Errorf("failed to create nic %s for machine %s: %w", nicName, s.scope.Machine.Name, err)
 	}
 
@@ -216,6 +216,14 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			if err != nil {
 				klog.Errorf("Network interfaces get returned invalid network interface, getting %T instead", networkIface)
 				continue
+			}
+
+			// If the NIC has a failed provision operation, attempt to update it. Requeue on failure.
+			if *niface.ProvisioningState == networkinterfaces.ProvisioningStateFailed {
+				klog.V(4).Infof("network interface %q in provisioning failed state, attempting to update", ifaceName)
+				if err := s.createOrUpdateNetworkInterface(ctx); err != nil {
+					return fmt.Errorf("network interface %s failed to provision", ifaceName)
+				}
 			}
 
 			// Internal dns name consists of a hostname and internal dns suffix
@@ -544,10 +552,12 @@ func (s *Reconciler) getZone(ctx context.Context) (string, error) {
 	return s.scope.MachineConfig.Zone, nil
 }
 
-func (s *Reconciler) createNetworkInterface(ctx context.Context, nicName string) error {
+// createOrUpdateNetworkInterface generates a networkinterface spec based on the Machine being reconciled and submits it for creation or updating.
+func (s *Reconciler) createOrUpdateNetworkInterface(ctx context.Context) error {
 	if s.scope.MachineConfig.Vnet == "" {
 		return machinecontroller.InvalidMachineConfiguration("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}
+	nicName := azure.GenerateNetworkInterfaceName(s.scope.Machine.Name)
 	networkInterfaceSpec := &networkinterfaces.Spec{
 		Name:     nicName,
 		VnetName: s.scope.MachineConfig.Vnet,
