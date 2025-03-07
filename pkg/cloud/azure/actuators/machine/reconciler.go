@@ -219,6 +219,9 @@ func (s *Reconciler) Update(ctx context.Context) error {
 				continue
 			}
 
+			if *niface.InterfacePropertiesFormat.ProvisioningState == networkinterfaces.ProvisioningStateFailed {
+				return fmt.Errorf("network interface %s failed to provision", ifaceName)
+			}
 			// Internal dns name consists of a hostname and internal dns suffix
 			if niface.InterfacePropertiesFormat.DNSSettings != nil && niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix != nil && vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
 				networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
