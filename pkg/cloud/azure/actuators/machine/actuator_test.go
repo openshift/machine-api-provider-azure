@@ -26,6 +26,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
@@ -120,16 +121,31 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 	availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).AnyTimes()
 	availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
 	availabilitySetsSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	networkInterfacesSvc := mock_azure.NewMockService(mockCtrl)
+	fakeGetRetVal := struct {
+		InterfacePropertiesFormat network.InterfacePropertiesFormat
+	}{
+		InterfacePropertiesFormat: network.InterfacePropertiesFormat{
+			DNSSettings: &network.InterfaceDNSSettings{
+				InternalDomainNameSuffix: to.StringPtr("dummy.local"),
+			},
+			IPConfigurations: &[]network.InterfaceIPConfiguration{},
+		},
+	}
+	networkInterfacesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(fakeGetRetVal, nil).AnyTimes()
+	networkInterfacesSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	networkInterfacesSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	return &Reconciler{
-		scope:                 newFakeScope(t, actuators.ControlPlane),
-		networkInterfacesSvc:  fakeSuccessSvc,
-		virtualMachinesSvc:    fakeVMSuccessSvc,
-		virtualMachinesExtSvc: fakeSuccessSvc,
-		disksSvc:              fakeSuccessSvc,
-		publicIPSvc:           fakeSuccessSvc,
-		availabilityZonesSvc:  availabilityZonesSvc,
-		availabilitySetsSvc:   availabilitySetsSvc,
+		scope:                     newFakeScope(t, actuators.ControlPlane),
+		networkInterfacesSvc:      networkInterfacesSvc,
+		virtualMachinesSvc:        fakeVMSuccessSvc,
+		virtualMachinesExtSvc:     fakeSuccessSvc,
+		disksSvc:                  fakeSuccessSvc,
+		publicIPSvc:               fakeSuccessSvc,
+		availabilityZonesSvc:      availabilityZonesSvc,
+		availabilitySetsSvc:       availabilitySetsSvc,
+		interfaceLoadBalancersSvc: fakeSuccessSvc,
 	}
 }
 
@@ -170,6 +186,14 @@ func (s *FakeVMService) Get(ctx context.Context, spec azure.Spec) (interface{}, 
 		Name: to.StringPtr(s.Name),
 		VirtualMachineProperties: &compute.VirtualMachineProperties{
 			ProvisioningState: to.StringPtr(s.ProvisioningState),
+			NetworkProfile: &compute.NetworkProfile{
+				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+					{
+						ID:                                  to.StringPtr("machine-test-nic"),
+						NetworkInterfaceReferenceProperties: &compute.NetworkInterfaceReferenceProperties{},
+					},
+				},
+			},
 		},
 	}, nil
 }
