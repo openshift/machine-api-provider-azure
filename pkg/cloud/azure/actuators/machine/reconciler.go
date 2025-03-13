@@ -692,8 +692,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			DiagnosticsProfile:  diagnosticsProfile,
 		}
 
-		if s.scope.MachineConfig.ManagedIdentity != "" {
-			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+		if mi := s.scope.MachineConfig.ManagedIdentity; mi != "" {
+			if !strings.HasPrefix(mi, "/subscriptions/") {
+				vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+			} else {
+				vmSpec.ManagedIdentity = mi
+			}
 		}
 
 		if s.scope.MachineConfig.CapacityReservationGroupID != "" {
