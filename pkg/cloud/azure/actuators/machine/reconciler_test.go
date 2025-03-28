@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
@@ -16,6 +17,7 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/decode"
 	mock_azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/mock"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -677,6 +679,65 @@ func TestValidateCapacityReservationGroupID(t *testing.T) {
 				g.Expect(err).To(MatchError(tc.expectedError))
 			} else {
 				g.Expect(err).ToNot(HaveOccurred())
+			}
+		})
+	}
+}
+
+// TestMachineUpdateWithProvisioningFailedNic tests whether or not the reconciler's `Update` function
+// attempts to recreate a NIC that is in a ProvisioningFailed state.
+// See OCPBUGS-31515
+func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
+	testCases := []struct {
+		name      string
+		expectErr error
+	}{
+		{
+			name: "nic is in provisioning failed state, should call again without error",
+		},
+		{
+			name:      "nic is in provisioning failed state, call again and expect an API error",
+			expectErr: errors.New("failed in CreateOrUpdate call"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			mockCtrl := gomock.NewController(t)
+			networkSvc := mock_azure.NewMockService(mockCtrl)
+
+			scope := func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") }
+			r := newFakeReconcilerWithScope(t, scope(t))
+			r.networkInterfacesSvc = networkSvc
+
+			nicName := azure.GenerateNetworkInterfaceName(r.scope.Machine.Name)
+			expectedVnet := r.scope.MachineConfig.Vnet
+
+			// When the NIC is fetched from Azure, make sure it's in a failed state
+			fakeGetRetVal := struct {
+				InterfacePropertiesFormat network.InterfacePropertiesFormat
+			}{
+				InterfacePropertiesFormat: network.InterfacePropertiesFormat{
+					ProvisioningState: network.ProvisioningStateFailed,
+				},
+			}
+			networkSvc.EXPECT().Get(context.TODO(), &networkinterfaces.Spec{VnetName: expectedVnet, Name: nicName}).Return(fakeGetRetVal, nil).Times(1)
+
+			expectedSpec := &networkinterfaces.Spec{
+				Name:       nicName,
+				SubnetName: r.scope.MachineConfig.Subnet,
+				VnetName:   r.scope.MachineConfig.Vnet,
+			}
+
+			// Because the NIC's in a failed state, we expect to see an attempt to recreate it again.
+			// If it errors, then the whole `Update` function will error, and the Machine will be queue for reconciliation.
+			networkSvc.EXPECT().CreateOrUpdate(context.TODO(), expectedSpec).Return(tc.expectErr).Times(1)
+
+			err := r.Update(context.TODO())
+			if tc.expectErr != nil {
+				g.Expect(err.Error()).To(ContainSubstring("failed to provision"))
+			} else {
+				g.Expect(err).To(BeNil())
 			}
 		})
 	}
