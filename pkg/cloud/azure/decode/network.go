@@ -9,8 +9,9 @@ type NetworkInterface struct {
 }
 
 type InterfacePropertiesFormat struct {
-	DNSSettings      *InterfaceDNSSettings       `json:"dnsSettings,omitempty"`
-	IPConfigurations *[]InterfaceIPConfiguration `json:"ipConfigurations,omitempty"`
+	DNSSettings       *InterfaceDNSSettings       `json:"dnsSettings,omitempty"`
+	IPConfigurations  *[]InterfaceIPConfiguration `json:"ipConfigurations,omitempty"`
+	ProvisioningState *string                     `json:"provisioningState,omitempty"`
 }
 
 type InterfaceDNSSettings struct {
