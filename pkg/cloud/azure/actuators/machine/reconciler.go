@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/go-autorest/autorest"
 	autorestazure "github.com/Azure/go-autorest/autorest/azure"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
@@ -164,9 +164,9 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		return fmt.Errorf("failed to get vm: %+v", err)
 	}
 
-	vm, err := decode.GetVirtualMachine(vmInterface)
+	vm, err := castToVirtualMachine(vmInterface)
 	if err != nil {
-		return errors.New("returned incorrect vm interface")
+		return fmt.Errorf("casting virtual machine in update: %w", err)
 	}
 
 	// TODO: Uncomment after implementing tagging.
@@ -183,25 +183,25 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	// The computer name for a VM instance is the hostname of the VM
 	// TODO(jchaloup): find a way how to propagete the hostname change in case
 	// someone/something changes the hostname inside the VM
-	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+	if vm.Properties != nil && vm.Properties.OSProfile != nil && vm.Properties.OSProfile.ComputerName != nil {
 		networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
 			Type:    apicorev1.NodeHostName,
-			Address: *vm.OsProfile.ComputerName,
+			Address: *vm.Properties.OSProfile.ComputerName,
 		})
 
 		// csr approved requires node internal dns name to be equal to a node name
 		networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
 			Type:    apicorev1.NodeInternalDNS,
-			Address: *vm.OsProfile.ComputerName,
+			Address: *vm.Properties.OSProfile.ComputerName,
 		})
 	}
 
-	if vm.NetworkProfile != nil && vm.NetworkProfile.NetworkInterfaces != nil {
+	if vm.Properties != nil && vm.Properties.NetworkProfile != nil {
 		if s.scope.MachineConfig.Vnet == "" {
 			return fmt.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 		}
 
-		for _, iface := range *vm.NetworkProfile.NetworkInterfaces {
+		for _, iface := range vm.Properties.NetworkProfile.NetworkInterfaces {
 			// Get iface name from the ID
 			ifaceName := path.Base(*iface.ID)
 			networkIface, err := s.networkInterfacesSvc.Get(ctx, &networkinterfaces.Spec{
@@ -228,10 +228,10 @@ func (s *Reconciler) Update(ctx context.Context) error {
 			}
 
 			// Internal dns name consists of a hostname and internal dns suffix
-			if niface.InterfacePropertiesFormat.DNSSettings != nil && niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix != nil && vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+			if niface.InterfacePropertiesFormat.DNSSettings != nil && niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix != nil && vm.Properties.OSProfile != nil && vm.Properties.OSProfile.ComputerName != nil {
 				networkAddresses = append(networkAddresses, apicorev1.NodeAddress{
 					Type:    apicorev1.NodeInternalDNS,
-					Address: fmt.Sprintf("%s.%s", *vm.OsProfile.ComputerName, *niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix),
+					Address: fmt.Sprintf("%s.%s", *vm.Properties.OSProfile.ComputerName, *niface.InterfacePropertiesFormat.DNSSettings.InternalDomainNameSuffix),
 				})
 			}
 
@@ -280,8 +280,8 @@ func (s *Reconciler) Update(ctx context.Context) error {
 		// If the internal load balancer isn't set on a control plane machine,
 		// we should attempt to populate it else if the machine is later replaced,
 		// its replacement will not get attached to the load balancer.
-		if s.scope.Role() == actuators.ControlPlane && s.scope.MachineConfig.InternalLoadBalancer == "" {
-			for _, iface := range *vm.NetworkProfile.NetworkInterfaces {
+		if s.scope.Role() == actuators.ControlPlane && s.scope.MachineConfig.InternalLoadBalancer == "" && vm.Properties != nil && vm.Properties.NetworkProfile != nil {
+			for _, iface := range vm.Properties.NetworkProfile.NetworkInterfaces {
 				// Get iface name from the ID
 				ifaceName := path.Base(*iface.ID)
 
@@ -323,11 +323,11 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	s.scope.Machine.Status.Addresses = networkAddresses
 
 	// Set provider ID
-	if vm.OsProfile != nil && vm.OsProfile.ComputerName != nil {
+	if vm.Properties != nil && vm.Properties.OSProfile != nil && vm.Properties.OSProfile.ComputerName != nil {
 		providerID := azure.GenerateMachineProviderID(
 			s.scope.SubscriptionID,
 			s.scope.MachineConfig.ResourceGroup,
-			*vm.OsProfile.ComputerName)
+			*vm.Properties.OSProfile.ComputerName)
 		s.scope.Machine.Spec.ProviderID = &providerID
 	} else {
 		klog.Warningf("Unable to set providerID, not able to get vm.OsProfile.ComputerName. Setting ProviderID to nil.")
@@ -351,21 +351,21 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	return nil
 }
 
-func getVMState(vm *decode.VirtualMachine) machinev1.AzureVMState {
-	if vm.VirtualMachineProperties == nil || vm.ProvisioningState == nil {
+func getVMState(vm *armcompute.VirtualMachine) machinev1.AzureVMState {
+	if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
 		return ""
 	}
 
-	if *vm.ProvisioningState != "Succeeded" {
-		return machinev1.AzureVMState(*vm.ProvisioningState)
+	if *vm.Properties.ProvisioningState != "Succeeded" {
+		return machinev1.AzureVMState(*vm.Properties.ProvisioningState)
 	}
 
-	if vm.InstanceView == nil || vm.InstanceView.Statuses == nil {
+	if vm.Properties.InstanceView == nil {
 		return ""
 	}
 
 	// https://docs.microsoft.com/en-us/java/api/com.azure.resourcemanager.compute.models.powerstate
-	for _, status := range *vm.InstanceView.Statuses {
+	for _, status := range vm.Properties.InstanceView.Statuses {
 		if status.Code == nil {
 			continue
 		}
@@ -392,7 +392,7 @@ func getVMState(vm *decode.VirtualMachine) machinev1.AzureVMState {
 	return ""
 }
 
-func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine) {
+func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMachine) {
 	if s.scope.Machine.Labels == nil {
 		s.scope.Machine.Labels = make(map[string]string)
 	}
@@ -403,17 +403,18 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine)
 
 	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(getVMState(vm))
 
-	if vm.VirtualMachineProperties != nil {
-		if vm.VirtualMachineProperties.HardwareProfile != nil {
-			s.scope.Machine.Labels[MachineInstanceTypeLabelName] = string(vm.VirtualMachineProperties.HardwareProfile.VMSize)
+	if vm.Properties != nil {
+		if vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
+			s.scope.Machine.Labels[MachineInstanceTypeLabelName] = string(*vm.Properties.HardwareProfile.VMSize)
 		}
 	}
 
 	if vm.Location != nil {
 		s.scope.Machine.Labels[MachineRegionLabelName] = *vm.Location
 	}
-	if vm.Zones != nil {
-		s.scope.Machine.Labels[MachineAZLabelName] = strings.Join(*vm.Zones, ",")
+	zones := nonNilZones(vm.Zones)
+	if len(zones) != 0 {
+		s.scope.Machine.Labels[MachineAZLabelName] = strings.Join(zones, ",")
 	}
 
 	if s.scope.MachineConfig.SpotVMOptions != nil {
@@ -428,37 +429,60 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *decode.VirtualMachine)
 	}
 }
 
+func nonNilZones(zones []*string) []string {
+	r := make([]string, 0, len(zones))
+	for _, zone := range zones {
+		if zone == nil {
+			continue
+		}
+		r = append(r, *zone)
+	}
+	return r
+}
+
+// castToVirtualMachine casts the return of s.virtualMachinesSvc.Get() to VirtualMachine
+func castToVirtualMachine(vmInterface interface{}) (*armcompute.VirtualMachine, error) {
+	vm, ok := vmInterface.(armcompute.VirtualMachinesClientGetResponse)
+	if !ok {
+		return nil, fmt.Errorf("expected armcompute.VirtualMachinesClientGetResponse, got %T", vmInterface)
+	}
+	return &vm.VirtualMachine, nil
+}
+
 // Exists checks if machine exists
 func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 	vmSpec := &virtualmachines.Spec{
 		Name: s.scope.Name(),
 	}
 	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
-
-	if err != nil && azure.ResourceNotFound(err) {
-		return false, nil
-	}
-
 	if err != nil {
+		if azure.ResourceNotFound(err) {
+			return false, nil
+		}
+
 		return false, fmt.Errorf("failed to get vm: %w", err)
 	}
 
-	vm, err := decode.GetVirtualMachine(vmInterface)
+	vm, err := castToVirtualMachine(vmInterface)
 	if err != nil {
-		return false, fmt.Errorf("returned incorrect vm interface: %v", err)
+		return false, fmt.Errorf("casting virtual machine in exists: %w", err)
 	}
 
-	switch machinev1.AzureVMState(*vm.ProvisioningState) {
-	case machinev1.VMStateDeleting:
-		return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
-	case machinev1.VMStateFailed:
-		klog.Infof("vm for machine %s has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
-		return false, &apierrors.UnexpectedObjectError{
-			Object: s.scope.Machine,
+	if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
+		return false, fmt.Errorf("vm for machine %s does not report ProvisioningState", s.scope.Machine.GetName())
+	} else {
+		switch machinev1.AzureVMState(*vm.Properties.ProvisioningState) {
+		case machinev1.VMStateDeleting:
+			return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
+		case machinev1.VMStateFailed:
+			klog.Infof("vm for machine %s has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
+			return false, &apierrors.UnexpectedObjectError{
+				Object: s.scope.Machine,
+			}
 		}
 	}
 
-	klog.Infof("Provisioning state is '%s' for machine %s", *vm.ProvisioningState, s.scope.Machine.GetName())
+	klog.Infof("Provisioning state is '%s' for machine %s", *vm.Properties.ProvisioningState, s.scope.Machine.GetName())
 	return true, nil
 }
 
@@ -730,11 +754,12 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 	} else if err != nil {
 		return fmt.Errorf("failed to get vm: %w", err)
 	} else {
-		vm, err := decode.GetVirtualMachine(vmInterface)
+		vm, err := castToVirtualMachine(vmInterface)
 		if err != nil {
-			return fmt.Errorf("returned incorrect vm interface: %v", err)
+			return fmt.Errorf("casting virtual machine in create: %w", err)
 		}
-		if vm.ProvisioningState == nil {
+
+		if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
 			return fmt.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
 		}
 
@@ -744,15 +769,15 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 
 		s.setMachineCloudProviderSpecifics(vm)
 
-		if *vm.ProvisioningState == "Failed" {
+		if *vm.Properties.ProvisioningState == "Failed" {
 			// If VM failed provisioning, delete it so it can be recreated
 			err = s.Delete(ctx)
 			if err != nil {
 				return fmt.Errorf("failed to delete machine: %w", err)
 			}
 			return fmt.Errorf("vm %s is deleted, retry creating in next reconcile", s.scope.Machine.Name)
-		} else if *vm.ProvisioningState != "Succeeded" {
-			return fmt.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.ProvisioningState)
+		} else if *vm.Properties.ProvisioningState != "Succeeded" {
+			return fmt.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.Properties.ProvisioningState)
 		}
 	}
 
@@ -846,7 +871,7 @@ func (s *Reconciler) getAvailabilitySetName() string {
 }
 
 // createDiagnosticsConfig sets up the diagnostics configuration for the virtual machine.
-func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compute.DiagnosticsProfile, error) {
+func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*armcompute.DiagnosticsProfile, error) {
 	boot := config.Diagnostics.Boot
 	if boot == nil {
 		return nil, nil
@@ -854,8 +879,8 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 
 	switch boot.StorageAccountType {
 	case machinev1.AzureManagedAzureDiagnosticsStorage:
-		return &compute.DiagnosticsProfile{
-			BootDiagnostics: &compute.BootDiagnostics{
+		return &armcompute.DiagnosticsProfile{
+			BootDiagnostics: &armcompute.BootDiagnostics{
 				Enabled: ptr.To[bool](true),
 			},
 		}, nil
@@ -864,8 +889,8 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*compu
 			return nil, machinecontroller.InvalidMachineConfiguration("missing configuration for customer managed storage account URI")
 		}
 
-		return &compute.DiagnosticsProfile{
-			BootDiagnostics: &compute.BootDiagnostics{
+		return &armcompute.DiagnosticsProfile{
+			BootDiagnostics: &armcompute.BootDiagnostics{
 				Enabled:    ptr.To[bool](true),
 				StorageURI: ptr.To[string](boot.CustomerManaged.StorageAccountURI),
 			},
