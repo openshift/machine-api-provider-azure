@@ -36,3 +36,28 @@ type Service interface {
 	CreateOrUpdate(ctx context.Context, spec Spec) error
 	Delete(ctx context.Context, spec Spec) error
 }
+
+func NewServiceClientError(err error) Service {
+	return serviceClientError{err}
+}
+
+// serviceClientError allows us to return a client initialisation error without
+// changing the signature of NewService. All of its methods return the client
+// initialisation error.
+type serviceClientError struct {
+	err error
+}
+
+var _ Service = serviceClientError{}
+
+func (e serviceClientError) Get(_ context.Context, _ Spec) (interface{}, error) {
+	return nil, e.err
+}
+
+func (e serviceClientError) CreateOrUpdate(_ context.Context, _ Spec) error {
+	return e.err
+}
+
+func (e serviceClientError) Delete(_ context.Context, _ Spec) error {
+	return e.err
+}
