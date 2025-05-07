@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Azure/go-autorest/autorest"
+	azureerrors "github.com/Azure/azure-sdk-for-go-extensions/pkg/errors"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machineapierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
@@ -106,15 +106,13 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 			klog.Errorf("Error storing machine info: %v", err)
 		}
 
-		var detailedError autorest.DetailedError
-		if errors.As(err, &detailedError) {
-			statusCode, ok := detailedError.StatusCode.(int)
+		if azErr := azureerrors.IsResponseError(err); azErr != nil {
 			// Any 4xx error that isn't invalid credentials should be a terminal failure.
 			// Invalid Credentials implies that the credentials expired between the scope creation and API calls,
 			// this may happen when CCO is refreshing credentials simultaneously.
 			// In this case we should retry as the credentials should be updated in the secret.
-			if ok && statusCode >= 400 && statusCode < 500 && !azure.InvalidCredentials(err) {
-				return a.handleMachineError(machine, machineapierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, detailedError), createEventAction)
+			if azErr.StatusCode >= 400 && azErr.StatusCode < 500 && !azure.InvalidCredentials(err) {
+				return a.handleMachineError(machine, machineapierrors.InvalidMachineConfiguration("failed to reconcile machine %q: %v", machine.Name, err), createEventAction)
 			}
 		}
 

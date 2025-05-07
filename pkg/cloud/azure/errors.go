@@ -18,7 +18,9 @@ package azure
 
 import (
 	"errors"
+	"net/http"
 
+	azureerrors "github.com/Azure/azure-sdk-for-go-extensions/pkg/errors"
 	"github.com/Azure/go-autorest/autorest"
 )
 
@@ -27,14 +29,16 @@ func ResourceNotFound(err error) bool {
 	if derr, ok := err.(autorest.DetailedError); ok && derr.StatusCode == 404 {
 		return true
 	}
-	return false
+	return azureerrors.IsNotFoundErr(err)
 }
 
 // InvalidCredentials parses the error to check if its an invalid credentials error
 func InvalidCredentials(err error) bool {
 	detailedError := autorest.DetailedError{}
-	if errors.As(err, &detailedError) && detailedError.StatusCode == 401 {
+	if errors.As(err, &detailedError) && detailedError.StatusCode == http.StatusUnauthorized {
 		return true
 	}
-	return false
+
+	azErr := azureerrors.IsResponseError(err)
+	return azErr != nil && azErr.StatusCode == http.StatusUnauthorized
 }
