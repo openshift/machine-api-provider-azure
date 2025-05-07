@@ -38,7 +38,7 @@ func getNetworkInterfacesClientStackHub(resourceManagerEndpoint, subscriptionID 
 }
 
 // NewStackHubService creates a new groups service.
-func NewStackHubService(scope *actuators.MachineScope) azure.Service {
+func NewStackHubService(scope *actuators.MachineScope) ServiceWithGetID {
 	return &StackHubService{
 		Client: getNetworkInterfacesClientStackHub(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
 		Scope:  scope,
