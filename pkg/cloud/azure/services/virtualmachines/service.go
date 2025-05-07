@@ -17,34 +17,44 @@ limitations under the License.
 package virtualmachines
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
-	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
+// stackHubAPIVersionVirtualMachines is the API version which will be used when
+// connecting to a StackHub cloud.
+//
+// Bumping this value changes the minimum version requirements of the target
+// StackHub deployment. Changes to this value should not be backported, and
+// require a release note.
+//
+// For public cloud deployments, the latest API version supported by the SDK
+// will be used.
+const stackHubAPIVersionVirtualMachines = "2019-03-01"
+
 // Service provides operations on resource groups
 type Service struct {
-	Client compute.VirtualMachinesClient
+	Client *armcompute.VirtualMachinesClient
 	Scope  *actuators.MachineScope
-}
-
-// getVirtualNetworksClient creates a new groups client from subscriptionid.
-func getVirtualMachinesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachinesClient {
-	vmClient := compute.NewVirtualMachinesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
-	vmClient.Authorizer = authorizer
-	vmClient.AddToUserAgent(azure.UserAgent)
-	return vmClient
 }
 
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
+	options := scope.ARMClientOptions()
+
 	if scope.IsStackHub() {
-		return NewServiceStackHub(scope)
+		options.APIVersion = stackHubAPIVersionVirtualMachines
+	}
+
+	vmClient, err := armcompute.NewVirtualMachinesClient(scope.SubscriptionID, scope.Token, options)
+	if err != nil {
+		return azure.NewServiceClientError(err)
 	}
 
 	return &Service{
-		Client: getVirtualMachinesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+		Client: vmClient,
 		Scope:  scope,
 	}
 }
