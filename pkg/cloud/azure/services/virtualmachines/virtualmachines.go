@@ -410,9 +410,7 @@ func getSpotVMOptions(spotVMOptions *machinev1.SpotVMOptions) (compute.VirtualMa
 		}
 	}
 
-	// We should use deallocate eviction policy it's - "the only supported eviction policy for Single Instance Spot VMs"
-	// https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/spot-instances.md#eviction-policies
-	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDeallocate, billingProfile, nil
+	return compute.VirtualMachinePriorityTypesSpot, compute.VirtualMachineEvictionPolicyTypesDelete, billingProfile, nil
 }
 
 func generateImagePlan(image machinev1.Image) *compute.Plan {

@@ -842,7 +842,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 				MaxPrice: &maxPrice,
 			},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: &maxPriceFloat,
 			},
@@ -858,7 +858,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 			name:           "not return an error with empty spot vm options",
 			spotVMOptions:  &machinev1.SpotVMOptions{},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: nil,
 			},
@@ -869,7 +869,7 @@ func TestGetSpotVMOptions(t *testing.T) {
 				MaxPrice: nil,
 			},
 			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDeallocate,
+			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
 			billingProfile: &compute.BillingProfile{
 				MaxPrice: nil,
 			},
