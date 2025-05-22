@@ -22,6 +22,9 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	machinev1 "github.com/openshift/api/machine/v1beta1"
+	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
+	"regexp"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/compute/mgmt/compute"
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
@@ -178,6 +181,11 @@ func (s *StackHubService) deriveVirtualMachineParametersStackHub(vmSpec *Spec, n
 		}
 	}
 
+	dataDisks, err := generateStackHubDataDisks(vmSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate data disk spec: %w", err)
+	}
+
 	virtualMachine := &compute.VirtualMachine{
 		Location: to.StringPtr(s.Scope.MachineConfig.Location),
 		Tags:     vmSpec.Tags,
@@ -196,6 +204,7 @@ func (s *StackHubService) deriveVirtualMachineParametersStackHub(vmSpec *Spec, n
 						StorageAccountType: compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType),
 					},
 				},
+				DataDisks: dataDisks,
 			},
 			OsProfile: osProfile,
 			NetworkProfile: &compute.NetworkProfile{
@@ -250,4 +259,81 @@ func (s *StackHubService) Delete(ctx context.Context, spec azure.Spec) error {
 
 	klog.V(2).Infof("successfully deleted vm %s ", vmSpec.Name)
 	return err
+}
+
+func generateStackHubDataDisks(vmSpec *Spec) (*[]compute.DataDisk, error) {
+	if len(vmSpec.DataDisks) == 0 {
+		return nil, nil
+	}
+
+	seenDataDiskLuns := make(map[int32]struct{})
+	seenDataDiskNames := make(map[string]struct{})
+	// defines rules for matching. strings must start and finish with an alphanumeric character
+	// and can only contain letters, numbers, underscores, periods or hyphens.
+	reg := regexp.MustCompile(`^[a-zA-Z0-9](?:[\w\.-]*[a-zA-Z0-9])?$`)
+	dataDisks := make([]compute.DataDisk, len(vmSpec.DataDisks))
+
+	for i, disk := range vmSpec.DataDisks {
+		dataDiskName := azure.GenerateDataDiskName(vmSpec.Name, disk.NameSuffix)
+
+		if len(dataDiskName) > 80 {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"The overall disk name name must not exceed 80 chars in length. Check your `nameSuffix`.",
+				dataDiskName, vmSpec.Name)
+		}
+
+		if matched := reg.MatchString(disk.NameSuffix); !matched {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"The nameSuffix can only contain letters, numbers, "+
+				"underscores, periods or hyphens. Check your `nameSuffix`.",
+				dataDiskName, vmSpec.Name)
+		}
+
+		if disk.DiskSizeGB < 4 {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"`diskSizeGB`: %d, is invalid, disk size must be greater or equal than 4.",
+				dataDiskName, vmSpec.Name, disk.DiskSizeGB)
+		}
+
+		if _, exists := seenDataDiskNames[disk.NameSuffix]; exists {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"A Data Disk with `nameSuffix`: %s, already exists. `nameSuffix` must be unique.",
+				dataDiskName, vmSpec.Name, disk.NameSuffix)
+		}
+
+		if disk.ManagedDisk.StorageAccountType == machinev1.StorageAccountUltraSSDLRS {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"`storageAccountType`: %s, is not supported for Data Disk in Azure Stack Hub.",
+				dataDiskName, vmSpec.Name, machinev1.StorageAccountUltraSSDLRS, machinev1.CachingTypeNone)
+		}
+
+		if disk.Lun < 0 || disk.Lun > 63 {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"Invalid value `lun`: %d. `lun` cannot be lower than 0 or higher than 63.",
+				dataDiskName, vmSpec.Name, disk.Lun)
+		}
+
+		if _, exists := seenDataDiskLuns[disk.Lun]; exists {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"A Data Disk with `lun`: %d, already exists. `lun` must be unique.",
+				dataDiskName, vmSpec.Name, disk.Lun)
+		}
+
+		seenDataDiskNames[disk.NameSuffix] = struct{}{}
+		seenDataDiskLuns[disk.Lun] = struct{}{}
+
+		dataDisks[i] = compute.DataDisk{
+			CreateOption: compute.DiskCreateOptionTypesEmpty,
+			DiskSizeGB:   to.Int32Ptr(disk.DiskSizeGB),
+			Lun:          to.Int32Ptr(disk.Lun),
+			Name:         to.StringPtr(dataDiskName),
+			Caching:      compute.CachingTypes(disk.CachingType),
+		}
+
+		dataDisks[i].ManagedDisk = &compute.ManagedDiskParameters{
+			StorageAccountType: compute.StorageAccountTypes(disk.ManagedDisk.StorageAccountType),
+		}
+	}
+
+	return &dataDisks, nil
 }
