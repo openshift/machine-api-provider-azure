@@ -307,6 +307,12 @@ func generateStackHubDataDisks(vmSpec *Spec) (*[]compute.DataDisk, error) {
 				dataDiskName, vmSpec.Name, machinev1.StorageAccountUltraSSDLRS, machinev1.CachingTypeNone)
 		}
 
+		if disk.ManagedDisk.DiskEncryptionSet != nil {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"Disk Encryption Set is not supported for Data Disk in Azure Stack Hub.",
+				dataDiskName, vmSpec.Name)
+		}
+
 		if disk.Lun < 0 || disk.Lun > 63 {
 			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
 				"Invalid value `lun`: %d. `lun` cannot be lower than 0 or higher than 63.",
