@@ -17,24 +17,16 @@ limitations under the License.
 package virtualmachines
 
 import (
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
-	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
+
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
 // Service provides operations on resource groups
 type Service struct {
-	Client compute.VirtualMachinesClient
+	Client *armcompute.VirtualMachinesClient
 	Scope  *actuators.MachineScope
-}
-
-// getVirtualNetworksClient creates a new groups client from subscriptionid.
-func getVirtualMachinesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) compute.VirtualMachinesClient {
-	vmClient := compute.NewVirtualMachinesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
-	vmClient.Authorizer = authorizer
-	vmClient.AddToUserAgent(azure.UserAgent)
-	return vmClient
 }
 
 // NewService creates a new groups service.
@@ -43,8 +35,13 @@ func NewService(scope *actuators.MachineScope) azure.Service {
 		return NewServiceStackHub(scope)
 	}
 
+	vmClient, err := armcompute.NewVirtualMachinesClient(scope.SubscriptionID, scope.Token, scope.ARMClientOptions())
+	if err != nil {
+		return azure.NewServiceClientError(err)
+	}
+
 	return &Service{
-		Client: getVirtualMachinesClient(scope.ResourceManagerEndpoint, scope.SubscriptionID, scope.Authorizer),
+		Client: vmClient,
 		Scope:  scope,
 	}
 }
