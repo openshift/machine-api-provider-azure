@@ -27,7 +27,6 @@ import (
 	"strconv"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	apierrors "github.com/openshift/machine-api-operator/pkg/controller/machine"
@@ -116,20 +115,15 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	}
 
 	klog.V(2).Infof("getting nic %s", vmSpec.NICName)
-	nicInterface, err := networkinterfaces.NewService(s.Scope).Get(ctx, &networkinterfaces.Spec{Name: vmSpec.NICName})
+	nicID, err := networkinterfaces.NewService(s.Scope).GetID(ctx, vmSpec.NICName)
 	if err != nil {
 		return err
-	}
-
-	nic, ok := nicInterface.(network.Interface)
-	if !ok {
-		return errors.New("error getting network security group")
 	}
 	klog.V(2).Infof("got nic %s", vmSpec.NICName)
 
 	klog.V(2).Infof("creating vm %s ", vmSpec.Name)
 
-	virtualMachine, err := s.deriveVirtualMachineParameters(vmSpec, nic)
+	virtualMachine, err := s.deriveVirtualMachineParameters(vmSpec, nicID)
 	if err != nil {
 		return err
 	}
@@ -164,7 +158,7 @@ func generateOSProfile(vmSpec *Spec) (*armcompute.OSProfile, error) {
 		sshKeyData = string(ssh.MarshalAuthorizedKey(publicRsaKey))
 	}
 
-	randomPassword, err := GenerateRandomString(32)
+	randomPassword, err := generateRandomString(32)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate random string: %w", err)
 	}
@@ -216,7 +210,11 @@ func generateOSProfile(vmSpec *Spec) (*armcompute.OSProfile, error) {
 // Derive virtual machine parameters for CreateOrUpdate API call based
 // on the provided virtual machine specification, resource location,
 // subscription ID, and the network interface.
-func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Interface) (*armcompute.VirtualMachine, error) {
+func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nicID string) (*armcompute.VirtualMachine, error) {
+	if s.Scope.IsStackHub() {
+		return s.deriveVirtualMachineParametersStackHub(vmSpec, nicID)
+	}
+
 	osProfile, err := generateOSProfile(vmSpec)
 	if err != nil {
 		return nil, err
@@ -269,7 +267,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nic network.Inter
 			NetworkProfile: &armcompute.NetworkProfile{
 				NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
 					{
-						ID: nic.ID,
+						ID: &nicID,
 						Properties: &armcompute.NetworkInterfaceReferenceProperties{
 							Primary: to.BoolPtr(true),
 						},
@@ -368,12 +366,12 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	return err
 }
 
-// GenerateRandomString returns a URL-safe, base64 encoded
+// generateRandomString returns a URL-safe, base64 encoded
 // securely generated random string.
 // It will return an error if the system's secure random
 // number generator fails to function correctly, in which
 // case the caller should not continue.
-func GenerateRandomString(n int) (string, error) {
+func generateRandomString(n int) (string, error) {
 	b := make([]byte, n)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.

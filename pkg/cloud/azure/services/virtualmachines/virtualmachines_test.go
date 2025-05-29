@@ -767,7 +767,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				},
 			}
 
-			vm, err := s.deriveVirtualMachineParameters(vmSpec, nic)
+			vm, err := s.deriveVirtualMachineParameters(vmSpec, *nic.ID)
 
 			if tc.expectedError != nil {
 				g.Expect(err).To(MatchError(tc.expectedError))
