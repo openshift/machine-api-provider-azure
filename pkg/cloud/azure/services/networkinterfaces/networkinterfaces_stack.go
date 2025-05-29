@@ -40,13 +40,31 @@ func (s *StackHubService) Get(ctx context.Context, spec azure.Spec) (interface{}
 	if !ok {
 		return network.Interface{}, errors.New("invalid network interface specification")
 	}
-	nic, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, nicSpec.Name, "")
+	return s.get(ctx, nicSpec.Name)
+}
+
+func (s *StackHubService) get(ctx context.Context, name string) (*network.Interface, error) {
+	nic, err := s.Client.Get(ctx, s.Scope.MachineConfig.ResourceGroup, name, "")
 	if err != nil && azure.ResourceNotFound(err) {
-		return nil, fmt.Errorf("network interface %s not found: %w", nicSpec.Name, err)
+		return nil, fmt.Errorf("network interface %s not found: %w", name, err)
 	} else if err != nil {
-		return nic, err
+		return nil, err
 	}
-	return nic, nil
+	return &nic, nil
+}
+
+// GetID returns the ID of the network interface with the given name
+func (s *StackHubService) GetID(ctx context.Context, name string) (string, error) {
+	nic, err := s.get(ctx, name)
+	if err != nil {
+		return "", err
+	}
+
+	if nic.ID == nil {
+		return "", fmt.Errorf("network interface %s does not have an ID", name)
+	}
+
+	return *nic.ID, nil
 }
 
 // CreateOrUpdate creates or updates a network interface.
