@@ -23,6 +23,17 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 )
 
+// stackHubAPIVersionVirtualMachines is the API version which will be used when
+// connecting to a StackHub cloud.
+//
+// Bumping this value changes the minimum version requirements of the target
+// StackHub deployment. Changes to this value should not be backported, and
+// require a release note.
+//
+// For public cloud deployments, the latest API version supported by the SDK
+// will be used.
+const stackHubAPIVersionVirtualMachines = "2019-03-01"
+
 // Service provides operations on resource groups
 type Service struct {
 	Client *armcompute.VirtualMachinesClient
@@ -31,11 +42,13 @@ type Service struct {
 
 // NewService creates a new groups service.
 func NewService(scope *actuators.MachineScope) azure.Service {
+	options := scope.ARMClientOptions()
+
 	if scope.IsStackHub() {
-		return NewServiceStackHub(scope)
+		options.APIVersion = stackHubAPIVersionVirtualMachines
 	}
 
-	vmClient, err := armcompute.NewVirtualMachinesClient(scope.SubscriptionID, scope.Token, scope.ARMClientOptions())
+	vmClient, err := armcompute.NewVirtualMachinesClient(scope.SubscriptionID, scope.Token, options)
 	if err != nil {
 		return azure.NewServiceClientError(err)
 	}
