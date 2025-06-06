@@ -258,9 +258,10 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nicID string) (*a
 				VMSize: ptr.To(armcompute.VirtualMachineSizeTypes(vmSpec.Size)),
 			},
 			StorageProfile: &armcompute.StorageProfile{
-				ImageReference: imageReference,
-				OSDisk:         osDisk,
-				DataDisks:      dataDisks,
+				ImageReference:     imageReference,
+				OSDisk:             osDisk,
+				DataDisks:          dataDisks,
+				DiskControllerType: ptr.To(armcompute.DiskControllerTypesNVMe),
 			},
 			SecurityProfile: securityProfile,
 			OSProfile:       osProfile,
