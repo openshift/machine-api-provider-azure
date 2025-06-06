@@ -44,6 +44,11 @@ func (s *Service) deriveVirtualMachineParametersStackHub(vmSpec *Spec, nicID str
 		}
 	}
 
+	dataDisks, err := generateDataDisks(vmSpec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate data disk spec: %w", err)
+	}
+
 	virtualMachine := &compute.VirtualMachine{
 		Location: ptr.To(s.Scope.MachineConfig.Location),
 		Tags:     vmSpec.Tags,
@@ -62,6 +67,7 @@ func (s *Service) deriveVirtualMachineParametersStackHub(vmSpec *Spec, nicID str
 						StorageAccountType: ptr.To(compute.StorageAccountTypes(vmSpec.OSDisk.ManagedDisk.StorageAccountType)),
 					},
 				},
+				DataDisks: dataDisks,
 			},
 			OSProfile: osProfile,
 			NetworkProfile: &compute.NetworkProfile{
