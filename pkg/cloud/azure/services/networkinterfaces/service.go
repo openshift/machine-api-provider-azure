@@ -17,6 +17,8 @@ limitations under the License.
 package networkinterfaces
 
 import (
+	"context"
+
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
@@ -29,6 +31,24 @@ type Service struct {
 	Scope  *actuators.MachineScope
 }
 
+// ServiceWithGetID implements the azure.Service interface, but additionally
+// provides a type safe method to return the ID of an object.
+//
+// The StackHub implementation of networkinterfaces uses a different API version
+// of 'network' to the non-StackHub version, which with the legacy SDK used here
+// means they return different types. To avoid potential errors from forgetting
+// this difference at the point of use, GetID returns a string and handles type
+// differences internally.
+//
+// This is useful in the virtualmachines service, which references a nic by ID
+// and does not require the full object.
+type ServiceWithGetID interface {
+	azure.Service
+
+	// GetID returns the ID of the object with the given name
+	GetID(ctx context.Context, name string) (string, error)
+}
+
 // getGroupsClient creates a new groups client from subscriptionid.
 func getNetworkInterfacesClient(resourceManagerEndpoint, subscriptionID string, authorizer autorest.Authorizer) network.InterfacesClient {
 	nicClient := network.NewInterfacesClientWithBaseURI(resourceManagerEndpoint, subscriptionID)
@@ -38,7 +58,7 @@ func getNetworkInterfacesClient(resourceManagerEndpoint, subscriptionID string, 
 }
 
 // NewService creates a new groups service.
-func NewService(scope *actuators.MachineScope) azure.Service {
+func NewService(scope *actuators.MachineScope) ServiceWithGetID {
 	if scope.IsStackHub() {
 		return NewStackHubService(scope)
 	}
