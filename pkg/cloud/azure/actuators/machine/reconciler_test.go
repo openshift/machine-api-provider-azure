@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/mock/gomock"
@@ -15,7 +15,6 @@ import (
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
-	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/decode"
 	mock_azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/mock"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -132,10 +131,10 @@ func TestExists(t *testing.T) {
 
 func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 	testStatus := "testState"
-	testSize := string(compute.VirtualMachineSizeTypesBasicA4)
+	testSize := string(armcompute.VirtualMachineSizeTypesBasicA4)
 	testRegion := "testRegion"
 	testZone := "testZone"
-	testZones := []string{testZone}
+	testZones := []*string{&testZone}
 
 	maxPrice := resource.MustParse("1")
 	r := Reconciler{
@@ -154,27 +153,27 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 		},
 	}
 
-	vm := &decode.VirtualMachine{
-		VirtualMachineProperties: &decode.VirtualMachineProperties{
+	vm := &armcompute.VirtualMachine{
+		Properties: &armcompute.VirtualMachineProperties{
 			ProvisioningState: &testStatus,
-			HardwareProfile: &decode.HardwareProfile{
-				VMSize: testSize,
+			HardwareProfile: &armcompute.HardwareProfile{
+				VMSize: ptr.To(armcompute.VirtualMachineSizeTypes(testSize)),
 			},
 		},
 		Location: &testRegion,
-		Zones:    &testZones,
+		Zones:    testZones,
 	}
 
 	r.setMachineCloudProviderSpecifics(vm)
 
 	actualInstanceStateAnnotation := r.scope.Machine.Annotations[MachineInstanceStateAnnotationName]
 	if actualInstanceStateAnnotation != testStatus {
-		t.Errorf("Expected instance state annotation: %v, got: %v", actualInstanceStateAnnotation, vm.VirtualMachineProperties.ProvisioningState)
+		t.Errorf("Expected instance state annotation: %v, got: %v", actualInstanceStateAnnotation, vm.Properties.ProvisioningState)
 	}
 
 	actualMachineTypeLabel := r.scope.Machine.Labels[MachineInstanceTypeLabelName]
-	if actualMachineTypeLabel != string(vm.HardwareProfile.VMSize) {
-		t.Errorf("Expected machine type label: %v, got: %v", actualMachineTypeLabel, string(vm.HardwareProfile.VMSize))
+	if actualMachineTypeLabel != string(*vm.Properties.HardwareProfile.VMSize) {
+		t.Errorf("Expected machine type label: %v, got: %v", actualMachineTypeLabel, string(*vm.Properties.HardwareProfile.VMSize))
 	}
 
 	actualMachineRegionLabel := r.scope.Machine.Labels[machinecontroller.MachineRegionLabelName]
@@ -183,8 +182,9 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 	}
 
 	actualMachineAZLabel := r.scope.Machine.Labels[machinecontroller.MachineAZLabelName]
-	if actualMachineAZLabel != strings.Join(*vm.Zones, ",") {
-		t.Errorf("Expected machine zone label: %v, got: %v", actualMachineAZLabel, strings.Join(*vm.Zones, ","))
+	zones := nonNilZones(vm.Zones)
+	if actualMachineAZLabel != strings.Join(zones, ",") {
+		t.Errorf("Expected machine zone label: %v, got: %v", actualMachineAZLabel, strings.Join(zones, ","))
 	}
 
 	if _, ok := r.scope.Machine.Spec.Labels[machinecontroller.MachineInterruptibleInstanceLabelName]; !ok {
@@ -194,12 +194,12 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 }
 
 func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
-	abcZones := []string{"a", "b", "c"}
+	abcZones := []*string{ptr.To("a"), ptr.To("b"), ptr.To("c")}
 
 	testCases := []struct {
 		name                string
 		scope               func(t *testing.T) *actuators.MachineScope
-		vm                  decode.VirtualMachine
+		vm                  armcompute.VirtualMachine
 		expectedLabels      map[string]string
 		expectedAnnotations map[string]string
 		expectedSpecLabels  map[string]string
@@ -207,7 +207,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a blank vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") },
-			vm:    decode.VirtualMachine{},
+			vm:    armcompute.VirtualMachine{},
 			expectedLabels: map[string]string{
 				actuators.MachineRoleLabel:      "worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
@@ -220,8 +220,8 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a running vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "good-worker") },
-			vm: decode.VirtualMachine{
-				VirtualMachineProperties: &decode.VirtualMachineProperties{
+			vm: armcompute.VirtualMachine{
+				Properties: &armcompute.VirtualMachineProperties{
 					ProvisioningState: ptr.To[string]("Running"),
 				},
 			},
@@ -237,10 +237,10 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a VMSize set vm",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "sized-worker") },
-			vm: decode.VirtualMachine{
-				VirtualMachineProperties: &decode.VirtualMachineProperties{
-					HardwareProfile: &decode.HardwareProfile{
-						VMSize: "big",
+			vm: armcompute.VirtualMachine{
+				Properties: &armcompute.VirtualMachineProperties{
+					HardwareProfile: &armcompute.HardwareProfile{
+						VMSize: ptr.To(armcompute.VirtualMachineSizeTypes("big")),
 					},
 				},
 			},
@@ -257,7 +257,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a vm location",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "located-worker") },
-			vm: decode.VirtualMachine{
+			vm: armcompute.VirtualMachine{
 				Location: ptr.To[string]("nowhere"),
 			},
 			expectedLabels: map[string]string{
@@ -273,8 +273,8 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name:  "with a vm with zones",
 			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "zoned-worker") },
-			vm: decode.VirtualMachine{
-				Zones: &abcZones,
+			vm: armcompute.VirtualMachine{
+				Zones: abcZones,
 			},
 			expectedLabels: map[string]string{
 				actuators.MachineRoleLabel:      "zoned-worker",
@@ -293,7 +293,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 				scope.MachineConfig.SpotVMOptions = &machinev1.SpotVMOptions{}
 				return scope
 			},
-			vm: decode.VirtualMachine{},
+			vm: armcompute.VirtualMachine{},
 			expectedLabels: map[string]string{
 				actuators.MachineRoleLabel:                              "spot-worker",
 				machinev1.MachineClusterIDLabel:                         "clusterID",
@@ -526,7 +526,7 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 	testCases := []struct {
 		name           string
 		config         *machinev1.AzureMachineProviderSpec
-		expectedConfig *compute.DiagnosticsProfile
+		expectedConfig *armcompute.DiagnosticsProfile
 		expectedError  error
 	}{
 		{
@@ -566,8 +566,8 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedConfig: &compute.DiagnosticsProfile{
-				BootDiagnostics: &compute.BootDiagnostics{
+			expectedConfig: &armcompute.DiagnosticsProfile{
+				BootDiagnostics: &armcompute.BootDiagnostics{
 					Enabled: ptr.To[bool](true),
 				},
 			},
@@ -597,8 +597,8 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 					},
 				},
 			},
-			expectedConfig: &compute.DiagnosticsProfile{
-				BootDiagnostics: &compute.BootDiagnostics{
+			expectedConfig: &armcompute.DiagnosticsProfile{
+				BootDiagnostics: &armcompute.BootDiagnostics{
 					Enabled:    ptr.To[bool](true),
 					StorageURI: ptr.To[string]("https://myaccount.blob.windows.net/"),
 				},
@@ -686,6 +686,8 @@ func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
 
+			testCtx := context.TODO()
+
 			scope := func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") }
 			r := newFakeReconcilerWithScope(t, scope(t))
 			r.networkInterfacesSvc = networkSvc
@@ -701,7 +703,7 @@ func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
 					ProvisioningState: network.ProvisioningStateFailed,
 				},
 			}
-			networkSvc.EXPECT().Get(context.TODO(), &networkinterfaces.Spec{VnetName: expectedVnet, Name: nicName}).Return(fakeGetRetVal, nil).Times(1)
+			networkSvc.EXPECT().Get(testCtx, &networkinterfaces.Spec{VnetName: expectedVnet, Name: nicName}).Return(fakeGetRetVal, nil).Times(1)
 
 			expectedSpec := &networkinterfaces.Spec{
 				Name:       nicName,
@@ -711,9 +713,9 @@ func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
 
 			// Because the NIC's in a failed state, we expect to see an attempt to recreate it again.
 			// If it errors, then the whole `Update` function will error, and the Machine will be queue for reconciliation.
-			networkSvc.EXPECT().CreateOrUpdate(context.TODO(), expectedSpec).Return(tc.expectErr).Times(1)
+			networkSvc.EXPECT().CreateOrUpdate(testCtx, expectedSpec).Return(tc.expectErr).Times(1)
 
-			err := r.Update(context.TODO())
+			err := r.Update(testCtx)
 			if tc.expectErr != nil {
 				g.Expect(err.Error()).To(ContainSubstring("failed to provision"))
 			} else {
