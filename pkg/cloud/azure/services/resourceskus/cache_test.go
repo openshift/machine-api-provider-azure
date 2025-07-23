@@ -245,7 +245,7 @@ func TestCacheGetZones(t *testing.T) {
 				t.Error(err)
 			}
 			if diff := cmp.Diff(zones, tc.want, []cmp.Option{cmpopts.EquateEmpty()}...); diff != "" {
-				t.Errorf(diff)
+				t.Errorf("zones differ, want: %s, got diff: %s", tc.want, diff)
 			}
 		})
 	}
@@ -394,7 +394,8 @@ func TestCacheGetZonesWithVMSize(t *testing.T) {
 				t.Error(err)
 			}
 			if diff := cmp.Diff(zones, tc.want, []cmp.Option{cmpopts.EquateEmpty()}...); diff != "" {
-				t.Fatalf(diff)
+				t.Fatalf("zones differ, want: %s, got diff: %s", tc.want, diff)
+
 			}
 		})
 	}
