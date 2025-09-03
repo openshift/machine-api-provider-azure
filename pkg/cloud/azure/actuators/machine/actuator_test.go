@@ -25,9 +25,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
-	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
@@ -181,21 +181,22 @@ type FakeVMService struct {
 // Get returns fake success.
 func (s *FakeVMService) Get(ctx context.Context, spec azure.Spec) (interface{}, error) {
 	s.GetCallCount++
-	return compute.VirtualMachine{
+	vm := armcompute.VirtualMachine{
 		ID:   to.StringPtr(s.ID),
 		Name: to.StringPtr(s.Name),
-		VirtualMachineProperties: &compute.VirtualMachineProperties{
+		Properties: &armcompute.VirtualMachineProperties{
 			ProvisioningState: to.StringPtr(s.ProvisioningState),
-			NetworkProfile: &compute.NetworkProfile{
-				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+			NetworkProfile: &armcompute.NetworkProfile{
+				NetworkInterfaces: []*armcompute.NetworkInterfaceReference{
 					{
-						ID:                                  to.StringPtr("machine-test-nic"),
-						NetworkInterfaceReferenceProperties: &compute.NetworkInterfaceReferenceProperties{},
+						ID:         to.StringPtr("machine-test-nic"),
+						Properties: &armcompute.NetworkInterfaceReferenceProperties{},
 					},
 				},
 			},
 		},
-	}, nil
+	}
+	return armcompute.VirtualMachinesClientGetResponse{VirtualMachine: vm}, nil
 }
 
 // CreateOrUpdate returns fake success.
@@ -393,9 +394,10 @@ func (s *FakeVMCheckZonesService) Get(ctx context.Context, spec azure.Spec) (int
 		return nil, errors.New("vm not found")
 	}
 
-	return &compute.VirtualMachine{
-		VirtualMachineProperties: &compute.VirtualMachineProperties{},
-	}, nil
+	vm := armcompute.VirtualMachine{
+		Properties: &armcompute.VirtualMachineProperties{},
+	}
+	return armcompute.VirtualMachinesClientGetResponse{VirtualMachine: vm}, nil
 }
 
 // CreateOrUpdate returns fake success.
@@ -731,19 +733,20 @@ func TestMachineEvents(t *testing.T) {
 			})
 
 			networkSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
-			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(compute.VirtualMachine{
+			vm := armcompute.VirtualMachine{
 				ID:   ptr.To[string]("vm-id"),
 				Name: ptr.To[string]("vm-name"),
-				VirtualMachineProperties: &compute.VirtualMachineProperties{
+				Properties: &armcompute.VirtualMachineProperties{
 					ProvisioningState: ptr.To[string]("Succeeded"),
-					HardwareProfile: &compute.HardwareProfile{
-						VMSize: compute.VirtualMachineSizeTypesStandardB2ms,
+					HardwareProfile: &armcompute.HardwareProfile{
+						VMSize: ptr.To(armcompute.VirtualMachineSizeTypesStandardB2Ms),
 					},
-					OsProfile: &compute.OSProfile{
+					OSProfile: &armcompute.OSProfile{
 						ComputerName: ptr.To[string]("vm-name"),
 					},
 				},
-			}, nil).AnyTimes()
+			}
+			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(armcompute.VirtualMachinesClientGetResponse{VirtualMachine: vm}, nil).AnyTimes()
 			vmSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			disksSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			networkSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
@@ -788,25 +791,21 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 	cases := []struct {
 		name       string
 		operation  func(actuator *Actuator, machine *machinev1.Machine)
-		event      string
-		statusCode interface{}
+		statusCode int
 		requeable  bool
 	}{
 		{
 			name:       "InvalidConfig",
-			event:      "Warning FailedCreate InvalidConfiguration: failed to reconcile machine \"azure-actuator-testing-machine\": compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=400",
 			statusCode: 400,
 			requeable:  false,
 		},
 		{
 			name:       "CreateMachine",
-			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create VM: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=300",
 			statusCode: 300,
 			requeable:  true,
 		},
 		{
 			name:       "CreateMachine",
-			event:      "Warning FailedCreate CreateError: failed to reconcile machine \"azure-actuator-testing-machine\"s: failed to create vm azure-actuator-testing-machine: failed to create VM: failed to create or get machine: compute.VirtualMachinesClient#CreateOrUpdate: MOCK: StatusCode=401",
 			statusCode: 401,
 			requeable:  true,
 		},
@@ -850,11 +849,13 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			})
 
 			networkSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).Times(1)
-			azureErr := autorest.NewError("compute.VirtualMachinesClient", "CreateOrUpdate", "MOCK")
-			azureErr.StatusCode = tc.statusCode
+			var azureErr error = &azcore.ResponseError{
+				ErrorCode:  fmt.Sprintf("StatusCode=%d", tc.statusCode),
+				StatusCode: tc.statusCode,
+			}
 			wrapErr := fmt.Errorf("failed to create or get machine: %w", azureErr)
 			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
-			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, autorest.NewError("compute.VirtualMachinesClient", "Get", "MOCK")).Times(1)
+			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("mock compute.VirtualMachinesClient Get error")).Times(1)
 			availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).Times(1)
 
 			_, ok := machineActuator.Create(context.TODO(), machine).(*machineapierrors.RequeueAfterError)
@@ -867,11 +868,11 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 
 			select {
 			case event := <-eventsChannel:
-				if event != tc.event {
-					t.Errorf("Expected %q event, got %q", tc.event, event)
+				if !strings.Contains(event, azureErr.Error()) {
+					t.Errorf("Expected event to contain error %q, got %q", azureErr.Error(), event)
 				}
 			default:
-				t.Errorf("Expected %q event, got none", tc.event)
+				t.Errorf("Expected an event containing error %q, got none", azureErr.Error())
 			}
 		})
 	}

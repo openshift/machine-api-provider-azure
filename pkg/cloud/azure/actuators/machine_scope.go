@@ -454,6 +454,9 @@ func updateFromSecret(coreClient controllerclient.Client, scope *MachineScope) e
 	scope.SubscriptionID = subscriptionID
 	scope.ResourceManagerEndpoint = env.ResourceManagerEndpoint
 
+	scope.Token = cred
+	scope.Cloud = cloudConfig
+
 	return nil
 }
 

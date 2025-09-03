@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2021-11-01/compute"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/compute/armcompute/v5"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-02-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 	. "github.com/onsi/gomega"
@@ -20,14 +20,15 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 	testCases := []struct {
 		name          string
 		updateSpec    func(*Spec)
-		validate      func(*WithT, *compute.VirtualMachine)
+		validate      func(*WithT, *armcompute.VirtualMachine)
 		expectedError error
 	}{
 		{
 			name:       "Unspecified security profile",
 			updateSpec: nil,
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).To(BeNil(), "vm.Properties.SecurityProfile")
 			},
 		},
 		{
@@ -35,10 +36,11 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: to.BoolPtr(true)}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.EncryptionAtHost).ToNot(BeNil())
-				g.Expect(*vm.SecurityProfile.EncryptionAtHost).To(BeTrue())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.EncryptionAtHost).ToNot(BeNil(), "vm.Properties.SecurityProfile.EncryptionAtHost")
+				g.Expect(*vm.Properties.SecurityProfile.EncryptionAtHost).To(BeTrue(), "vm.Properties.SecurityProfile.EncryptionAtHost")
 			},
 		},
 		{
@@ -46,10 +48,11 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: to.BoolPtr(false)}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.EncryptionAtHost).ToNot(BeNil())
-				g.Expect(*vm.SecurityProfile.EncryptionAtHost).To(BeFalse())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.EncryptionAtHost).ToNot(BeNil(), "vm.Properties.SecurityProfile.EncryptionAtHost")
+				g.Expect(*vm.Properties.SecurityProfile.EncryptionAtHost).To(BeFalse(), "vm.Properties.SecurityProfile.EncryptionAtHost")
 			},
 		},
 		{
@@ -57,9 +60,10 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.SecurityProfile = &machinev1.SecurityProfile{EncryptionAtHost: nil}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.EncryptionAtHost).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.EncryptionAtHost).To(BeNil(), "vm.Properties.SecurityProfile.EncryptionAtHost")
 			},
 		},
 		{
@@ -76,12 +80,13 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.UefiSettings).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.UefiSettings.SecureBootEnabled).ToNot(BeNil())
-				g.Expect(*vm.SecurityProfile.UefiSettings.SecureBootEnabled).To(BeTrue())
-				g.Expect(vm.SecurityProfile.SecurityType).To(Equal(compute.SecurityTypesTrustedLaunch))
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings).ToNot(BeNil(), "vm.Properties.SecurityProfile.UefiSettings")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings.SecureBootEnabled).ToNot(BeNil(), "vm.Properties.SecurityProfile.UefiSettings.SecureBootEnabled")
+				g.Expect(*vm.Properties.SecurityProfile.UefiSettings.SecureBootEnabled).To(BeTrue(), "vm.Properties.SecurityProfile.UefiSettings.SecureBootEnabled")
+				g.Expect(*vm.Properties.SecurityProfile.SecurityType).To(Equal(armcompute.SecurityTypesTrustedLaunch), "vm.Properties.SecurityProfile.SecurityType")
 			},
 		},
 		{
@@ -98,9 +103,10 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.UefiSettings).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings).To(BeNil(), "vm.Properties.SecurityProfile.UefiSettings")
 			},
 		},
 		{
@@ -117,11 +123,13 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.UefiSettings).ToNot(BeNil())
-				g.Expect(*vm.SecurityProfile.UefiSettings.VTpmEnabled).To(BeTrue())
-				g.Expect(vm.SecurityProfile.SecurityType).To(Equal(compute.SecurityTypesTrustedLaunch))
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings).ToNot(BeNil(), "vm.Properties.SecurityProfile.UefiSettings")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings.VTpmEnabled).ToNot(BeNil(), "vm.Properties.SecurityProfile.UefiSettings.VTpmEnabled")
+				g.Expect(*vm.Properties.SecurityProfile.UefiSettings.VTpmEnabled).To(BeTrue(), "vm.Properties.SecurityProfile.UefiSettings.VTpmEnabled")
+				g.Expect(*vm.Properties.SecurityProfile.SecurityType).To(Equal(armcompute.SecurityTypesTrustedLaunch), "vm.Properties.SecurityProfile.SecurityType")
 			},
 		},
 		{
@@ -138,9 +146,10 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.SecurityProfile).ToNot(BeNil())
-				g.Expect(vm.SecurityProfile.UefiSettings).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties).ToNot(BeNil(), "vm.Properties")
+				g.Expect(vm.Properties.SecurityProfile).ToNot(BeNil(), "vm.Properties.SecurityProfile")
+				g.Expect(vm.Properties.SecurityProfile.UefiSettings).To(BeNil(), "vm.Properties.SecurityProfile.UefiSettings")
 			},
 		},
 		{
@@ -272,7 +281,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			},
 			expectedError: apierrors.InvalidMachineConfiguration("failed to generate security profile for vm testvm. "+
 				"UEFISettings should be set when SecurityType is set to %s.",
-				compute.SecurityTypesTrustedLaunch),
+				armcompute.SecurityTypesTrustedLaunch),
 		},
 		{
 			name: "Error when security profile with UEFISettings is set and security type is not set to TrustedLaunch",
@@ -295,7 +304,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 		{
 			name:       "Non-ThirdParty Marketplace Image",
 			updateSpec: nil,
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
 				g.Expect(vm.Plan).To(BeNil())
 			},
 		},
@@ -304,7 +313,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.Image.Type = machinev1.AzureImageTypeMarketplaceWithPlan
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
 				g.Expect(vm.Plan).ToNot(BeNil())
 
 			},
@@ -324,8 +333,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 			},
 		},
 		{
@@ -343,8 +352,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 			},
 		},
 		{
@@ -352,8 +361,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.UltraSSDCapability = machinev1.AzureUltraSSDCapabilityEnabled
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeTrue(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 			},
 		},
 		{
@@ -361,8 +370,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 			updateSpec: func(vmSpec *Spec) {
 				vmSpec.UltraSSDCapability = machinev1.AzureUltraSSDCapabilityDisabled
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 			},
 		},
 		{
@@ -381,8 +390,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeFalse(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 			},
 		},
 		{
@@ -400,11 +409,11 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				if vm.AdditionalCapabilities != nil {
-					g.Expect(vm.AdditionalCapabilities.UltraSSDEnabled).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				if vm.Properties.AdditionalCapabilities != nil {
+					g.Expect(vm.Properties.AdditionalCapabilities.UltraSSDEnabled).To(BeNil(), "vm.Properties.AdditionalCapabilities.UltraSSDEnabled")
 				} else {
-					g.Expect(vm.AdditionalCapabilities).To(BeNil())
+					g.Expect(vm.Properties.AdditionalCapabilities).To(BeNil(), "vm.Properties.AdditionalCapabilities")
 				}
 			},
 		},
@@ -424,9 +433,9 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.StorageProfile.DataDisks).ToNot(BeNil())
-				g.Expect((*vm.StorageProfile.DataDisks)[0].DeleteOption).To(BeIdenticalTo(compute.DiskDeleteOptionTypesDetach))
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties.StorageProfile.DataDisks).To(HaveLen(1), "vm.Properties.StorageProfile.DataDisks")
+				g.Expect(*(vm.Properties.StorageProfile.DataDisks[0].DeleteOption)).To(BeIdenticalTo(armcompute.DiskDeleteOptionTypesDetach), "vm.Properties.StorageProfile.DataDisks[0].DeleteOption")
 			},
 		},
 		{
@@ -445,9 +454,9 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					},
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.StorageProfile.DataDisks).ToNot(BeNil())
-				g.Expect((*vm.StorageProfile.DataDisks)[0].DeleteOption).To(BeIdenticalTo(compute.DiskDeleteOptionTypesDelete))
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties.StorageProfile.DataDisks).To(HaveLen(1), "vm.Properties.StorageProfile.DataDisks")
+				g.Expect(*(vm.Properties.StorageProfile.DataDisks[0].DeleteOption)).To(BeIdenticalTo(armcompute.DiskDeleteOptionTypesDelete), "vm.Properties.StorageProfile.DataDisks[0].DeleteOption")
 			},
 		},
 		{
@@ -691,7 +700,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					"kubernetes.io_cluster.test": to.StringPtr("owned"),
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
 				g.Expect(vm.Tags).Should(Equal(map[string]*string{"kubernetes.io_cluster.test": to.StringPtr("owned")}))
 			},
 			expectedError: nil,
@@ -705,7 +714,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 					"created-by":                 to.StringPtr("ocp"),
 				}
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
 				g.Expect(vm.Tags).Should(Equal(map[string]*string{
 					"kubernetes.io_cluster.test": to.StringPtr("owned"),
 					"created-by":                 to.StringPtr("ocp"),
@@ -719,8 +728,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				vmSpec.Name = "testvm"
 				vmSpec.CapacityReservationGroupID = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(*vm.VirtualMachineProperties.CapacityReservation.CapacityReservationGroup.ID).Should(Equal("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"))
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(*vm.Properties.CapacityReservation.CapacityReservationGroup.ID).Should(Equal("/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/myResourceGroupName/providers/Microsoft.Compute/capacityReservationGroups/myCapacityReservationGroup"), "vm.Properties.CapacityReservation.CapacityReservationGroup.ID")
 			},
 			expectedError: nil,
 		},
@@ -730,8 +739,8 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				vmSpec.Name = "testvm"
 				vmSpec.CapacityReservationGroupID = ""
 			},
-			validate: func(g *WithT, vm *compute.VirtualMachine) {
-				g.Expect(vm.VirtualMachineProperties.CapacityReservation).To(BeNil())
+			validate: func(g *WithT, vm *armcompute.VirtualMachine) {
+				g.Expect(vm.Properties.CapacityReservation).To(BeNil(), "vm.Properties.CapacityReservation")
 			},
 			expectedError: nil,
 		},
@@ -758,7 +767,7 @@ func TestDeriveVirtualMachineParameters(t *testing.T) {
 				},
 			}
 
-			vm, err := s.deriveVirtualMachineParameters(vmSpec, nic)
+			vm, err := s.deriveVirtualMachineParameters(vmSpec, *nic.ID)
 
 			if tc.expectedError != nil {
 				g.Expect(err).To(MatchError(tc.expectedError))
@@ -809,8 +818,8 @@ func getTestVMSpec(updateSpec func(*Spec)) *Spec {
 		CustomData:      "",
 		ManagedIdentity: "",
 		Tags:            map[string]*string{},
-		Priority:        compute.VirtualMachinePriorityTypesRegular,
-		EvictionPolicy:  compute.VirtualMachineEvictionPolicyTypesDelete,
+		Priority:        armcompute.VirtualMachinePriorityTypesRegular,
+		EvictionPolicy:  armcompute.VirtualMachineEvictionPolicyTypesDelete,
 		BillingProfile:  nil,
 		SecurityProfile: nil,
 	}
@@ -832,18 +841,18 @@ func TestGetSpotVMOptions(t *testing.T) {
 	testCases := []struct {
 		name           string
 		spotVMOptions  *machinev1.SpotVMOptions
-		priority       compute.VirtualMachinePriorityTypes
-		evictionPolicy compute.VirtualMachineEvictionPolicyTypes
-		billingProfile *compute.BillingProfile
+		priority       armcompute.VirtualMachinePriorityTypes
+		evictionPolicy armcompute.VirtualMachineEvictionPolicyTypes
+		billingProfile *armcompute.BillingProfile
 	}{
 		{
 			name: "get spot vm option succefully",
 			spotVMOptions: &machinev1.SpotVMOptions{
 				MaxPrice: &maxPrice,
 			},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
-			billingProfile: &compute.BillingProfile{
+			priority:       armcompute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: armcompute.VirtualMachineEvictionPolicyTypesDelete,
+			billingProfile: &armcompute.BillingProfile{
 				MaxPrice: &maxPriceFloat,
 			},
 		},
@@ -857,9 +866,9 @@ func TestGetSpotVMOptions(t *testing.T) {
 		{
 			name:           "not return an error with empty spot vm options",
 			spotVMOptions:  &machinev1.SpotVMOptions{},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
-			billingProfile: &compute.BillingProfile{
+			priority:       armcompute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: armcompute.VirtualMachineEvictionPolicyTypesDelete,
+			billingProfile: &armcompute.BillingProfile{
 				MaxPrice: nil,
 			},
 		},
@@ -868,9 +877,9 @@ func TestGetSpotVMOptions(t *testing.T) {
 			spotVMOptions: &machinev1.SpotVMOptions{
 				MaxPrice: nil,
 			},
-			priority:       compute.VirtualMachinePriorityTypesSpot,
-			evictionPolicy: compute.VirtualMachineEvictionPolicyTypesDelete,
-			billingProfile: &compute.BillingProfile{
+			priority:       armcompute.VirtualMachinePriorityTypesSpot,
+			evictionPolicy: armcompute.VirtualMachineEvictionPolicyTypesDelete,
+			billingProfile: &armcompute.BillingProfile{
 				MaxPrice: nil,
 			},
 		},
