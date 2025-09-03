@@ -17,7 +17,15 @@ limitations under the License.
 package actuators
 
 import (
+	"net/http"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/go-autorest/autorest"
+
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 )
 
 // AzureClients contains all the Azure clients used by the scopes.
@@ -25,4 +33,31 @@ type AzureClients struct {
 	SubscriptionID          string
 	Authorizer              autorest.Authorizer
 	ResourceManagerEndpoint string
+
+	// For SDK v2
+	Token azcore.TokenCredential
+	Cloud cloud.Configuration
+}
+
+// ARMClientOptions returns default ARM client options for CAPZ SDK v2 requests.
+func (c *AzureClients) ARMClientOptions() *arm.ClientOptions {
+	opts := &arm.ClientOptions{}
+	opts.Cloud = c.Cloud
+	opts.PerCallPolicies = []policy.Policy{
+		userAgentPolicy{},
+	}
+	opts.Retry.MaxRetries = -1 // Less than zero means one try and no retries.
+
+	return opts
+}
+
+// userAgentPolicy extends the "User-Agent" header on requests.
+// It implements the policy.Policy interface.
+type userAgentPolicy struct{}
+
+// Do extends the "User-Agent" header of a request by appending CAPZ's user agent.
+func (p userAgentPolicy) Do(req *policy.Request) (*http.Response, error) {
+	// FIXME: Ought to include a version after our UA string if we have one
+	req.Raw().Header.Set("User-Agent", req.Raw().UserAgent()+" "+azure.UserAgent)
+	return req.Next()
 }
