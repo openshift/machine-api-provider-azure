@@ -44,7 +44,7 @@ func (s *Service) deriveVirtualMachineParametersStackHub(vmSpec *Spec, nicID str
 		}
 	}
 
-	dataDisks, err := generateDataDisks(vmSpec, true)
+	dataDisks, err := generateDataDisks(vmSpec, s.Scope.IsStackHub())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate data disk spec: %w", err)
 	}
