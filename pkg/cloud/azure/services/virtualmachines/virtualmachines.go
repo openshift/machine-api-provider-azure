@@ -244,7 +244,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nicID string) (*a
 		return nil, fmt.Errorf("failed to get Spot VM options %w", err)
 	}
 
-	dataDisks, err := generateDataDisks(vmSpec, false)
+	dataDisks, err := generateDataDisks(vmSpec, s.Scope.IsStackHub())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate data disk spec: %w", err)
 	}
@@ -605,20 +605,11 @@ func generateDataDisks(vmSpec *Spec, isStackHub bool) ([]*armcompute.DataDisk, e
 				dataDiskName, vmSpec.Name, disk.DeletionPolicy, machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)
 		}
 
-		if isStackHub {
-			// DeletionPolicy must be set to `Detach` on Azure Stack Hub. This is the implicit behavior and only valid option.
-			if disk.DeletionPolicy != machinev1.DiskDeletionPolicyTypeDetach {
-				return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
-					"`deletionPolicy` unsupported value %s. Supported value is `Detach` on Azure Stack Hub.",
-					dataDiskName, vmSpec.Name, disk.DeletionPolicy)
-			}
-
-			// DiskEncryptionSet is not supported on Azure Stack Hub
-			if disk.ManagedDisk.DiskEncryptionSet != nil {
-				return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
-					"`diskEncryptionSet` is not supported by Azure Stack Hub.",
-					dataDiskName, vmSpec.Name)
-			}
+		// DiskEncryptionSet is not supported on Azure Stack Hub
+		if disk.ManagedDisk.DiskEncryptionSet != nil && isStackHub {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"`diskEncryptionSet` is not supported on Azure Stack Hub.",
+				dataDiskName, vmSpec.Name)
 		}
 
 		seenDataDiskNames[disk.NameSuffix] = struct{}{}
@@ -632,7 +623,7 @@ func generateDataDisks(vmSpec *Spec, isStackHub bool) ([]*armcompute.DataDisk, e
 			Caching:      ptr.To(armcompute.CachingTypes(disk.CachingType)),
 		}
 
-		// DeleteOption not supported on Azure Stack Hub, the implicit behavior is to detach the disk (disk remains after VM deletion)
+		// DeleteOption not supported on Azure Stack Hub API, disks are manually deleted in reconciler based on deletionPolicy
 		if !isStackHub {
 			dataDisks[i].DeleteOption = ptr.To(armcompute.DiskDeleteOptionTypes(disk.DeletionPolicy))
 		}
