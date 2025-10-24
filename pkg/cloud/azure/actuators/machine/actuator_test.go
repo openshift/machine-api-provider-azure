@@ -89,13 +89,13 @@ func newMachine(t *testing.T, machineConfig machinev1.AzureMachineProviderSpec, 
 	}
 }
 
-func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
+func newFakeMachineScope(t *testing.T, label string, cloudEnv string) *actuators.MachineScope {
 	labels := make(map[string]string)
 	labels[actuators.MachineRoleLabel] = label
 	labels[machinev1.MachineClusterIDLabel] = "clusterID"
 	machineConfig := machinev1.AzureMachineProviderSpec{}
 	m := newMachine(t, machineConfig, labels)
-	return &actuators.MachineScope{
+	return actuators.NewFakeMachineScope(actuators.FakeMachineScopeParams{
 		Context: context.Background(),
 		Machine: m,
 		MachineConfig: &machinev1.AzureMachineProviderSpec{
@@ -106,7 +106,8 @@ func newFakeScope(t *testing.T, label string) *actuators.MachineScope {
 			ManagedIdentity: "dummyIdentity",
 		},
 		MachineStatus: &machinev1.AzureMachineProviderStatus{},
-	}
+		CloudEnv:      cloudEnv,
+	})
 }
 
 func newFakeReconciler(t *testing.T) *Reconciler {
@@ -137,7 +138,7 @@ func newFakeReconciler(t *testing.T) *Reconciler {
 	networkInterfacesSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 
 	return &Reconciler{
-		scope:                     newFakeScope(t, actuators.ControlPlane),
+		scope:                     newFakeMachineScope(t, actuators.ControlPlane, string(configv1.AzurePublicCloud)),
 		networkInterfacesSvc:      networkInterfacesSvc,
 		virtualMachinesSvc:        fakeVMSuccessSvc,
 		virtualMachinesExtSvc:     fakeSuccessSvc,
@@ -447,7 +448,7 @@ func (s *FakeAvailabilityZonesService) Delete(ctx context.Context, spec azure.Sp
 }
 
 func TestAvailabilityZones(t *testing.T) {
-	fakeScope := newFakeScope(t, actuators.ControlPlane)
+	fakeScope := newFakeMachineScope(t, actuators.ControlPlane, string(configv1.AzurePublicCloud))
 	fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 
 	fakeReconciler.scope.MachineConfig.Zone = "2"
@@ -491,7 +492,7 @@ func TestGetZone(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		fakeScope := newFakeScope(t, actuators.ControlPlane)
+		fakeScope := newFakeMachineScope(t, actuators.ControlPlane, string(configv1.AzurePublicCloud))
 		fakeReconciler := newFakeReconcilerWithScope(t, fakeScope)
 		fakeReconciler.scope.MachineConfig.Zone = tc.inputZone
 
@@ -512,7 +513,7 @@ func TestGetZone(t *testing.T) {
 }
 
 func TestCustomUserData(t *testing.T) {
-	fakeScope := newFakeScope(t, actuators.Node)
+	fakeScope := newFakeMachineScope(t, actuators.Node, string(configv1.AzurePublicCloud))
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",
@@ -541,7 +542,7 @@ func TestCustomUserData(t *testing.T) {
 }
 
 func TestCustomDataFailures(t *testing.T) {
-	fakeScope := newFakeScope(t, actuators.Node)
+	fakeScope := newFakeMachineScope(t, actuators.Node, string(configv1.AzurePublicCloud))
 	userDataSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testCustomUserData",

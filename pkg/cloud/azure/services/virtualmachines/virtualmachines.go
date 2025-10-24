@@ -244,7 +244,7 @@ func (s *Service) deriveVirtualMachineParameters(vmSpec *Spec, nicID string) (*a
 		return nil, fmt.Errorf("failed to get Spot VM options %w", err)
 	}
 
-	dataDisks, err := generateDataDisks(vmSpec)
+	dataDisks, err := generateDataDisks(vmSpec, s.Scope.IsStackHub())
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate data disk spec: %w", err)
 	}
@@ -540,7 +540,7 @@ func generateSecurityProfile(vmSpec *Spec, osDisk *armcompute.OSDisk) (*armcompu
 	return securityProfile, nil
 }
 
-func generateDataDisks(vmSpec *Spec) ([]*armcompute.DataDisk, error) {
+func generateDataDisks(vmSpec *Spec, isStackHub bool) ([]*armcompute.DataDisk, error) {
 	seenDataDiskLuns := make(map[int32]struct{})
 	seenDataDiskNames := make(map[string]struct{})
 	// defines rules for matching. strings must start and finish with an alphanumeric character
@@ -605,6 +605,13 @@ func generateDataDisks(vmSpec *Spec) ([]*armcompute.DataDisk, error) {
 				dataDiskName, vmSpec.Name, disk.DeletionPolicy, machinev1.DiskDeletionPolicyTypeDelete, machinev1.DiskDeletionPolicyTypeDetach)
 		}
 
+		// DiskEncryptionSet is not supported on Azure Stack Hub
+		if disk.ManagedDisk.DiskEncryptionSet != nil && isStackHub {
+			return nil, apierrors.InvalidMachineConfiguration("failed to create Data Disk: %s for vm %s. "+
+				"`diskEncryptionSet` is not supported on Azure Stack Hub.",
+				dataDiskName, vmSpec.Name)
+		}
+
 		seenDataDiskNames[disk.NameSuffix] = struct{}{}
 		seenDataDiskLuns[disk.Lun] = struct{}{}
 
@@ -614,7 +621,11 @@ func generateDataDisks(vmSpec *Spec) ([]*armcompute.DataDisk, error) {
 			Lun:          to.Int32Ptr(disk.Lun),
 			Name:         to.StringPtr(dataDiskName),
 			Caching:      ptr.To(armcompute.CachingTypes(disk.CachingType)),
-			DeleteOption: ptr.To(armcompute.DiskDeleteOptionTypes(disk.DeletionPolicy)),
+		}
+
+		// DeleteOption not supported on Azure Stack Hub API, disks are manually deleted in reconciler based on deletionPolicy
+		if !isStackHub {
+			dataDisks[i].DeleteOption = ptr.To(armcompute.DiskDeleteOptionTypes(disk.DeletionPolicy))
 		}
 
 		dataDisks[i].ManagedDisk = &armcompute.ManagedDiskParameters{
