@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.23-openshift-4.19 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.21 AS builder
 WORKDIR /go/src/github.com/openshift/machine-api-provider-azure
 COPY . .
 # VERSION env gets set in the openshift/release image and refers to the golang version, which interferes with our own
