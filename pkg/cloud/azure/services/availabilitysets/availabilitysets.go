@@ -18,6 +18,8 @@ type Spec struct {
 	Name string
 }
 
+const defaultPlatformUpdateDomainCount = 5
+
 // CreateOrUpdate creates or updates the availability set with the given name.
 func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 	availabilitysetsSpec, ok := spec.(*Spec)
@@ -37,6 +39,11 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			return fmt.Errorf("failed to get fault domain count: %w", err)
 		}
 
+		updateDomainCount := defaultPlatformUpdateDomainCount
+		if faultDomainCount == 1 {
+			updateDomainCount = 1
+		}
+
 		availabilitySet = compute.AvailabilitySet{
 			Name: to.StringPtr(availabilitysetsSpec.Name),
 			Sku: &compute.Sku{
@@ -45,7 +52,7 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 			Location: to.StringPtr(s.Scope.Location()),
 			AvailabilitySetProperties: &compute.AvailabilitySetProperties{
 				PlatformFaultDomainCount:  to.Int32Ptr(int32(faultDomainCount)),
-				PlatformUpdateDomainCount: to.Int32Ptr(int32(5)),
+				PlatformUpdateDomainCount: to.Int32Ptr(int32(updateDomainCount)),
 			},
 			Tags: s.Scope.Tags,
 		}
