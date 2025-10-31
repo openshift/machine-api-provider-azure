@@ -518,6 +518,29 @@ func (s *Reconciler) Delete(ctx context.Context) error {
 		return fmt.Errorf("failed to delete OS disk: %w", err)
 	}
 
+	// On Azure Stack Hub, DeleteOption is not supported on the VM API.
+	// We need to manually delete data disks that have deletionPolicy set to Delete.
+	if s.scope.IsStackHub() && len(s.scope.MachineConfig.DataDisks) > 0 {
+		for _, disk := range s.scope.MachineConfig.DataDisks {
+			if disk.DeletionPolicy == machinev1.DiskDeletionPolicyTypeDelete {
+				dataDiskName := azure.GenerateDataDiskName(s.scope.Machine.Name, disk.NameSuffix)
+
+				dataDiskSpec := &disks.Spec{
+					Name: dataDiskName,
+				}
+				if err := s.disksSvc.Delete(ctx, dataDiskSpec); err != nil {
+					metrics.RegisterFailedInstanceDelete(&metrics.MachineLabels{
+						Name:      s.scope.Machine.Name,
+						Namespace: s.scope.Machine.Namespace,
+						Reason:    "failed to delete data disk",
+					})
+
+					return fmt.Errorf("failed to delete data disk %s: %w", dataDiskName, err)
+				}
+			}
+		}
+	}
+
 	if s.scope.MachineConfig.Vnet == "" {
 		return fmt.Errorf("MachineConfig vnet is missing on machine %s", s.scope.Machine.Name)
 	}

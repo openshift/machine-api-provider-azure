@@ -11,11 +11,13 @@ import (
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/gomega"
+	configv1 "github.com/openshift/api/config/v1"
 	machinev1 "github.com/openshift/api/machine/v1beta1"
 	machinecontroller "github.com/openshift/machine-api-operator/pkg/controller/machine"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	mock_azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/mock"
+	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/disks"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/networkinterfaces"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -205,9 +207,11 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		expectedSpecLabels  map[string]string
 	}{
 		{
-			name:  "with a blank vm",
-			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") },
-			vm:    armcompute.VirtualMachine{},
+			name: "with a blank vm",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "worker", string(configv1.AzurePublicCloud))
+			},
+			vm: armcompute.VirtualMachine{},
 			expectedLabels: map[string]string{
 				actuators.MachineRoleLabel:      "worker",
 				machinev1.MachineClusterIDLabel: "clusterID",
@@ -218,8 +222,10 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			expectedSpecLabels: nil,
 		},
 		{
-			name:  "with a running vm",
-			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "good-worker") },
+			name: "with a running vm",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "good-worker", string(configv1.AzurePublicCloud))
+			},
 			vm: armcompute.VirtualMachine{
 				Properties: &armcompute.VirtualMachineProperties{
 					ProvisioningState: ptr.To[string]("Running"),
@@ -235,8 +241,10 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			expectedSpecLabels: nil,
 		},
 		{
-			name:  "with a VMSize set vm",
-			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "sized-worker") },
+			name: "with a VMSize set vm",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "sized-worker", string(configv1.AzurePublicCloud))
+			},
 			vm: armcompute.VirtualMachine{
 				Properties: &armcompute.VirtualMachineProperties{
 					HardwareProfile: &armcompute.HardwareProfile{
@@ -255,8 +263,10 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			expectedSpecLabels: nil,
 		},
 		{
-			name:  "with a vm location",
-			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "located-worker") },
+			name: "with a vm location",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "located-worker", string(configv1.AzurePublicCloud))
+			},
 			vm: armcompute.VirtualMachine{
 				Location: ptr.To[string]("nowhere"),
 			},
@@ -271,8 +281,10 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			expectedSpecLabels: nil,
 		},
 		{
-			name:  "with a vm with zones",
-			scope: func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "zoned-worker") },
+			name: "with a vm with zones",
+			scope: func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "zoned-worker", string(configv1.AzurePublicCloud))
+			},
 			vm: armcompute.VirtualMachine{
 				Zones: abcZones,
 			},
@@ -289,7 +301,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 		{
 			name: "with a vm on spot",
 			scope: func(t *testing.T) *actuators.MachineScope {
-				scope := newFakeScope(t, "spot-worker")
+				scope := newFakeMachineScope(t, "spot-worker", string(configv1.AzurePublicCloud))
 				scope.MachineConfig.SpotVMOptions = &machinev1.SpotVMOptions{}
 				return scope
 			},
@@ -688,7 +700,9 @@ func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
 
 			testCtx := context.TODO()
 
-			scope := func(t *testing.T) *actuators.MachineScope { return newFakeScope(t, "worker") }
+			scope := func(t *testing.T) *actuators.MachineScope {
+				return newFakeMachineScope(t, "worker", string(configv1.AzurePublicCloud))
+			}
 			r := newFakeReconcilerWithScope(t, scope(t))
 			r.networkInterfacesSvc = networkSvc
 
@@ -721,6 +735,164 @@ func TestMachineUpdateWithProvisionsngFailedNic(t *testing.T) {
 			} else {
 				g.Expect(err).To(BeNil())
 			}
+		})
+	}
+}
+
+// TestStackHubDataDiskDeletion tests that data disks with DeletionPolicy=Delete are manually deleted on Azure Stack Hub
+func TestStackHubDataDiskDeletion(t *testing.T) {
+	testCases := []struct {
+		name       string
+		isStackHub bool
+		dataDisks  []machinev1.DataDisk
+	}{
+		{
+			name:       "Stack Hub with single data disk with Delete policy",
+			isStackHub: true,
+			dataDisks: []machinev1.DataDisk{
+				{
+					NameSuffix:     "disk1",
+					DiskSizeGB:     128,
+					Lun:            0,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+			},
+		},
+		{
+			name:       "Stack Hub with multiple data disks with Delete policy",
+			isStackHub: true,
+			dataDisks: []machinev1.DataDisk{
+				{
+					NameSuffix:     "disk1",
+					DiskSizeGB:     128,
+					Lun:            0,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+				{
+					NameSuffix:     "disk2",
+					DiskSizeGB:     256,
+					Lun:            1,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+			},
+		},
+		{
+			name:       "Stack Hub with data disk with Detach policy",
+			isStackHub: true,
+			dataDisks: []machinev1.DataDisk{
+				{
+					NameSuffix:     "disk1",
+					DiskSizeGB:     128,
+					Lun:            0,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDetach,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+			},
+		},
+		{
+			name:       "Stack Hub with mixed deletion policies",
+			isStackHub: true,
+			dataDisks: []machinev1.DataDisk{
+				{
+					NameSuffix:     "disk1",
+					DiskSizeGB:     128,
+					Lun:            0,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+				{
+					NameSuffix:     "disk2",
+					DiskSizeGB:     256,
+					Lun:            1,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDetach,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+			},
+		},
+		{
+			name:       "Non-Stack Hub with data disks",
+			isStackHub: false,
+			dataDisks: []machinev1.DataDisk{
+				{
+					NameSuffix:     "disk1",
+					DiskSizeGB:     128,
+					Lun:            0,
+					DeletionPolicy: machinev1.DiskDeletionPolicyTypeDelete,
+					ManagedDisk:    machinev1.DataDiskManagedDiskParameters{StorageAccountType: machinev1.StorageAccountPremiumLRS},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			g := NewWithT(t)
+			mockCtrl := gomock.NewController(t)
+
+			vmSvc := mock_azure.NewMockService(mockCtrl)
+			disksSvc := mock_azure.NewMockService(mockCtrl)
+			networkSvc := mock_azure.NewMockService(mockCtrl)
+			availabilitySetsSvc := mock_azure.NewMockService(mockCtrl)
+
+			testCtx := context.TODO()
+
+			platformType := string(configv1.AzureStackCloud)
+			if !tc.isStackHub {
+				platformType = string(configv1.AzurePublicCloud)
+			}
+			scope := newFakeMachineScope(t, "worker", platformType)
+			scope.MachineConfig.DataDisks = tc.dataDisks
+
+			r := &Reconciler{
+				scope:                scope,
+				virtualMachinesSvc:   vmSvc,
+				disksSvc:             disksSvc,
+				networkInterfacesSvc: networkSvc,
+				availabilitySetsSvc:  availabilitySetsSvc,
+			}
+
+			// Expect VM deletion
+			vmSvc.EXPECT().Delete(testCtx, gomock.Any()).Return(nil).Times(1)
+
+			// Expect OS disk deletion - always happens
+			expectedOSDiskName := azure.GenerateOSDiskName(scope.Machine.Name)
+			disksSvc.EXPECT().Delete(testCtx, gomock.Any()).DoAndReturn(
+				func(ctx context.Context, spec azure.Spec) error {
+					diskSpec, ok := spec.(*disks.Spec)
+					g.Expect(ok).To(BeTrue(), "spec should be a disk spec")
+					g.Expect(diskSpec.Name).To(Equal(expectedOSDiskName), "OS disk name should match")
+					return nil
+				},
+			).Times(1)
+
+			// Expect data disk deletions only for disks with Delete policy on Stack Hub
+			if tc.isStackHub {
+				for _, disk := range tc.dataDisks {
+					if disk.DeletionPolicy == machinev1.DiskDeletionPolicyTypeDelete {
+						expectedDataDiskName := azure.GenerateDataDiskName(scope.Machine.Name, disk.NameSuffix)
+						disksSvc.EXPECT().Delete(testCtx, gomock.Any()).DoAndReturn(
+							func(ctx context.Context, spec azure.Spec) error {
+								diskSpec, ok := spec.(*disks.Spec)
+								g.Expect(ok).To(BeTrue(), "spec should be a disk spec")
+								g.Expect(diskSpec.Name).To(Equal(expectedDataDiskName), "data disk name should match")
+								return nil
+							},
+						).Times(1)
+					}
+				}
+			}
+
+			// Expect network interface deletion
+			networkSvc.EXPECT().Delete(testCtx, gomock.Any()).Return(nil).Times(1)
+
+			// Expect availability set deletion
+			availabilitySetsSvc.EXPECT().Delete(testCtx, gomock.Any()).Return(nil).Times(1)
+
+			err := r.Delete(testCtx)
+			g.Expect(err).To(BeNil())
 		})
 	}
 }
