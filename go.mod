@@ -12,7 +12,6 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.4.3
-	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.7.0
 	github.com/hashicorp/golang-lru v1.0.2
 	github.com/jongio/azidext/go/azidext v0.5.0
@@ -24,7 +23,7 @@ require (
 	github.com/openshift/machine-api-operator v0.2.1-0.20251110092458-e0af0f3f44b8
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.10.1
-	go.uber.org/mock v0.4.0
+	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.43.0
 	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
