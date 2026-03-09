@@ -725,7 +725,7 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 			return fmt.Errorf("failed to get zone: %w", err)
 		}
 
-		diagnosticsProfile, err := createDiagnosticsConfig(s.scope.MachineConfig)
+		diagnosticsProfile, err := createDiagnosticsConfig(s.scope, s.scope.MachineConfig)
 		if err != nil {
 			return fmt.Errorf("failed to configure diagnostics profile: %w", err)
 		}
@@ -909,7 +909,7 @@ func (s *Reconciler) getAvailabilitySetName() string {
 }
 
 // createDiagnosticsConfig sets up the diagnostics configuration for the virtual machine.
-func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*armcompute.DiagnosticsProfile, error) {
+func createDiagnosticsConfig(scope *actuators.MachineScope, config *machinev1.AzureMachineProviderSpec) (*armcompute.DiagnosticsProfile, error) {
 	boot := config.Diagnostics.Boot
 	if boot == nil {
 		return nil, nil
@@ -917,6 +917,12 @@ func createDiagnosticsConfig(config *machinev1.AzureMachineProviderSpec) (*armco
 
 	switch boot.StorageAccountType {
 	case machinev1.AzureManagedAzureDiagnosticsStorage:
+		// Validate that AzureManaged boot diagnostics is not used on Azure Stack Hub
+		if scope.IsStackHub() {
+			return nil, machinecontroller.InvalidMachineConfiguration(
+				"AzureManaged boot diagnostics is not supported on Azure Stack Hub",
+			)
+		}
 		return &armcompute.DiagnosticsProfile{
 			BootDiagnostics: &armcompute.BootDiagnostics{
 				Enabled: ptr.To[bool](true),

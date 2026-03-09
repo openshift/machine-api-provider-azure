@@ -559,18 +559,25 @@ func TestCreateAvailabilitySet(t *testing.T) {
 func TestCreateDiagnosticsConfig(t *testing.T) {
 	testCases := []struct {
 		name           string
+		scope          *actuators.MachineScope
 		config         *machinev1.AzureMachineProviderSpec
 		expectedConfig *armcompute.DiagnosticsProfile
 		expectedError  error
 	}{
 		{
-			name:           "with no boot configuration",
+			name: "with no boot configuration",
+			scope: &actuators.MachineScope{
+				Machine: &machinev1.Machine{},
+			},
 			config:         &machinev1.AzureMachineProviderSpec{},
 			expectedConfig: nil,
 			expectedError:  nil,
 		},
 		{
 			name: "with no storage account type",
+			scope: &actuators.MachineScope{
+				Machine: &machinev1.Machine{},
+			},
 			config: &machinev1.AzureMachineProviderSpec{
 				Diagnostics: machinev1.AzureDiagnostics{
 					Boot: &machinev1.AzureBootDiagnostics{},
@@ -581,6 +588,9 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 		},
 		{
 			name: "with an invalid storage account type",
+			scope: &actuators.MachineScope{
+				Machine: &machinev1.Machine{},
+			},
 			config: &machinev1.AzureMachineProviderSpec{
 				Diagnostics: machinev1.AzureDiagnostics{
 					Boot: &machinev1.AzureBootDiagnostics{
@@ -592,7 +602,12 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 			expectedError:  machinecontroller.InvalidMachineConfiguration("unknown storage account type for boot diagnostics: \"foo\", supported types are AzureManaged & CustomerManaged"),
 		},
 		{
-			name: "with an Azure managed storage account",
+			name: "with an Azure managed storage account on public Azure",
+			scope: actuators.NewFakeMachineScope(actuators.FakeMachineScopeParams{
+				Machine:  &machinev1.Machine{},
+				CloudEnv: string(configv1.AzurePublicCloud),
+				Context:  context.Background(),
+			}),
 			config: &machinev1.AzureMachineProviderSpec{
 				Diagnostics: machinev1.AzureDiagnostics{
 					Boot: &machinev1.AzureBootDiagnostics{
@@ -609,6 +624,9 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 		},
 		{
 			name: "with an Customer managed storage account with no account URI",
+			scope: &actuators.MachineScope{
+				Machine: &machinev1.Machine{},
+			},
 			config: &machinev1.AzureMachineProviderSpec{
 				Diagnostics: machinev1.AzureDiagnostics{
 					Boot: &machinev1.AzureBootDiagnostics{
@@ -621,6 +639,9 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 		},
 		{
 			name: "with an Customer managed storage account with a valid account URI",
+			scope: &actuators.MachineScope{
+				Machine: &machinev1.Machine{},
+			},
 			config: &machinev1.AzureMachineProviderSpec{
 				Diagnostics: machinev1.AzureDiagnostics{
 					Boot: &machinev1.AzureBootDiagnostics{
@@ -639,13 +660,55 @@ func TestCreateDiagnosticsConfig(t *testing.T) {
 			},
 			expectedError: nil,
 		},
+		{
+			name: "with Azure managed storage account on Azure Stack Hub should fail",
+			scope: actuators.NewFakeMachineScope(actuators.FakeMachineScopeParams{
+				Machine:  &machinev1.Machine{},
+				CloudEnv: string(configv1.AzureStackCloud),
+				Context:  context.Background(),
+			}),
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.AzureManagedAzureDiagnosticsStorage,
+					},
+				},
+			},
+			expectedConfig: nil,
+			expectedError:  machinecontroller.InvalidMachineConfiguration("AzureManaged boot diagnostics is not supported on Azure Stack Hub"),
+		},
+		{
+			name: "with Customer managed storage account on Azure Stack Hub should succeed",
+			scope: actuators.NewFakeMachineScope(actuators.FakeMachineScopeParams{
+				Machine:  &machinev1.Machine{},
+				CloudEnv: string(configv1.AzureStackCloud),
+				Context:  context.Background(),
+			}),
+			config: &machinev1.AzureMachineProviderSpec{
+				Diagnostics: machinev1.AzureDiagnostics{
+					Boot: &machinev1.AzureBootDiagnostics{
+						StorageAccountType: machinev1.CustomerManagedAzureDiagnosticsStorage,
+						CustomerManaged: &machinev1.AzureCustomerManagedBootDiagnostics{
+							StorageAccountURI: "https://mystackhubaccount.blob.local.azurestack.external/",
+						},
+					},
+				},
+			},
+			expectedConfig: &armcompute.DiagnosticsProfile{
+				BootDiagnostics: &armcompute.BootDiagnostics{
+					Enabled:    ptr.To[bool](true),
+					StorageURI: ptr.To[string]("https://mystackhubaccount.blob.local.azurestack.external/"),
+				},
+			},
+			expectedError: nil,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			g := NewWithT(t)
 
-			config, err := createDiagnosticsConfig(tc.config)
+			config, err := createDiagnosticsConfig(tc.scope, tc.config)
 			if tc.expectedError != nil {
 				g.Expect(err).To(MatchError(tc.expectedError))
 			} else {
