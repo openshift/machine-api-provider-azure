@@ -80,6 +80,7 @@ func (s *Service) deriveVirtualMachineParametersStackHub(vmSpec *Spec, nicID str
 					},
 				},
 			},
+			DiagnosticsProfile: vmSpec.DiagnosticsProfile,
 		},
 	}
 
