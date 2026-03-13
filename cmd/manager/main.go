@@ -96,7 +96,7 @@ func main() {
 	)
 	// Sets up feature gates
 	defaultMutableGate := feature.DefaultMutableFeatureGate
-	gateOpts, err := features.NewFeatureGateOptions(defaultMutableGate, apifeatures.SelfManaged, apifeatures.FeatureGateAzureWorkloadIdentity, apifeatures.FeatureGateMachineAPIMigration)
+	gateOpts, err := features.NewFeatureGateOptions(defaultMutableGate, 4, apifeatures.SelfManaged, apifeatures.FeatureGateAzureWorkloadIdentity, apifeatures.FeatureGateMachineAPIMigration)
 	if err != nil {
 		klog.Fatalf("Error setting up feature gates: %v", err)
 	}
