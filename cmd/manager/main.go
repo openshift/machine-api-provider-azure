@@ -32,6 +32,7 @@ import (
 	machinesetcontroller "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators/machineset"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/record"
+	"github.com/openshift/machine-api-provider-azure/pkg/version"
 	"k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	"k8s.io/klog/v2"
@@ -94,9 +95,14 @@ func main() {
 		1,
 		"Maximum number of concurrent reconciles per controller instance.",
 	)
-	// Sets up feature gates
+	// Sets up feature gates (version from build time, default 4 for unknown)
+	// Default should be changed to 5 once we branch for 5
+	majorVersion := version.Version.Major
+	if majorVersion == 0 {
+		majorVersion = 4
+	}
 	defaultMutableGate := feature.DefaultMutableFeatureGate
-	gateOpts, err := features.NewFeatureGateOptions(defaultMutableGate, 4, apifeatures.SelfManaged, apifeatures.FeatureGateAzureWorkloadIdentity, apifeatures.FeatureGateMachineAPIMigration)
+	gateOpts, err := features.NewFeatureGateOptions(defaultMutableGate, majorVersion, apifeatures.SelfManaged, apifeatures.FeatureGateAzureWorkloadIdentity, apifeatures.FeatureGateMachineAPIMigration)
 	if err != nil {
 		klog.Fatalf("Error setting up feature gates: %v", err)
 	}
