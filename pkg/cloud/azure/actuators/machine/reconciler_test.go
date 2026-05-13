@@ -69,7 +69,7 @@ func TestExists(t *testing.T) {
 				ProvisioningState: string(machinev1.VMStateDeleting),
 			},
 			expected:    true,
-			errExpected: true,
+			errExpected: false,
 		},
 		{
 			name: "VM has some arbitrary ProvisiongState",
@@ -88,8 +88,8 @@ func TestExists(t *testing.T) {
 				ID:                "machine-test-ID",
 				ProvisioningState: "Failed",
 			},
-			expected:    false,
-			errExpected: true,
+			expected:    true,
+			errExpected: false,
 		},
 		{
 			name: "VM does not exists",

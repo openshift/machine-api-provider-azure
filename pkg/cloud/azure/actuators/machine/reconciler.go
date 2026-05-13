@@ -44,7 +44,6 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 	apicorev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -480,16 +479,6 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 
 	if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
 		return false, fmt.Errorf("vm for machine %s does not report ProvisioningState", s.scope.Machine.GetName())
-	} else {
-		switch machinev1.AzureVMState(*vm.Properties.ProvisioningState) {
-		case machinev1.VMStateDeleting:
-			return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
-		case machinev1.VMStateFailed:
-			klog.Infof("vm for machine %s has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
-			return false, &apierrors.UnexpectedObjectError{
-				Object: s.scope.Machine,
-			}
-		}
 	}
 
 	klog.Infof("Provisioning state is '%s' for machine %s", *vm.Properties.ProvisioningState, s.scope.Machine.GetName())
