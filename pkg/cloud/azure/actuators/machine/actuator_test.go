@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
+	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 	controllerfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -874,6 +875,154 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 				}
 			default:
 				t.Errorf("Expected an event containing error %q, got none", azureErr.Error())
+			}
+		})
+	}
+}
+
+func TestActuatorUpdateFailedVM(t *testing.T) {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: globalInfrastuctureName,
+		},
+		Status: configv1.InfrastructureStatus{
+			InfrastructureName: "test-failed-vm",
+			PlatformStatus: &configv1.PlatformStatus{
+				Azure: &configv1.AzurePlatformStatus{
+					CloudName: configv1.AzurePublicCloud,
+				},
+			},
+		},
+	}
+
+	cases := []struct {
+		name          string
+		initialPhase  *string
+		expectError   bool
+		expectedPhase *string
+	}{
+		{
+			name:          "VM Failed while phase is nil (treated as Provisioning) should be terminal",
+			initialPhase:  nil,
+			expectError:   true,
+			expectedPhase: ptr.To(machinev1.PhaseFailed),
+		},
+		{
+			name:          "VM Failed while phase is Provisioning should be terminal",
+			initialPhase:  ptr.To(machinev1.PhaseProvisioning),
+			expectError:   true,
+			expectedPhase: ptr.To(machinev1.PhaseFailed),
+		},
+		{
+			name:          "VM Failed while phase is Provisioned should be terminal",
+			initialPhase:  ptr.To(machinev1.PhaseProvisioned),
+			expectError:   true,
+			expectedPhase: ptr.To(machinev1.PhaseFailed),
+		},
+		{
+			name:          "VM Failed while phase is Running should continue reconciling",
+			initialPhase:  ptr.To(machinev1.PhaseRunning),
+			expectError:   false,
+			expectedPhase: ptr.To(machinev1.PhaseRunning),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			machine, err := stubMachine()
+			if err != nil {
+				t.Fatal(err)
+			}
+			machine.Status.Phase = tc.initialPhase
+
+			cs := controllerfake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithObjects(StubAzureCredentialsSecret(), infra).
+				WithStatusSubresource(&machinev1.Machine{}).
+				Build()
+
+			m := machine.DeepCopy()
+			if err := cs.Create(context.TODO(), m); err != nil {
+				t.Fatal(err)
+			}
+
+			mockCtrl := gomock.NewController(t)
+			vmSvc := mock_azure.NewMockService(mockCtrl)
+
+			// Return a VM with Failed provisioning state and no
+			// NetworkProfile so that the NIC/LB code paths are skipped.
+			vm := armcompute.VirtualMachine{
+				ID:   ptr.To("vm-id"),
+				Name: ptr.To("vm-name"),
+				Properties: &armcompute.VirtualMachineProperties{
+					ProvisioningState: ptr.To("Failed"),
+					HardwareProfile: &armcompute.HardwareProfile{
+						VMSize: ptr.To(armcompute.VirtualMachineSizeTypesStandardB2Ms),
+					},
+					OSProfile: &armcompute.OSProfile{
+						ComputerName: ptr.To("vm-name"),
+					},
+				},
+			}
+			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(
+				armcompute.VirtualMachinesClientGetResponse{VirtualMachine: vm}, nil,
+			).AnyTimes()
+
+			eventsChannel := make(chan string, 1)
+
+			machineActuator := NewActuator(ActuatorParams{
+				CoreClient: cs,
+				ReconcilerBuilder: func(scope *actuators.MachineScope) *Reconciler {
+					return &Reconciler{
+						scope:              scope,
+						virtualMachinesSvc: vmSvc,
+					}
+				},
+				EventRecorder: &record.FakeRecorder{
+					Events: eventsChannel,
+				},
+			})
+
+			updateErr := machineActuator.Update(t.Context(), m)
+
+			// Verify error expectation.
+			if tc.expectError && updateErr == nil {
+				t.Fatalf("expected Update to return an error, got nil")
+			}
+			if !tc.expectError && updateErr != nil {
+				t.Fatalf("expected Update to succeed, got: %v", updateErr)
+			}
+
+			// When an error is expected, verify it is a CreateMachine
+			// MachineError (terminal failure).
+			if tc.expectError {
+				var machineErr *machineapierrors.MachineError
+				if !errors.As(updateErr, &machineErr) {
+					t.Fatalf("expected a *MachineError, got %T: %v", updateErr, updateErr)
+				}
+				if machineErr.Reason != machinev1.CreateMachineError {
+					t.Errorf("expected error reason %v, got %v", machinev1.CreateMachineError, machineErr.Reason)
+				}
+			}
+
+			// Verify in-memory Phase on the machine object.
+			if !reflect.DeepEqual(m.Status.Phase, tc.expectedPhase) {
+				t.Errorf("expected in-memory Phase %v, got %v",
+					ptr.Deref(tc.expectedPhase, "<nil>"),
+					ptr.Deref(m.Status.Phase, "<nil>"))
+			}
+
+			// Verify the Phase has NOT been persisted to the API
+			// server. The actuator sets it in-memory for the MAO
+			// harness to persist via updateStatus.
+			persisted := &machinev1.Machine{}
+			if err := cs.Get(context.TODO(), controllerclient.ObjectKeyFromObject(m), persisted); err != nil {
+				t.Fatalf("failed to get machine from fake client: %v", err)
+			}
+			if !reflect.DeepEqual(persisted.Status.Phase, tc.initialPhase) {
+				t.Errorf("expected persisted Phase %v (unchanged), got %v",
+					ptr.Deref(tc.initialPhase, "<nil>"),
+					ptr.Deref(persisted.Status.Phase, "<nil>"))
 			}
 		})
 	}
