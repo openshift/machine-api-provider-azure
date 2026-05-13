@@ -663,7 +663,7 @@ func TestMachineEvents(t *testing.T) {
 			operation: func(actuator *Actuator, machine *machinev1.Machine) {
 				actuator.Update(context.TODO(), machine)
 			},
-			event: fmt.Sprintf("Normal Updated Updated machine %q", machine.Name),
+			event: fmt.Sprintf("Normal Updated Updated machine %q. State: %s", machine.Name, machinev1.VMStateRunning),
 		},
 		{
 			name:       "Delete machine event failed (scope)",
@@ -740,6 +740,12 @@ func TestMachineEvents(t *testing.T) {
 				Name: ptr.To[string]("vm-name"),
 				Properties: &armcompute.VirtualMachineProperties{
 					ProvisioningState: ptr.To[string]("Succeeded"),
+					InstanceView: &armcompute.VirtualMachineInstanceView{
+						Statuses: []*armcompute.InstanceViewStatus{
+							{Code: ptr.To("ProvisioningState/succeeded")},
+							{Code: ptr.To("PowerState/running")},
+						},
+					},
 					HardwareProfile: &armcompute.HardwareProfile{
 						VMSize: ptr.To(armcompute.VirtualMachineSizeTypesStandardB2Ms),
 					},
