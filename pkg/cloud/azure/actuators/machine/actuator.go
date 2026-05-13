@@ -204,11 +204,9 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
-	currentResourceVersion := scope.Machine.ResourceVersion
-
 	// Create event only if machine object was modified
-	if previousResourceVersion != currentResourceVersion {
-		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
+	if previousResourceVersion != scope.Machine.ResourceVersion {
+		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q. State: %s", machine.Name, ptr.Deref(scope.MachineStatus.VMState, "<not set>"))
 	}
 
 	// If a VM fails to provision we want to mark it as terminally failed.
