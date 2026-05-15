@@ -166,7 +166,7 @@ func TestSetMachineCloudProviderSpecifics(t *testing.T) {
 		Zones:    testZones,
 	}
 
-	r.setMachineCloudProviderSpecifics(vm)
+	r.setMachineCloudProviderSpecifics(vm, getVMState(vm))
 
 	actualInstanceStateAnnotation := r.scope.Machine.Annotations[MachineInstanceStateAnnotationName]
 	if actualInstanceStateAnnotation != testStatus {
@@ -347,7 +347,7 @@ func TestSetMachineCloudProviderSpecificsTable(t *testing.T) {
 			g := NewWithT(t)
 
 			r := newFakeReconcilerWithScope(t, tc.scope(t))
-			r.setMachineCloudProviderSpecifics(&tc.vm)
+			r.setMachineCloudProviderSpecifics(&tc.vm, getVMState(&tc.vm))
 
 			machine := r.scope.Machine
 			g.Expect(machine.Labels).To(Equal(tc.expectedLabels))

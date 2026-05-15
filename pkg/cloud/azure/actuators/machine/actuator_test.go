@@ -880,7 +880,7 @@ func TestActuatorUpdateFailedVM(t *testing.T) {
 				Build()
 
 			m := machine.DeepCopy()
-			if err := cs.Create(context.TODO(), m); err != nil {
+			if err := cs.Create(t.Context(), m); err != nil {
 				t.Fatal(err)
 			}
 
