@@ -349,7 +349,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	s.scope.MachineStatus.VMID = vm.ID
 	s.scope.MachineStatus.VMState = &vmState
 
-	s.setMachineCloudProviderSpecifics(vm)
+	s.setMachineCloudProviderSpecifics(vm, vmState)
 
 	return nil
 }
@@ -359,43 +359,55 @@ func getVMState(vm *armcompute.VirtualMachine) machinev1.AzureVMState {
 		return ""
 	}
 
-	if *vm.Properties.ProvisioningState != "Succeeded" {
+	// A non-terminal provisioning state indicates an ongoing operation. We
+	// return this as the VMState.
+	if *vm.Properties.ProvisioningState != "Succeeded" && *vm.Properties.ProvisioningState != "Failed" {
 		return machinev1.AzureVMState(*vm.Properties.ProvisioningState)
 	}
 
-	if vm.Properties.InstanceView == nil {
-		return ""
+	var statuses []*armcompute.InstanceViewStatus
+	if vm.Properties.InstanceView != nil {
+		statuses = vm.Properties.InstanceView.Statuses
 	}
 
+	// Note that ProvisioningState refers to success or failure of a long
+	// running operation, so a Failed provisioning state does not necessarily
+	// mean the VM has failed. If the VM has a power state, we return that for
+	// any terminal provisioning state.
+
 	// https://docs.microsoft.com/en-us/java/api/com.azure.resourcemanager.compute.models.powerstate
-	for _, status := range vm.Properties.InstanceView.Statuses {
-		if status.Code == nil {
+	for _, status := range statuses {
+		if status.Code == nil || !strings.HasPrefix(*status.Code, "PowerState/") {
 			continue
 		}
-		switch *status.Code {
-		case "ProvisioningState/succeeded":
-			continue
-		case "PowerState/starting":
+		switch strings.TrimPrefix(*status.Code, "PowerState/") {
+		case "starting":
 			return machinev1.VMStateStarting
-		case "PowerState/running":
+		case "running":
 			return machinev1.VMStateRunning
-		case "PowerState/stopping":
+		case "stopping":
 			return machinev1.VMStateStopping
-		case "PowerState/stopped":
+		case "stopped":
 			return machinev1.VMStateStopped
-		case "PowerState/deallocating":
+		case "deallocating":
 			return machinev1.VMStateDeallocating
-		case "PowerState/deallocated":
+		case "deallocated":
 			return machinev1.VMStateDeallocated
 		default:
 			return machinev1.VMStateUnknown
 		}
 	}
 
+	// If there is no power state and the provisioning state is failed, we
+	// return Failed.
+	if *vm.Properties.ProvisioningState == "Failed" {
+		return machinev1.VMStateFailed
+	}
+
 	return ""
 }
 
-func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMachine) {
+func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMachine, vmState machinev1.AzureVMState) {
 	if s.scope.Machine.Labels == nil {
 		s.scope.Machine.Labels = make(map[string]string)
 	}
@@ -404,7 +416,7 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMach
 		s.scope.Machine.Annotations = make(map[string]string)
 	}
 
-	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(getVMState(vm))
+	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(vmState)
 
 	if vm.Properties != nil {
 		if vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
