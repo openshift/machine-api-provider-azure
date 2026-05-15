@@ -293,7 +293,13 @@ func TestReconcileFailure(t *testing.T) {
 	}
 }
 
-func TestReconcileVMFailedState(t *testing.T) {
+func TestReconcileCreateVMExists(t *testing.T) {
+	// This is a legacy test which calls Create() for a VM that has a Failed
+	// provisioning state, i.e. a VM that already exists. This will not happen,
+	// as the prior successful Exists() call will send us down the Update() path
+	// instead. While this would never happen, if it ever did we expect to call
+	// CreateOrUpdate, which is idempotent.
+
 	fakeReconciler := newFakeReconciler(t)
 	fakeVMService := &FakeVMService{
 		Name:              "machine-test",
@@ -306,81 +312,16 @@ func TestReconcileVMFailedState(t *testing.T) {
 	fakeNicService := &FakeCountService{}
 	fakeReconciler.networkInterfacesSvc = fakeNicService
 
-	if err := fakeReconciler.Create(context.Background()); err == nil {
-		t.Errorf("expected create to fail")
+	if err := fakeReconciler.Create(t.Context()); err != nil {
+		t.Errorf("expected create not to fail")
 	}
 
 	if fakeVMService.GetCallCount != 1 {
 		t.Errorf("expected get to be called just once")
 	}
 
-	if fakeVMService.DeleteCallCount != 1 {
-		t.Errorf("expected delete to be called just once")
-	}
-
-	if fakeDiskService.DeleteCallCount != 1 {
-		t.Errorf("expected disk delete to be called just once")
-	}
-
-	if fakeNicService.DeleteCallCount != 1 {
-		t.Errorf("expected nic delete to be called just once")
-	}
-
-	if fakeVMService.CreateOrUpdateCallCount != 0 {
-		t.Errorf("expected createorupdate not to be called")
-	}
-}
-
-func TestReconcileVMUpdatingState(t *testing.T) {
-	fakeReconciler := newFakeReconciler(t)
-	fakeVMService := &FakeVMService{
-		Name:              "machine-test",
-		ID:                "machine-test-ID",
-		ProvisioningState: "Updating",
-	}
-	fakeReconciler.virtualMachinesSvc = fakeVMService
-
-	if err := fakeReconciler.Create(context.Background()); err == nil {
-		t.Errorf("expected create to fail")
-	}
-
-	if fakeVMService.GetCallCount != 1 {
-		t.Errorf("expected get to be called just once")
-	}
-
-	if fakeVMService.DeleteCallCount != 0 {
-		t.Errorf("expected delete not to be called")
-	}
-
-	if fakeVMService.CreateOrUpdateCallCount != 0 {
-		t.Errorf("expected createorupdate not to be called")
-	}
-}
-
-func TestReconcileVMSuceededState(t *testing.T) {
-	fakeReconciler := newFakeReconciler(t)
-	fakeVMService := &FakeVMService{
-		Name:              "machine-test",
-		ID:                "machine-test-ID",
-		ProvisioningState: "Succeeded",
-	}
-	fakeReconciler.virtualMachinesSvc = fakeVMService
-
-	if err := fakeReconciler.Create(context.Background()); err != nil {
-		t.Errorf("failed to create machine: %+v", err)
-	}
-
-	if fakeVMService.GetCallCount != 2 {
-		// One call for create, and one for the update that happens when the create is successful.
-		t.Errorf("expected get to be called exactly twice")
-	}
-
-	if fakeVMService.DeleteCallCount != 0 {
-		t.Errorf("expected delete not to be called")
-	}
-
-	if fakeVMService.CreateOrUpdateCallCount != 0 {
-		t.Errorf("expected createorupdate not to be called")
+	if fakeVMService.CreateOrUpdateCallCount != 1 {
+		t.Errorf("expected createorupdate to be called")
 	}
 }
 
@@ -696,7 +637,7 @@ func TestMachineEvents(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(tc.credSecret, infra).WithStatusSubresource(&machinev1.Machine{}).Build()
+			cs := controllerfake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(tc.credSecret, StubAzureUserDataSecret(), infra).WithStatusSubresource(&machinev1.Machine{}).Build()
 
 			m := tc.machine.DeepCopy()
 			if err := cs.Create(context.TODO(), m); err != nil {
@@ -756,6 +697,7 @@ func TestMachineEvents(t *testing.T) {
 			}
 			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(armcompute.VirtualMachinesClientGetResponse{VirtualMachine: vm}, nil).AnyTimes()
 			vmSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			disksSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			networkSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 			pipSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
@@ -822,16 +764,7 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cs := controllerfake.NewClientBuilder().WithObjects(
-				StubAzureCredentialsSecret(), &corev1.Secret{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      "azure-actuator-user-data-secret",
-						Namespace: "default",
-					},
-					Data: map[string][]byte{
-						"userData": []byte("S3CR3T"),
-					},
-				},
-				infra).Build()
+				StubAzureCredentialsSecret(), StubAzureUserDataSecret(), infra).Build()
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
@@ -863,7 +796,6 @@ func TestStatusCodeBasedCreationErrors(t *testing.T) {
 			}
 			wrapErr := fmt.Errorf("failed to create or get machine: %w", azureErr)
 			vmSvc.EXPECT().CreateOrUpdate(gomock.Any(), gomock.Any()).Return(wrapErr).Times(1)
-			vmSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("mock compute.VirtualMachinesClient Get error")).Times(1)
 			availabilityZonesSvc.EXPECT().Get(gomock.Any(), gomock.Any()).Return([]string{"testzone"}, nil).Times(1)
 
 			_, ok := machineActuator.Create(context.TODO(), machine).(*machineapierrors.RequeueAfterError)
@@ -1083,16 +1015,8 @@ func TestInvalidConfigurationCreationErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cs := controllerfake.NewClientBuilder().WithObjects(StubAzureCredentialsSecret(), &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "azure-actuator-user-data-secret",
-					Namespace: "default",
-				},
-				Data: map[string][]byte{
-					"userData": []byte("S3CR3T"),
-				},
-			},
-				infra).Build()
+			cs := controllerfake.NewClientBuilder().WithObjects(
+				StubAzureCredentialsSecret(), StubAzureUserDataSecret(), infra).Build()
 
 			mockCtrl := gomock.NewController(t)
 			networkSvc := mock_azure.NewMockService(mockCtrl)
