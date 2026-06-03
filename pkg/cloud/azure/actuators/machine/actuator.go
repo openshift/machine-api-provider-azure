@@ -28,9 +28,9 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/actuators"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	controllerclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -99,7 +99,7 @@ func (a *Actuator) Create(ctx context.Context, machine *machinev1.Machine) error
 
 	}
 
-	err = a.reconcilerBuilder(scope).Create(context.Background())
+	err = a.reconcilerBuilder(scope).Create(ctx)
 	if err != nil {
 		// We still want to persist on failure to update MachineStatus
 		if err := scope.Persist(); err != nil {
@@ -150,7 +150,7 @@ func (a *Actuator) Delete(ctx context.Context, machine *machinev1.Machine) error
 		return a.handleMachineError(machine, machineapierrors.DeleteMachine("failed to create machine %q scope: %v", machine.Name, err), deleteEventAction)
 	}
 
-	err = a.reconcilerBuilder(scope).Delete(context.Background())
+	err = a.reconcilerBuilder(scope).Delete(ctx)
 	if err != nil {
 		// We still want to persist on failure to update MachineStatus
 		if err := scope.Persist(); err != nil {
@@ -186,7 +186,7 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		return a.handleMachineError(machine, machineapierrors.UpdateMachine("failed to create machine %q scope: %v", machine.Name, err), updateEventAction)
 	}
 
-	err = a.reconcilerBuilder(scope).Update(context.Background())
+	err = a.reconcilerBuilder(scope).Update(ctx)
 	if err != nil {
 		// We still want to persist on failure to update MachineStatus
 		if err := scope.Persist(); err != nil {
@@ -204,11 +204,39 @@ func (a *Actuator) Update(ctx context.Context, machine *machinev1.Machine) error
 		return fmt.Errorf("error storing machine info: %v", err)
 	}
 
-	currentResourceVersion := scope.Machine.ResourceVersion
-
 	// Create event only if machine object was modified
-	if previousResourceVersion != currentResourceVersion {
-		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q", machine.Name)
+	if previousResourceVersion != scope.Machine.ResourceVersion {
+		a.eventRecorder.Eventf(machine, corev1.EventTypeNormal, "Updated", "Updated machine %q. State: %s", machine.Name, ptr.Deref(scope.MachineStatus.VMState, "<not set>"))
+	}
+
+	// If a VM fails to provision we want to mark it as terminally failed.
+	// However, if Azure marks it failed after it has reached a running
+	// state we want to be cautious, as it may be running a workload. There is a high chance that an error is:
+	// - transient (e.g. cloud maintainance)
+	// - unrelated (e.g. a detach failure from the CSI driver)
+	// Consequently, we deliberately never mark a VM as Failed after it has
+	// reached a running state, unless it has been deleted.
+	//
+	// Here we mark a Failed VM as terminally failed only if it is not yet
+	// running. Otherwise we allow the controller to continue retrying.
+	//
+	// See:
+	// - https://redhat.atlassian.net/browse/OCPBUGS-85416
+	// - https://redhat.atlassian.net/browse/OCPBUGS-10762
+	//
+	// NOTES:
+	// - We treat no Phase as equivalent to Provisioning.
+	// - scope.Persist() writes Azure-specific state. We deliberately set the
+	//   failed state after that to allow the MAO harness to persist the Failed
+	//   state consistently.
+	switch ptr.Deref(machine.Status.Phase, machinev1.PhaseProvisioning) {
+	case machinev1.PhaseProvisioning, machinev1.PhaseProvisioned:
+		if ptr.Deref(scope.MachineStatus.VMState, "") == machinev1.VMStateFailed {
+			machine.Status.Phase = ptr.To(machinev1.PhaseFailed)
+
+			klog.Errorf("vm for machine %s has unexpected 'Failed' provisioning state", machine.GetName())
+			return machineapierrors.CreateMachine("vm has unexpected 'Failed' provisioning state")
+		}
 	}
 
 	return nil
@@ -227,10 +255,7 @@ func (a *Actuator) Exists(ctx context.Context, machine *machinev1.Machine) (bool
 		return false, fmt.Errorf("failed to create scope: %+v", err)
 	}
 
-	isExists, err := a.reconcilerBuilder(scope).Exists(context.Background())
-	if apierrors.IsUnexpectedObjectError(err) {
-		return isExists, nil
-	}
+	isExists, err := a.reconcilerBuilder(scope).Exists(ctx)
 	if err != nil {
 		klog.Errorf("failed to check machine %s exists: %v", machine.Name, err)
 	}
