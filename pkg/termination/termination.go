@@ -22,9 +22,16 @@ import (
 const (
 	// azureTerminationEndpointURL see the following link for more details about the endpoint
 	// https://docs.microsoft.com/en-us/azure/virtual-machines/windows/scheduled-events#endpoint-discovery
-	azureTerminationEndpointURL                          = "http://169.254.169.254/metadata/scheduledevents?api-version=2019-08-01"
-	terminatingConditionType    corev1.NodeConditionType = "Terminating"
-	terminationRequestedReason                           = "TerminationRequested"
+	azureTerminationEndpointURL = "http://169.254.169.254/metadata/scheduledevents"
+
+	// apiVersion20240709 adds SpotRebalanceRecommendation as an event type, but as of June 2026 is not generally available.
+	apiVersion20240709 = "?api-version=2024-07-09"
+
+	// apiVersion20200701 is the most recent generally available API version for scheduled events.
+	apiVersion20200701 = "?api-version=2020-07-01"
+
+	terminatingConditionType   corev1.NodeConditionType = "Terminating"
+	terminationRequestedReason string                   = "TerminationRequested"
 )
 
 // Handler represents a handler that will run to check the termination
@@ -40,7 +47,7 @@ func NewHandler(logger logr.Logger, cfg *rest.Config, pollInterval time.Duration
 		return nil, fmt.Errorf("error creating client: %v", err)
 	}
 
-	pollURL, err := url.Parse(azureTerminationEndpointURL)
+	pollURL, err := getPollURL(context.Background(), logger)
 	if err != nil {
 		// This should never happen
 		panic(err)
@@ -56,6 +63,61 @@ func NewHandler(logger logr.Logger, cfg *rest.Config, pollInterval time.Duration
 		namespace:    namespace,
 		log:          logger,
 	}, nil
+}
+
+// getPollURL gets the poll URL for the termination endpoint.
+// It first tries to use the 2024-07-09 API version, and if that is not available, it falls back to the 2020-07-01 API version.
+func getPollURL(ctx context.Context, logger logr.Logger) (*url.URL, error) {
+	pollURL, err := url.Parse(azureTerminationEndpointURL + apiVersion20240709)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing poll URL: %v", err)
+	}
+
+	available, err := endpointAvailable(ctx, pollURL)
+	if err != nil {
+		return nil, fmt.Errorf("error checking endpoint availability: %v", err)
+	}
+	if available {
+		logger.V(1).Info("Using API version 2024-07-09")
+		return pollURL, nil
+	}
+
+	pollURL, err = url.Parse(azureTerminationEndpointURL + apiVersion20200701)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing poll URL: %v", err)
+	}
+
+	logger.V(1).Info("Using API version 2020-07-01, SpotRebalanceRecommendation is not available")
+	return pollURL, nil
+}
+
+// endpointAvailable checks if the endpoint is available by making a GET request to the endpoint.
+// When an API version is not available, the endpoint will return a 404.
+func endpointAvailable(ctx context.Context, pollURL *url.URL) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", pollURL.String(), nil)
+	if err != nil {
+		return false, fmt.Errorf("error creating request: %v", err)
+	}
+
+	req.Header.Add("Metadata", "true")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		return true, nil
+	case http.StatusNotFound:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 }
 
 // handler implements the logic to check the termination endpoint and delete the
@@ -126,7 +188,7 @@ func (h *handler) run(ctx context.Context) error {
 		}
 
 		for _, event := range s.Events {
-			if event.EventType == preemptEventType {
+			if event.EventType == preemptEventType || event.EventType == spotRebalanceRecommendationEventType {
 				// Instance marked for termination
 				return true, nil
 			}
@@ -215,6 +277,7 @@ func addNodeTerminationCondition(node *corev1.Node) {
 }
 
 const preemptEventType = "Preempt"
+const spotRebalanceRecommendationEventType = "SpotRebalanceRecommendation"
 
 // scheduledEvents represents metadata response, more detailed info can be found here:
 // https://docs.microsoft.com/en-us/azure/virtual-machines/linux/scheduled-events#use-the-api
