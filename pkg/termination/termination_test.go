@@ -77,15 +77,14 @@ var _ = Describe("Handler Suite", func() {
 		testNode = newTestNode(nodeName)
 		createNode(testNode)
 
-		// use NewHandler() instead of manual construction in order to test NewHandler() logic
-		// like checking that machine api is added to scheme
-		handlerInterface, err := NewHandler(klogr.New(), cfg, 100*time.Millisecond, "", nodeName)
-		Expect(err).ToNot(HaveOccurred())
-
-		h = handlerInterface.(*handler)
-
-		// set pollURL so we can override initial value later
-		h.pollURL = nil
+		h = &handler{
+			client:       k8sClient,
+			pollURL:      nil,
+			pollInterval: 100 * time.Millisecond,
+			nodeName:     nodeName,
+			namespace:    testNamespace,
+			log:          klogr.New(),
+		}
 	})
 
 	JustBeforeEach(func() {
@@ -123,66 +122,133 @@ var _ = Describe("Handler Suite", func() {
 	Context("when polling the termination endpoint", func() {
 		var counter int32
 
-		BeforeEach(func() {
-			counter = 0
-
-			// Ensure the polling logic is excercised in tests
-			httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
-				if atomic.LoadInt32(&counter) == 4 {
-					rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[{"EventType":"Preempt", "ResourceType": "VirtualMachine"}]}`))
-				} else {
-					atomic.AddInt32(&counter, 1)
-					rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[]}`))
-				}
-			})
-		})
-
-		Context("and the handler is stopped", func() {
-			JustBeforeEach(func() {
-				// Ensure the polling logic is tested as well
-				for atomic.LoadInt32(&counter) < 4 {
-					// use 50ms since polling is set to 100ms
-					time.Sleep(50 * time.Millisecond)
-					continue
-				}
-
-				close(stop)
-			})
-
-			It("should not return an error", func() {
-				Eventually(errs).Should(Receive(BeNil()))
-			})
-
-			It("should not mark the node for deletion", func() {
-				Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
-			})
-		})
-
-		Context("and the instance termination notice is fulfilled", func() {
-			JustBeforeEach(func() {
-				// Ensure the polling logic is tested as well
-				for atomic.LoadInt32(&counter) < 4 {
-					// use 50ms since polling is set to 100ms
-					time.Sleep(50 * time.Millisecond)
-					continue
-				}
-			})
-
-			It("should mark the node for deletion", func() {
-				Eventually(nodeMarkedForDeletion(testNode.Name)).Should(BeTrue())
-			})
-		})
-
-		Context("and the instance termination notice is not fulfilled", func() {
+		Context("with Preempt event type", func() {
 			BeforeEach(func() {
+				counter = 0
+
+				// Ensure the polling logic is excercised in tests
 				httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
-					atomic.AddInt32(&counter, 1)
-					emptyEvents(rw, req)
+					if atomic.LoadInt32(&counter) == 4 {
+						rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[{"EventType":"Preempt", "ResourceType": "VirtualMachine"}]}`))
+					} else {
+						atomic.AddInt32(&counter, 1)
+						rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[]}`))
+					}
 				})
 			})
 
-			It("should not mark the node for deletion", func() {
-				Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
+			Context("and the handler is stopped", func() {
+				JustBeforeEach(func() {
+					// Ensure the polling logic is tested as well
+					for atomic.LoadInt32(&counter) < 4 {
+						// use 50ms since polling is set to 100ms
+						time.Sleep(50 * time.Millisecond)
+						continue
+					}
+
+					close(stop)
+				})
+
+				It("should not return an error", func() {
+					Eventually(errs).Should(Receive(BeNil()))
+				})
+
+				It("should not mark the node for deletion", func() {
+					Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
+				})
+			})
+
+			Context("and the instance termination notice is fulfilled", func() {
+				JustBeforeEach(func() {
+					// Ensure the polling logic is tested as well
+					for atomic.LoadInt32(&counter) < 4 {
+						// use 50ms since polling is set to 100ms
+						time.Sleep(50 * time.Millisecond)
+						continue
+					}
+				})
+
+				It("should mark the node for deletion", func() {
+					Eventually(nodeMarkedForDeletion(testNode.Name)).Should(BeTrue())
+				})
+			})
+
+			Context("and the instance termination notice is not fulfilled", func() {
+				BeforeEach(func() {
+					httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
+						atomic.AddInt32(&counter, 1)
+						emptyEvents(rw, req)
+					})
+				})
+
+				It("should not mark the node for deletion", func() {
+					Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
+				})
+			})
+		})
+
+		Context("with SpotRebalanceRecommendation event type", func() {
+			BeforeEach(func() {
+				counter = 0
+
+				// Ensure the polling logic is excercised in tests
+				httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
+					if atomic.LoadInt32(&counter) == 4 {
+						rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[{"EventType":"SpotRebalanceRecommendation", "ResourceType": "VirtualMachine"}]}`))
+					} else {
+						atomic.AddInt32(&counter, 1)
+						rw.Write([]byte(`{"DocumentIncarnation":0,"Events":[]}`))
+					}
+				})
+			})
+
+			Context("and the handler is stopped", func() {
+				JustBeforeEach(func() {
+					// Ensure the polling logic is tested as well
+					for atomic.LoadInt32(&counter) < 4 {
+						// use 50ms since polling is set to 100ms
+						time.Sleep(50 * time.Millisecond)
+						continue
+					}
+
+					close(stop)
+				})
+
+				It("should not return an error", func() {
+					Eventually(errs).Should(Receive(BeNil()))
+				})
+
+				It("should not mark the node for deletion", func() {
+					Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
+				})
+			})
+
+			Context("and the instance termination notice is fulfilled", func() {
+				JustBeforeEach(func() {
+					// Ensure the polling logic is tested as well
+					for atomic.LoadInt32(&counter) < 4 {
+						// use 50ms since polling is set to 100ms
+						time.Sleep(50 * time.Millisecond)
+						continue
+					}
+				})
+
+				It("should mark the node for deletion", func() {
+					Eventually(nodeMarkedForDeletion(testNode.Name)).Should(BeTrue())
+				})
+			})
+
+			Context("and the instance termination notice is not fulfilled", func() {
+				BeforeEach(func() {
+					httpHandler = newMockHTTPHandler(func(rw http.ResponseWriter, req *http.Request) {
+						atomic.AddInt32(&counter, 1)
+						emptyEvents(rw, req)
+					})
+				})
+
+				It("should not mark the node for deletion", func() {
+					Consistently(nodeMarkedForDeletion(testNode.Name)).Should(BeFalse())
+				})
 			})
 		})
 	})
