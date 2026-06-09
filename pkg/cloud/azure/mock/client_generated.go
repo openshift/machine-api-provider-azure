@@ -8,8 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	azure "github.com/openshift/machine-api-provider-azure/pkg/cloud/azure"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockSpec is a mock of Spec interface
