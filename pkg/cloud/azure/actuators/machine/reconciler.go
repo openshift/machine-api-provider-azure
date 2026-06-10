@@ -44,7 +44,6 @@ import (
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/resourceskus"
 	"github.com/openshift/machine-api-provider-azure/pkg/cloud/azure/services/virtualmachines"
 	apicorev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
@@ -219,8 +218,12 @@ func (s *Reconciler) Update(ctx context.Context) error {
 				continue
 			}
 
+			if niface == nil || niface.InterfacePropertiesFormat == nil {
+				continue
+			}
+
 			// If the NIC has a failed provision operation, attempt to update it. Requeue on failure.
-			if *niface.ProvisioningState == networkinterfaces.ProvisioningStateFailed {
+			if ptr.Deref(niface.ProvisioningState, "") == networkinterfaces.ProvisioningStateFailed {
 				klog.V(4).Infof("network interface %q in provisioning failed state, attempting to update", ifaceName)
 				if err := s.createOrUpdateNetworkInterface(ctx); err != nil {
 					return fmt.Errorf("network interface %s failed to provision", ifaceName)
@@ -346,7 +349,7 @@ func (s *Reconciler) Update(ctx context.Context) error {
 	s.scope.MachineStatus.VMID = vm.ID
 	s.scope.MachineStatus.VMState = &vmState
 
-	s.setMachineCloudProviderSpecifics(vm)
+	s.setMachineCloudProviderSpecifics(vm, vmState)
 
 	return nil
 }
@@ -356,43 +359,55 @@ func getVMState(vm *armcompute.VirtualMachine) machinev1.AzureVMState {
 		return ""
 	}
 
-	if *vm.Properties.ProvisioningState != "Succeeded" {
+	// A non-terminal provisioning state indicates an ongoing operation. We
+	// return this as the VMState.
+	if *vm.Properties.ProvisioningState != "Succeeded" && *vm.Properties.ProvisioningState != "Failed" {
 		return machinev1.AzureVMState(*vm.Properties.ProvisioningState)
 	}
 
-	if vm.Properties.InstanceView == nil {
-		return ""
+	var statuses []*armcompute.InstanceViewStatus
+	if vm.Properties.InstanceView != nil {
+		statuses = vm.Properties.InstanceView.Statuses
 	}
 
+	// Note that ProvisioningState refers to success or failure of a long
+	// running operation, so a Failed provisioning state does not necessarily
+	// mean the VM has failed. If the VM has a power state, we return that for
+	// any terminal provisioning state.
+
 	// https://docs.microsoft.com/en-us/java/api/com.azure.resourcemanager.compute.models.powerstate
-	for _, status := range vm.Properties.InstanceView.Statuses {
-		if status.Code == nil {
+	for _, status := range statuses {
+		if status.Code == nil || !strings.HasPrefix(*status.Code, "PowerState/") {
 			continue
 		}
-		switch *status.Code {
-		case "ProvisioningState/succeeded":
-			continue
-		case "PowerState/starting":
+		switch strings.TrimPrefix(*status.Code, "PowerState/") {
+		case "starting":
 			return machinev1.VMStateStarting
-		case "PowerState/running":
+		case "running":
 			return machinev1.VMStateRunning
-		case "PowerState/stopping":
+		case "stopping":
 			return machinev1.VMStateStopping
-		case "PowerState/stopped":
+		case "stopped":
 			return machinev1.VMStateStopped
-		case "PowerState/deallocating":
+		case "deallocating":
 			return machinev1.VMStateDeallocating
-		case "PowerState/deallocated":
+		case "deallocated":
 			return machinev1.VMStateDeallocated
 		default:
 			return machinev1.VMStateUnknown
 		}
 	}
 
+	// If there is no power state and the provisioning state is failed, we
+	// return Failed.
+	if *vm.Properties.ProvisioningState == "Failed" {
+		return machinev1.VMStateFailed
+	}
+
 	return ""
 }
 
-func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMachine) {
+func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMachine, vmState machinev1.AzureVMState) {
 	if s.scope.Machine.Labels == nil {
 		s.scope.Machine.Labels = make(map[string]string)
 	}
@@ -401,7 +416,7 @@ func (s *Reconciler) setMachineCloudProviderSpecifics(vm *armcompute.VirtualMach
 		s.scope.Machine.Annotations = make(map[string]string)
 	}
 
-	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(getVMState(vm))
+	s.scope.Machine.Annotations[MachineInstanceStateAnnotationName] = string(vmState)
 
 	if vm.Properties != nil {
 		if vm.Properties.HardwareProfile != nil && vm.Properties.HardwareProfile.VMSize != nil {
@@ -480,16 +495,6 @@ func (s *Reconciler) Exists(ctx context.Context) (bool, error) {
 
 	if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
 		return false, fmt.Errorf("vm for machine %s does not report ProvisioningState", s.scope.Machine.GetName())
-	} else {
-		switch machinev1.AzureVMState(*vm.Properties.ProvisioningState) {
-		case machinev1.VMStateDeleting:
-			return true, fmt.Errorf("vm for machine %s has unexpected 'Deleting' provisioning state", s.scope.Machine.GetName())
-		case machinev1.VMStateFailed:
-			klog.Infof("vm for machine %s has unexpected 'Failed' provisioning state", s.scope.Machine.GetName())
-			return false, &apierrors.UnexpectedObjectError{
-				Object: s.scope.Machine,
-			}
-		}
 	}
 
 	klog.Infof("Provisioning state is '%s' for machine %s", *vm.Properties.ProvisioningState, s.scope.Machine.GetName())
@@ -714,109 +719,74 @@ func (s *Reconciler) createVirtualMachine(ctx context.Context, nicName, asName s
 		return fmt.Errorf("failed to decode ssh public key: %w", err)
 	}
 
-	vmSpec := &virtualmachines.Spec{
-		Name: s.scope.Machine.Name,
+	zone, err := s.getZone(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get zone: %w", err)
 	}
 
-	vmInterface, err := s.virtualMachinesSvc.Get(ctx, vmSpec)
-	if err != nil && vmInterface == nil {
-		zone, err := s.getZone(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get zone: %w", err)
+	diagnosticsProfile, err := createDiagnosticsConfig(s.scope, s.scope.MachineConfig)
+	if err != nil {
+		return fmt.Errorf("failed to configure diagnostics profile: %w", err)
+	}
+
+	if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
+		return fmt.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
+	}
+
+	vmSpec := &virtualmachines.Spec{
+		Name:                s.scope.Machine.Name,
+		NICName:             nicName,
+		SSHKeyData:          string(decoded),
+		Size:                s.scope.MachineConfig.VMSize,
+		OSDisk:              s.scope.MachineConfig.OSDisk,
+		DataDisks:           s.scope.MachineConfig.DataDisks,
+		Image:               s.scope.MachineConfig.Image,
+		Zone:                zone,
+		Tags:                s.scope.Tags,
+		SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
+		UltraSSDCapability:  s.scope.MachineConfig.UltraSSDCapability,
+		AvailabilitySetName: asName,
+		DiagnosticsProfile:  diagnosticsProfile,
+	}
+
+	if mi := s.scope.MachineConfig.ManagedIdentity; mi != "" {
+		if !strings.HasPrefix(mi, "/subscriptions/") {
+			vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
+		} else {
+			vmSpec.ManagedIdentity = mi
+		}
+	}
+
+	if s.scope.MachineConfig.CapacityReservationGroupID != "" {
+		if err = validateAzureCapacityReservationGroupID(s.scope.MachineConfig.CapacityReservationGroupID); err != nil {
+			return fmt.Errorf("failed to validate capacityReservationGroupID: %w", err)
+		}
+		vmSpec.CapacityReservationGroupID = s.scope.MachineConfig.CapacityReservationGroupID
+	}
+
+	userData, userDataErr := s.getCustomUserData()
+	if userDataErr != nil {
+		return fmt.Errorf("failed to get custom script data: %w", userDataErr)
+	}
+
+	if userData != "" {
+		vmSpec.CustomData = userData
+	}
+
+	// If we get an AsynOpIncompleteError, this means the VM is being created and we completed the request successfully.
+	if err := s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec); err != nil && !errors.Is(err, autorestazure.NewAsyncOpIncompleteError("compute.VirtualMachinesCreateOrUpdateFuture")) {
+		metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
+			Name:      s.scope.Machine.Name,
+			Namespace: s.scope.Machine.Namespace,
+			Reason:    "failed to create VM",
+		})
+
+		var detailedError autorest.DetailedError
+		if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
+			return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s: %v", s.scope.Machine.Name, err)
 		}
 
-		diagnosticsProfile, err := createDiagnosticsConfig(s.scope, s.scope.MachineConfig)
-		if err != nil {
-			return fmt.Errorf("failed to configure diagnostics profile: %w", err)
-		}
-
-		if s.scope.Machine.Labels == nil || s.scope.Machine.Labels[machinev1.MachineClusterIDLabel] == "" {
-			return fmt.Errorf("machine is missing %q label", machinev1.MachineClusterIDLabel)
-		}
-
-		vmSpec = &virtualmachines.Spec{
-			Name:                s.scope.Machine.Name,
-			NICName:             nicName,
-			SSHKeyData:          string(decoded),
-			Size:                s.scope.MachineConfig.VMSize,
-			OSDisk:              s.scope.MachineConfig.OSDisk,
-			DataDisks:           s.scope.MachineConfig.DataDisks,
-			Image:               s.scope.MachineConfig.Image,
-			Zone:                zone,
-			Tags:                s.scope.Tags,
-			SecurityProfile:     s.scope.MachineConfig.SecurityProfile,
-			UltraSSDCapability:  s.scope.MachineConfig.UltraSSDCapability,
-			AvailabilitySetName: asName,
-			DiagnosticsProfile:  diagnosticsProfile,
-		}
-
-		if mi := s.scope.MachineConfig.ManagedIdentity; mi != "" {
-			if !strings.HasPrefix(mi, "/subscriptions/") {
-				vmSpec.ManagedIdentity = azure.GenerateManagedIdentityName(s.scope.SubscriptionID, s.scope.MachineConfig.ResourceGroup, s.scope.MachineConfig.ManagedIdentity)
-			} else {
-				vmSpec.ManagedIdentity = mi
-			}
-		}
-
-		if s.scope.MachineConfig.CapacityReservationGroupID != "" {
-			if err = validateAzureCapacityReservationGroupID(s.scope.MachineConfig.CapacityReservationGroupID); err != nil {
-				return fmt.Errorf("failed to validate capacityReservationGroupID: %w", err)
-			}
-			vmSpec.CapacityReservationGroupID = s.scope.MachineConfig.CapacityReservationGroupID
-		}
-
-		userData, userDataErr := s.getCustomUserData()
-		if userDataErr != nil {
-			return fmt.Errorf("failed to get custom script data: %w", userDataErr)
-		}
-
-		if userData != "" {
-			vmSpec.CustomData = userData
-		}
-
-		// If we get an AsynOpIncompleteError, this means the VM is being created and we completed the request successfully.
-		if err := s.virtualMachinesSvc.CreateOrUpdate(ctx, vmSpec); err != nil && !errors.Is(err, autorestazure.NewAsyncOpIncompleteError("compute.VirtualMachinesCreateOrUpdateFuture")) {
-			metrics.RegisterFailedInstanceCreate(&metrics.MachineLabels{
-				Name:      s.scope.Machine.Name,
-				Namespace: s.scope.Machine.Namespace,
-				Reason:    "failed to create VM",
-			})
-
-			var detailedError autorest.DetailedError
-			if errors.As(err, &detailedError) && detailedError.Message == "Failure sending request" {
-				return machinecontroller.InvalidMachineConfiguration("failure sending request for machine %s: %v", s.scope.Machine.Name, err)
-			}
-
-			return fmt.Errorf("failed to create VM: %w", err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("failed to get vm: %w", err)
-	} else {
-		vm, err := castToVirtualMachine(vmInterface)
-		if err != nil {
-			return fmt.Errorf("casting virtual machine in create: %w", err)
-		}
-
-		if vm.Properties == nil || vm.Properties.ProvisioningState == nil {
-			return fmt.Errorf("vm %s is nil provisioning state, reconcile", s.scope.Machine.Name)
-		}
-
-		vmState := getVMState(vm)
-		s.scope.MachineStatus.VMID = vm.ID
-		s.scope.MachineStatus.VMState = &vmState
-
-		s.setMachineCloudProviderSpecifics(vm)
-
-		if *vm.Properties.ProvisioningState == "Failed" {
-			// If VM failed provisioning, delete it so it can be recreated
-			err = s.Delete(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to delete machine: %w", err)
-			}
-			return fmt.Errorf("vm %s is deleted, retry creating in next reconcile", s.scope.Machine.Name)
-		} else if *vm.Properties.ProvisioningState != "Succeeded" {
-			return fmt.Errorf("vm %s is still in provisioning state %s, reconcile", s.scope.Machine.Name, *vm.Properties.ProvisioningState)
-		}
+		return fmt.Errorf("failed to create VM: %w", err)
 	}
 
 	return nil
