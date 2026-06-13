@@ -474,7 +474,7 @@ func getValueFromSecretOrEnvironment(secretData map[string][]byte, dataKey strin
 }
 
 func getEnvironment(m *MachineScope) (*azure.Environment, error) {
-	if m.IsStackHub() {
+	if m.IsStackHub() || m.armEndpoint != "" {
 		env, err := azure.EnvironmentFromURL(m.armEndpoint)
 		if err != nil {
 			return nil, err
