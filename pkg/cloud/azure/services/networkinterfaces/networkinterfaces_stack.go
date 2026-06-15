@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/profiles/2019-03-01/network/mgmt/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -147,20 +148,24 @@ func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) e
 
 		loadBalancerInboundNatRules := []network.InboundNatRule{}
 		loadBalancerInboundNatRulesV6 := []network.InboundNatRule{}
-		// loadbalancers can have multiple frontends and backends with different IP families
-		// TODO: this logic is different in public azure, check that no functionality is broken by this
-		for i, _ := range *lb.FrontendIPConfigurations {
-			// iterate only for the frontends that have backends configured
-			if i >= len(*lb.BackendAddressPools) {
-				break
+		// Classify backend pools by name: pools with "-v6" suffix are IPv6.
+		if lb.BackendAddressPools != nil {
+			for _, pool := range *lb.BackendAddressPools {
+				if pool.Name == nil || pool.ID == nil {
+					continue
+				}
+				if strings.HasSuffix(*pool.Name, "-v6") {
+					backendAddressPoolsV6 = append(backendAddressPoolsV6,
+						network.BackendAddressPool{ID: pool.ID})
+				} else {
+					backendAddressPools = append(backendAddressPools,
+						network.BackendAddressPool{ID: pool.ID})
+				}
 			}
+		}
 
-			backendAddressPools = append(backendAddressPools,
-				network.BackendAddressPool{
-					ID: (*lb.BackendAddressPools)[i].ID,
-				})
-
-			if nicSpec.NatRule != nil {
+		if nicSpec.NatRule != nil {
+			for range *lb.FrontendIPConfigurations {
 				loadBalancerInboundNatRules = append(loadBalancerInboundNatRules,
 					network.InboundNatRule{ID: (*lb.InboundNatRules)[*nicSpec.NatRule].ID})
 			}
@@ -182,18 +187,20 @@ func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) e
 		if !ok {
 			return errors.New("internal load balancer get returned invalid network interface")
 		}
-		// loadbalancers can have multiple frontends and backends with different IP families
-		// TODO: this logic is different in public azure, check that no functionality is broken by this
-		for i, _ := range *internallb.FrontendIPConfigurations {
-			// iterate only for the frontends that have backends configured
-			if i >= len(*internallb.BackendAddressPools) {
-				break
+		// Classify internal LB backend pools by name suffix
+		if internallb.BackendAddressPools != nil {
+			for _, pool := range *internallb.BackendAddressPools {
+				if pool.Name == nil || pool.ID == nil {
+					continue
+				}
+				if strings.HasSuffix(*pool.Name, "-v6") {
+					backendAddressPoolsV6 = append(backendAddressPoolsV6,
+						network.BackendAddressPool{ID: pool.ID})
+				} else {
+					backendAddressPools = append(backendAddressPools,
+						network.BackendAddressPool{ID: pool.ID})
+				}
 			}
-
-			backendAddressPools = append(backendAddressPools,
-				network.BackendAddressPool{
-					ID: (*internallb.BackendAddressPools)[i].ID,
-				})
 		}
 	}
 	nicConfig.LoadBalancerBackendAddressPools = &backendAddressPools
