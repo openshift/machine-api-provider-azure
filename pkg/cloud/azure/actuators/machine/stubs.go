@@ -102,3 +102,15 @@ func StubAzureCredentialsSecret() *corev1.Secret {
 		},
 	}
 }
+
+func StubAzureUserDataSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      userDataSecretName,
+			Namespace: defaultNamespace,
+		},
+		Data: map[string][]byte{
+			"userData": []byte("S3CR3T"),
+		},
+	}
+}

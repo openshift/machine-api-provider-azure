@@ -19,10 +19,10 @@ require (
 	github.com/jongio/azidext/go/azidext v0.5.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.28.1
-	github.com/onsi/gomega v1.39.0
-	github.com/openshift/api v0.0.0-20260320151444-324a1bcb9f55
+	github.com/onsi/gomega v1.39.1
+	github.com/openshift/api v0.0.0-20260429211050-21ed4c20b122
 	github.com/openshift/library-go v0.0.0-20260318142011-72bf34f474bc
-	github.com/openshift/machine-api-operator v0.2.1-0.20260320085232-221c405ba014
+	github.com/openshift/machine-api-operator v0.2.1-0.20260518090549-d7772c629147
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.10.2
 	go.uber.org/mock v0.4.0
@@ -91,7 +91,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/openshift/client-go v0.0.0-20260317180604-743f664b82d1 // indirect
+	github.com/openshift/client-go v0.0.0-20260429123927-c81f86abfa6a // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
