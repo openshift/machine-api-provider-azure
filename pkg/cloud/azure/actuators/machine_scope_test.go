@@ -480,6 +480,31 @@ func TestGetCloudEnvironment(t *testing.T) {
 			expectedEnvironment: string(configv1.AzureStackCloud),
 			expectedARMEndpoint: "test",
 		},
+		{
+			name: "when cloud environment is USSecCloud return it with ARM endpoint",
+			client: controllerfake.NewClientBuilder().WithObjects(&configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: globalInfrastuctureName,
+				},
+				Status: configv1.InfrastructureStatus{
+					InfrastructureName: "test-ussec",
+					PlatformStatus: &configv1.PlatformStatus{
+						Azure: &configv1.AzurePlatformStatus{
+							CloudName:   configv1.AzureUSSecCloud,
+							ARMEndpoint: "https://management.azure.microsoft.scloud",
+							ResourceTags: []configv1.AzureResourceTag{
+								{
+									Key:   "created-for",
+									Value: "ocp",
+								},
+							},
+						},
+					},
+				},
+			}).Build(),
+			expectedEnvironment: string(configv1.AzureUSSecCloud),
+			expectedARMEndpoint: "https://management.azure.microsoft.scloud",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -507,6 +532,57 @@ func TestGetCloudEnvironment(t *testing.T) {
 
 			if armEndpoint != tc.expectedARMEndpoint {
 				t.Fatalf("expected arm endpoint %s, got: %s", tc.expectedARMEndpoint, armEndpoint)
+			}
+		})
+	}
+}
+
+func TestIsUSSecCloud(t *testing.T) {
+	testCases := []struct {
+		name     string
+		cloudEnv string
+		expected bool
+	}{
+		{
+			name:     "returns true for AzureUSSecCloud",
+			cloudEnv: "AzureUSSecCloud",
+			expected: true,
+		},
+		{
+			name:     "returns true for AzureUSSecCloud case insensitive",
+			cloudEnv: "azureusseccloud",
+			expected: true,
+		},
+		{
+			name:     "returns false for AzurePublicCloud",
+			cloudEnv: "AzurePublicCloud",
+			expected: false,
+		},
+		{
+			name:     "returns false for AzureStackCloud",
+			cloudEnv: "AzureStackCloud",
+			expected: false,
+		},
+		{
+			name:     "returns false for AzureUSGovernmentCloud",
+			cloudEnv: "AzureUSGovernmentCloud",
+			expected: false,
+		},
+		{
+			name:     "returns false for empty string",
+			cloudEnv: "",
+			expected: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			scope := &MachineScope{
+				cloudEnv: tc.cloudEnv,
+			}
+			result := scope.IsUSSecCloud()
+			if result != tc.expected {
+				t.Fatalf("IsUSSecCloud() = %v, expected %v for cloudEnv %q", result, tc.expected, tc.cloudEnv)
 			}
 		})
 	}
