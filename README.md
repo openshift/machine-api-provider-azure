@@ -13,6 +13,10 @@ Kubernetes [Cluster-API Azure provider](https://github.com/kubernetes-sigs/clust
 In the future, we may align the master branch with the upstream project as it
 stabilizes within the community.
 
+# Development
+
+- [Bumping Kubernetes and Go](docs/development/bump-k8s-go.md)
+
 # How to deploy and run azure actuator
 
 ## Azure cloud resources
