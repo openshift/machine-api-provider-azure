@@ -14,12 +14,9 @@ make vet      # Lint (run before committing)
 make vendor   # Update vendor after changing go.mod
 ```
 
-### Running specific tests
+## Development
 
-```bash
-KUBEBUILDER_ASSETS="$(go run ./vendor/sigs.k8s.io/controller-runtime/tools/setup-envtest use 1.34.1 -p path --bin-dir ./bin --index https://raw.githubusercontent.com/openshift/api/master/envtest-releases.yaml)" \
-go run ./vendor/github.com/onsi/ginkgo/v2/ginkgo -v ./pkg/cloud/azure/actuators/machine/...
-```
+- [Bumping Kubernetes and Go](docs/development/bump-k8s-go.md) - Complete runbook for k8s/Go version bumps
 
 ## Key Locations
 
@@ -63,6 +60,18 @@ go run ./vendor/github.com/onsi/ginkgo/v2/ginkgo -v ./pkg/cloud/azure/actuators/
 - Mock Azure clients for unit tests
 - `stubs.go` for test fixtures
 - `*_suite_test.go` for controller setup
+
+### Running tests
+
+Run all tests:
+```bash
+make test
+```
+
+Run tests for a specific package using `GINKGO_EXTRA_ARGS`:
+```bash
+GINKGO_EXTRA_ARGS="./pkg/cloud/azure/actuators/machine/..." make test
+```
 
 ## Code Patterns
 
