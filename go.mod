@@ -20,7 +20,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/onsi/ginkgo/v2 v2.28.1
 	github.com/onsi/gomega v1.40.0
-	github.com/openshift/api v0.0.0-20260715165912-72066cc9718b
+	github.com/openshift/api v0.0.0-20260818065717-ff5491f142bb
 	github.com/openshift/library-go v0.0.0-20260716104731-fdf18b82797f
 	github.com/openshift/machine-api-operator v0.2.1-0.20260728080121-c24b61e0ea06
 	github.com/pkg/errors v0.9.1
