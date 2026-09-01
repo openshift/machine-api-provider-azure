@@ -285,6 +285,10 @@ func (m *MachineScope) IsStackHub() bool {
 	return strings.EqualFold(m.cloudEnv, string(configv1.AzureStackCloud))
 }
 
+func (m *MachineScope) IsUSSecCloud() bool {
+	return strings.EqualFold(m.cloudEnv, string(configv1.AzureUSSecCloud))
+}
+
 func GetInfrastructure(client controllerclient.Client) (*configv1.Infrastructure, error) {
 	infra := &configv1.Infrastructure{}
 	infraName := controllerclient.ObjectKey{Name: globalInfrastuctureName}
@@ -303,7 +307,7 @@ func GetCloudEnvironment(infra *configv1.Infrastructure) (string, string) {
 	}
 
 	armEndpoint := ""
-	if infra.Status.PlatformStatus != nil || infra.Status.PlatformStatus.Azure != nil || infra.Status.PlatformStatus.Azure.ARMEndpoint != "" {
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.Azure != nil && infra.Status.PlatformStatus.Azure.ARMEndpoint != "" {
 		armEndpoint = infra.Status.PlatformStatus.Azure.ARMEndpoint
 	}
 
@@ -468,7 +472,7 @@ func getValueFromSecretOrEnvironment(secretData map[string][]byte, dataKey strin
 }
 
 func getEnvironment(m *MachineScope) (*azure.Environment, error) {
-	if m.IsStackHub() {
+	if m.IsStackHub() || m.IsUSSecCloud() {
 		env, err := azure.EnvironmentFromURL(m.armEndpoint)
 		if err != nil {
 			return nil, err
