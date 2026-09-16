@@ -10,7 +10,7 @@ require (
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v1.2.3
 	github.com/golang/mock v1.6.0
-	github.com/google/go-cmp v0.5.8
+	github.com/google/go-cmp v0.6.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/mitchellh/mapstructure v1.4.2
 	github.com/onsi/ginkgo v1.16.5
@@ -19,7 +19,7 @@ require (
 	github.com/openshift/machine-api-operator v0.2.1-0.20220922080915-f7f326323f37
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.4.0
-	golang.org/x/crypto v0.15.0
+	golang.org/x/crypto v0.33.0
 
 	// kube 1.25
 	k8s.io/api v0.25.1
@@ -95,14 +95,15 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/xlab/treeprint v1.1.0 // indirect
 	go.starlark.net v0.0.0-20200306205701-8dd3e2ee1dd5 // indirect
-	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/term v0.14.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/time v0.0.0-20220609170525-579cf78fd858 // indirect
-	golang.org/x/tools v0.6.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
@@ -120,3 +121,5 @@ require (
 	sigs.k8s.io/kustomize/kyaml v0.13.9 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
+
+replace golang.org/x/net => github.com/openshift-sustaining/net v0.35.0-sec.4
