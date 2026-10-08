@@ -193,13 +193,13 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 
 		loadBalancerInboundNatRules := []network.InboundNatRule{}
 		loadBalancerInboundNatRulesV6 := []network.InboundNatRule{}
-		// Classify backend pools by name: pools with "-v6" suffix are IPv6.
+		// Classify backend pools by name; see isIPv6BackendPool.
 		if lb.BackendAddressPools != nil {
 			for _, pool := range *lb.BackendAddressPools {
 				if pool.Name == nil || pool.ID == nil {
 					continue
 				}
-				if strings.HasSuffix(*pool.Name, "-v6") {
+				if isIPv6BackendPool(*pool.Name) {
 					backendAddressPoolsV6 = append(backendAddressPoolsV6,
 						network.BackendAddressPool{ID: pool.ID})
 				} else {
@@ -237,13 +237,13 @@ func (s *Service) CreateOrUpdate(ctx context.Context, spec azure.Spec) error {
 		if !ok {
 			return errors.New("internal load balancer get returned invalid network interface")
 		}
-		// Classify internal LB backend pools by name suffix
+		// Classify internal LB backend pools by name; see isIPv6BackendPool.
 		if internallb.BackendAddressPools != nil {
 			for _, pool := range *internallb.BackendAddressPools {
 				if pool.Name == nil || pool.ID == nil {
 					continue
 				}
-				if strings.HasSuffix(*pool.Name, "-v6") {
+				if isIPv6BackendPool(*pool.Name) {
 					backendAddressPoolsV6 = append(backendAddressPoolsV6,
 						network.BackendAddressPool{ID: pool.ID})
 				} else {
@@ -372,6 +372,22 @@ func (s *Service) Delete(ctx context.Context, spec azure.Spec) error {
 	}
 	klog.V(2).Infof("successfully deleted nic %s", nicSpec.Name)
 	return err
+}
+
+// isIPv6BackendPool reports whether a load balancer backend pool holds IPv6
+// addresses, based on its name.
+//
+// Two naming conventions are in play on a dual-stack cluster. The installer
+// suffixes the pools it creates with "-v6" (openshift/installer#10329), while
+// cloud-provider-azure's getBackendPoolName suffixes the pools it creates with
+// "-IPv6". So matching only the installer's convention misclassifies the cloud
+// provider's pool as IPv4 and attaches the IPv4 ipConfig to it. Azure then
+// rejects the whole NIC with
+// AllNicIpConfigurationsOfLbBackendPoolMustHaveSamePrivateIpAddressVersion and
+// the Machine never leaves Provisioning.
+func isIPv6BackendPool(name string) bool {
+	lowered := strings.ToLower(name)
+	return strings.HasSuffix(lowered, "-v6") || strings.HasSuffix(lowered, "-ipv6")
 }
 
 func subnetHasIPv6(subnet network.Subnet) bool {
