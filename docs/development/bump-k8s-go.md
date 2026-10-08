@@ -306,7 +306,7 @@ Update `ENVTEST_K8S_VERSION` to the highest patch version available in the
 index for the target k8s minor (determined in the Prerequisites section):
 
 ```makefile
-ENVTEST_K8S_VERSION = 1.36.2  # highest patch from envtest-releases.yaml
+ENVTEST_K8S_VERSION = 1.37.1  # highest patch from envtest-releases.yaml
 ```
 
 Update `BUILD_IMAGE` to the new builder image:
