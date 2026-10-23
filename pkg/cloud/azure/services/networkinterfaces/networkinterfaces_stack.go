@@ -148,13 +148,14 @@ func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) e
 
 		loadBalancerInboundNatRules := []network.InboundNatRule{}
 		loadBalancerInboundNatRulesV6 := []network.InboundNatRule{}
-		// Classify backend pools by name: pools with "-v6" suffix are IPv6.
+		// Classify backend pools by name suffix.
 		if lb.BackendAddressPools != nil {
 			for _, pool := range *lb.BackendAddressPools {
 				if pool.Name == nil || pool.ID == nil {
 					continue
 				}
-				if strings.HasSuffix(*pool.Name, "-v6") {
+				if strings.HasSuffix(strings.ToLower(*pool.Name), "-ipv6") ||
+					strings.HasSuffix(strings.ToLower(*pool.Name), "-v6") {
 					backendAddressPoolsV6 = append(backendAddressPoolsV6,
 						network.BackendAddressPool{ID: pool.ID})
 				} else {
@@ -187,13 +188,14 @@ func (s *StackHubService) CreateOrUpdate(ctx context.Context, spec azure.Spec) e
 		if !ok {
 			return errors.New("internal load balancer get returned invalid network interface")
 		}
-		// Classify internal LB backend pools by name suffix
+		// Classify internal LB backend pools by name suffix.
 		if internallb.BackendAddressPools != nil {
 			for _, pool := range *internallb.BackendAddressPools {
 				if pool.Name == nil || pool.ID == nil {
 					continue
 				}
-				if strings.HasSuffix(*pool.Name, "-v6") {
+				if strings.HasSuffix(strings.ToLower(*pool.Name), "-ipv6") ||
+					strings.HasSuffix(strings.ToLower(*pool.Name), "-v6") {
 					backendAddressPoolsV6 = append(backendAddressPoolsV6,
 						network.BackendAddressPool{ID: pool.ID})
 				} else {
