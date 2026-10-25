@@ -20,6 +20,7 @@ import (
 type MockCacher struct {
 	ctrl     *gomock.Controller
 	recorder *MockCacherMockRecorder
+	isgomock struct{}
 }
 
 // MockCacherMockRecorder is the mock recorder for MockCacher.
@@ -86,6 +87,7 @@ func (mr *MockCacherMockRecorder) Remove(key any) *gomock.Call {
 type MockPeekingCacher struct {
 	ctrl     *gomock.Controller
 	recorder *MockPeekingCacherMockRecorder
+	isgomock struct{}
 }
 
 // MockPeekingCacherMockRecorder is the mock recorder for MockPeekingCacher.
